@@ -15,6 +15,22 @@
 .abaya-template .flag{width:38px;height:38px;border-radius:50%;background:linear-gradient(90deg,#006233 50%,#fff 50%);display:grid;place-items:center;color:#d21034;font-size:17px;font-weight:700}
 .abaya-template .hx{position:relative;container-type:inline-size;line-height:1.25}
 .abaya-template .hx>img{display:block;width:100%;height:auto;aspect-ratio:887/548}
+.abaya-template .hx.hx-poster>img{aspect-ratio:auto;border-bottom:2px solid var(--gold)}
+.abaya-template .hx.hx-poster>:not(img){position:static}
+.abaya-template .vx-adv-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 10px;background:linear-gradient(180deg,#fffdf8,#f4ead4);border-bottom:1px solid #e4d4b0;text-align:center;font-size:12px}
+.abaya-template .vx-adv-bar i{display:grid;place-items:center;width:40px;height:40px;margin:0 auto 4px;border-radius:50%;background:#f8f1e2;border:2px solid var(--gold);font-style:normal;font-size:18px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.abaya-template .vx-adv-bar b{display:block;font-size:12px;color:#1b1b1b}
+.abaya-template .vx-adv-bar small{display:block;font-size:10.5px;color:#666}
+.abaya-template .sw.sw-thumbs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.abaya-template .sw.sw-thumbs button{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px;border-radius:18px;border:2px solid #d9cdb2;background:#fff;color:#222;transition:all .2s ease}
+.abaya-template .sw.sw-thumbs button[aria-pressed=true]{border-color:var(--gr);background:linear-gradient(145deg,#0d4b37,#17704f);color:#fff;box-shadow:0 6px 16px rgba(13,75,55,.32)}
+.abaya-template .sw-thumb-img{width:100%;aspect-ratio:1/1;object-fit:cover;object-position:top center;border-radius:12px;border:1.5px solid var(--gold);display:block}
+.abaya-template .sw-thumb-meta{display:flex;align-items:center;justify-content:center;gap:6px;font-size:14px;font-weight:800}
+.abaya-template .form-color-preview{display:flex;align-items:center;gap:12px;padding:10px;margin-bottom:10px;border-radius:16px;border:2px solid var(--gold);background:#fff;box-shadow:0 4px 12px rgba(201,162,75,.2)}
+.abaya-template .form-color-preview img{width:76px;height:76px;border-radius:12px;object-fit:cover;object-position:top center;border:1.5px solid var(--gold);flex-shrink:0}
+.abaya-template .form-color-preview small{display:block;font-size:11px;color:#666}
+.abaya-template .form-color-preview b{display:block;font-size:13.5px;color:var(--gr);margin:2px 0}
+.abaya-template .form-color-preview span{display:block;font-size:12px;font-weight:700;color:#c4143a}
 .abaya-template .hx>:not(img){position:absolute}
 .abaya-template .vx-t1{display:flex;align-items:center;justify-content:center;gap:2cqw;color:#fff;background:linear-gradient(110deg,#0a3a2a,#17704f);transform:rotate(-4deg);clip-path:polygon(2% 14%,98% 0,100% 80%,95% 100%,3% 92%,0 50%);text-align:center;left:47.13%;top:0.36%;width:47.91%;height:29.93%}
 .abaya-template .vx-t1 b{display:block;font-size:7.4cqw}

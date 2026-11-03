@@ -11,21 +11,25 @@ import "./abaya-template.css";
 
 type AbayaColor = "green" | "black";
 
-const detailKeys = [
-  { key: "t1" as const, label: "العباية - أمام" },
-  { key: "t2" as const, label: "العباية - خلف" },
-  { key: "t3" as const, label: "الجمبسوت - أمام" },
-  { key: "t4" as const, label: "الجمبسوت - خلف" },
-  { key: "t5" as const, label: "تفاصيل القماش" },
-];
-
 const colorChoices = [
-  { id: "green" as const, label: "أخضر", storeValue: "Emerald", hex: "#0d4b37" },
-  { id: "black" as const, label: "أسود", storeValue: "Noir", hex: "#111" },
+  {
+    id: "green" as const,
+    label: "أخضر ملكي",
+    storeValue: "Emerald",
+    hex: "#0d4b37",
+    thumb: abayaImages.colorPreviews.green.thumb,
+  },
+  {
+    id: "black" as const,
+    label: "أسود فاخر",
+    storeValue: "Noir",
+    hex: "#111111",
+    thumb: abayaImages.colorPreviews.black.thumb,
+  },
 ];
 
 export default function AbayaLanding({ product, quantity = 1 }: { product: Product; quantity?: number }) {
-  const [color, setColor] = useState<AbayaColor | null>(null);
+  const [color, setColor] = useState<AbayaColor>("green");
   const [wilaya, setWilaya] = useState("");
   const [commune, setCommune] = useState("");
   const [size, setSize] = useState("");
@@ -36,17 +40,16 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
   const checkoutStarted = useRef(false);
 
   const current: AbayaColor = color === "black" ? "black" : "green";
-  const images = abayaImages[current];
+  const activeColorPreview = abayaImages.colorPreviews[current];
   const coat = getProduct("blazer-lilac-dream");
   const communes = abayaCommunesByWilaya[wilaya] ?? [];
   const total = product.price * quantity;
-  const oldPrice = product.oldPrice ?? 14000;
-  const selectedColorChoice = colorChoices.find(c => c.id === color);
+  const selectedColorChoice = colorChoices.find(c => c.id === color) ?? colorChoices[0];
 
   const checkout = useCheckoutDraft({
     formRef,
     source: "abaya",
-    getItems: () => [{ productId: product.id, quantity, color: selectedColorChoice?.storeValue ?? "Emerald", size }],
+    getItems: () => [{ productId: product.id, quantity, color: selectedColorChoice.storeValue, size }],
     watchKey: `${color}|${wilaya}|${commune}|${size}|${delivery}|${quantity}`,
   });
 
@@ -94,24 +97,27 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
           </div>
         </header>
 
-        <section className="hx" aria-label="عباية رويال + Jump suit">
-          <img id="hero" src={images.hero} alt="عباية رويال + Jump suit" width="887" height="548" fetchPriority="high" />
-          <div className="vx-t1"><em>👑</em><div><b>عرض خاص</b><span>عباية رويال + <bdi dir="ltr">Jump suit</bdi></span></div></div>
-          <div className="vx-t2">تصميم أنيق يبرز جمالك في كل مناسبة <b>♥</b></div>
-          <div className="vx-pr"><b>{product.price} دج</b><s>{oldPrice} دج</s></div>
-          <div className="vx-av">{product.stock > 0 ? "🔥 المنتج متوفر الآن" : "المنتج غير متوفر حالياً"}</div>
-          <div className="vx-adv">
-            <div><i>🚚</i>توصيل سريع<small>لكل ولايات الجزائر</small></div>
-            <div><i>🛡️</i>دفع عند الاستلام<small>أمان تام</small></div>
-            <div><i>✅</i>جودة مضمونة<small>100%</small></div>
-            <div><i>📦</i>إمكانية الاستبدال<small>خلال 7 أيام</small></div>
+        <section className="hx hx-poster" aria-label="عباية رويال + Jump suit">
+          <img
+            id="hero"
+            src={abayaImages.mainHero}
+            alt="عباية رويال + Jump suit — عرض خاص 9600 دج"
+            width="1024"
+            height="840"
+            fetchPriority="high"
+          />
+          <div className="vx-adv-bar">
+            <div><i>🚚</i><b>توصيل سريع</b><small>لكل ولايات الجزائر</small></div>
+            <div><i>🛡️</i><b>دفع عند الاستلام</b><small>أمان تام</small></div>
+            <div><i>✅</i><b>جودة مضمونة</b><small>100%</small></div>
+            <div><i>📦</i><b>إمكانية الاستبدال</b><small>خلال 7 أيام</small></div>
           </div>
         </section>
 
         <div className="g5">
-          {detailKeys.map(item => (
+          {abayaImages.thumbs.map(item => (
             <div key={item.key}>
-              <img src={images[item.key]} alt={item.label} loading="lazy" />
+              <img src={item.src} alt={item.label} loading="lazy" />
               <p>{item.label}</p>
             </div>
           ))}
@@ -120,7 +126,7 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
         <div className="pair">
           <div className="card">
             <b>جودة تتحدث عن نفسها</b><br />
-            عباية من القطيفة الخضراء الفاخرة بتطريز راقٍ، مع جمبسوت أنيق، لإطلالة متكاملة في كل مناسبة.
+            عباية من القطيفة الفاخرة بتطريز راقٍ، مع جمبسوت أنيق، لإطلالة متكاملة في كل مناسبة.
           </div>
           <div className="pk"><div><span>👑</span><br />رضاك يهمنا</div></div>
         </div>
@@ -138,8 +144,36 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
             <div className="cols">
               <form ref={formRef} id="f" noValidate onSubmit={submit} onFocusCapture={startCheckout}>
                 <CheckoutDraftNotice checked={checkout.consent} onChange={checkout.setConsent} status={checkout.draftStatus} error={checkout.draftError} />
-                <input type="hidden" name="color" value={selectedColorChoice?.storeValue ?? "Emerald"} />
+                <input type="hidden" name="color" value={selectedColorChoice.storeValue} />
                 <input type="hidden" name="delivery" value={delivery} />
+
+                <label>اختاري لون العباية (مع الجمبسوت الأسود)</label>
+                <div className="sw sw-thumbs" id="cb">
+                  {colorChoices.map(item => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      data-c={item.id}
+                      aria-pressed={color === item.id}
+                      onClick={() => setColor(item.id)}
+                    >
+                      <img src={item.thumb} alt={item.label} className="sw-thumb-img" />
+                      <span className="sw-thumb-meta">
+                        <span className="dot" style={{ background: item.hex }} />
+                        <b>{item.label}</b>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="form-color-preview">
+                  <img src={activeColorPreview.thumb} alt={activeColorPreview.caption} />
+                  <div>
+                    <small>اللون المختار حالياً :</small>
+                    <b>{activeColorPreview.caption}</b>
+                    <span>السعر: {total} دج · الدفع عند الاستلام</span>
+                  </div>
+                </div>
+                <div className="err" id="e_c" role={errors.color ? "alert" : undefined}>{errors.color}</div>
 
                 <div className="fld"><i aria-hidden="true">👤</i><input id="n" name="customer" aria-label="الاسم الكامل" aria-invalid={Boolean(errors.customer)} placeholder="الاسم الكامل" autoComplete="name" /></div>
                 <div className="err" id="e_n" role={errors.customer ? "alert" : undefined}>{errors.customer}</div>
@@ -174,16 +208,6 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
                 </div>
                 <div className="err" id="e_s" role={errors.size ? "alert" : undefined}>{errors.size}</div>
 
-                <label>اللون</label>
-                <div className="sw" id="cb">
-                  {colorChoices.map(item => (
-                    <button type="button" key={item.id} data-c={item.id} aria-pressed={color === item.id} onClick={() => setColor(item.id)}>
-                      <span className="dot" style={{ background: item.hex }} />{item.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="err" id="e_c" role={errors.color ? "alert" : undefined}>{errors.color}</div>
-
                 <label>نوع التوصيل</label>
                 <div className="sw" id="dv">
                   <button type="button" data-d="home" aria-pressed={delivery === "home"} onClick={() => setDelivery("home")}>🏠 إلى المنزل</button>
@@ -197,7 +221,7 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
 
                 <div className="sum" id="sum">
                   المقاس: {size || "-"}<br />
-                  اللون: {selectedColorChoice ? selectedColorChoice.label : "-"}<br />
+                  اللون: {selectedColorChoice.label}<br />
                   الولاية: {wilaya || "-"} | البلدية: {commune || "-"}<br />
                   التوصيل: {delivery === "home" ? "إلى المنزل" : "إلى المكتب"}<br />
                   <b>الإجمالي: {total} دج</b> - الدفع عند الاستلام
