@@ -1,0 +1,1 @@
+{"routes":[{"path":"/","title":"Miss Sensuelle — Accueil"},{"path":"/catalogue","title":"Miss Sensuelle — Catalogue"},{"path":"/produit/:slug","title":"Miss Sensuelle — Produit"},{"path":"/commande","title":"Miss Sensuelle — Commande"},{"path":"/admin","title":"Miss Sensuelle — Administration"},{"path":"/404","title":"Miss Sensuelle — Page introuvable"}]}

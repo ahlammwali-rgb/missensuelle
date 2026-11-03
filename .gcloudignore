@@ -1,0 +1,10 @@
+.gcloudignore
+.git
+.gitignore
+node_modules/
+dist/
+.env
+.env.*
+.manus-logs/
+*.manus-starter-*
+.maquette-assets/
