@@ -204,6 +204,31 @@ export const products: Product[] = [
     accent: "#0c6b4b",
     stock: 12,
   },
+  {
+    id: "p-008",
+    slug: "doudoune-hiver-luxe",
+    name: "Doudoune Hiver de Luxe",
+    category: "vestes",
+    categoryLabel: "Vestes & Manteaux",
+    price: 7600,
+    oldPrice: 9000,
+    badge: "Offre spéciale",
+    description: "Doudoune d'hiver luxueuse avec col en fourrure douce, isolation thermique optimale et coupe moderne.",
+    details: ["Fourrure luxueuse douce", "Excellente isolation contre le froid", "Coupe moderne et légère", "Tailles S à XXL"],
+    colors: ["أزرق سماوي", "أبيض", "أسود"],
+    image: "/manus-storage/doudoune-bg.jpg",
+    gallery: [
+      "/manus-storage/doudoune-bg.jpg",
+      "/manus-storage/doudoune-white.jpg",
+      "/manus-storage/doudoune-blue.jpg",
+      "/manus-storage/doudoune-black.jpg",
+    ],
+    arName: "دواقون شتوية فاخرة",
+    arCategoryLabel: "معاطف و دواقون",
+    arDescription: "دواقون شتوية فاخرة بفراء ناعم وعزل ممتاز للبرد تمنحك الدفء والأناقة والراحة.",
+    accent: "#17307e",
+    stock: 25,
+  },
 ];
 
 export const wilayas = [
@@ -211,7 +236,9 @@ export const wilayas = [
 ];
 
 export const formatDZD = (value: number) => `${new Intl.NumberFormat("fr-DZ").format(value)} DA`;
-export const getProduct = (slug: string) => getCatalogProducts().find(product => product.slug === slug);
+export const getProduct = (slug: string) =>
+  getCatalogProducts().find(product => product.slug === slug) ??
+  products.find(product => product.slug === slug);
 
 
 export const CATALOG_STORAGE_KEY = "miss-sensuelle-catalog";
@@ -244,7 +271,11 @@ export function getCatalogProducts(): Product[] {
       return { ...product, colors, ...(galleryChanged ? { gallery } : {}) };
     });
     const savedIds = new Set(normalized.map(product => product.id));
-    const missingBuiltIns = products.filter(product => product.id === "p-007" && !savedIds.has(product.id));
+    const missingBuiltIns = products.filter(
+      product =>
+        (product.id === "p-007" || (normalized.length >= 7 && product.id === "p-008")) &&
+        !savedIds.has(product.id),
+    );
     if (missingBuiltIns.length || colorsChanged) {
       const migrated = [...normalized, ...missingBuiltIns];
       localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(migrated));
