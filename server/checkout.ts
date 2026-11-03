@@ -15,6 +15,7 @@ import {
   recoveryStatusSchema,
   saveDraftSchema,
   submitOrderSchema,
+  updateOrderDetailsSchema,
   type AbandonedCheckout,
   type CheckoutOrder,
   type CheckoutPayload,
@@ -22,6 +23,7 @@ import {
   type SaveDraftInput,
   type SubmitOrderInput,
   type SubmitOrderResult,
+  type UpdateOrderDetailsInput,
 } from "../shared/checkout";
 import { getDb } from "./db";
 
@@ -51,6 +53,78 @@ export function updateMemoryOrderStatus(id: number, status: CheckoutOrder["statu
   const found = memoryOrders.find(order => order.dbId === id);
   if (found) found.status = status;
   return found ? [found] : [];
+}
+
+export async function updateCheckoutOrderDetails(input: UpdateOrderDetailsInput) {
+  const parsed = updateOrderDetailsSchema.parse(input);
+  const db = await getDb();
+  if (!db) {
+    const found = memoryOrders.find(order => order.dbId === parsed.id);
+    if (!found) throw new CheckoutValidationError("Commande introuvable");
+    found.customer = parsed.customer;
+    found.phone = parsed.phone;
+    if (parsed.productId) found.productId = parsed.productId;
+    found.product = parsed.product;
+    found.quantity = parsed.quantity;
+    found.total = parsed.total;
+    found.color = parsed.color;
+    found.size = parsed.size;
+    found.delivery = parsed.delivery;
+    found.wilaya = parsed.wilaya;
+    found.commune = parsed.commune;
+    found.address = parsed.address;
+    found.note = parsed.note;
+    return found;
+  }
+  await db.transaction(async tx => {
+    await tx.update(storeOrders).set({
+      customerName: parsed.customer,
+      phone: parsed.phone,
+      wilaya: parsed.wilaya,
+      commune: parsed.commune,
+      address: parsed.address,
+      note: parsed.note || null,
+      total: parsed.total,
+    }).where(eq(storeOrders.id, parsed.id));
+
+    const existingItems = await tx.select().from(storeOrderItems).where(eq(storeOrderItems.orderId, parsed.id));
+    if (existingItems.length > 0) {
+      const unitPrice = Math.round(parsed.total / Math.max(1, parsed.quantity));
+      await tx.update(storeOrderItems).set({
+        productName: parsed.product.replace(/\s*×\s*\d+$/, ""),
+        quantity: parsed.quantity,
+        unitPrice,
+      }).where(eq(storeOrderItems.id, existingItems[0].id));
+    }
+
+    const sessions = await tx.select().from(storeCheckoutSessions).where(eq(storeCheckoutSessions.orderId, parsed.id));
+    if (sessions[0]?.payload) {
+      const oldPayload = checkoutPayloadSchema.safeParse(sessions[0].payload);
+      if (oldPayload.success) {
+        const nextPayload: CheckoutPayload = {
+          ...oldPayload.data,
+          customer: parsed.customer,
+          phone: parsed.phone,
+          wilaya: parsed.wilaya,
+          commune: parsed.commune,
+          address: parsed.address,
+          note: parsed.note,
+          delivery: parsed.delivery,
+          items: oldPayload.data.items.map((item, idx) => idx === 0 ? {
+            ...item,
+            productId: parsed.productId || item.productId,
+            quantity: parsed.quantity,
+            color: parsed.color,
+            size: parsed.size,
+          } : item),
+        };
+        await tx.update(storeCheckoutSessions).set({ payload: nextPayload, updatedAt: new Date() })
+          .where(eq(storeCheckoutSessions.id, sessions[0].id));
+      }
+    }
+  });
+  const all = await listCheckoutOrders();
+  return all.find(o => o.dbId === parsed.id) ?? null;
 }
 
 export class CheckoutValidationError extends Error {
@@ -250,9 +324,13 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
       createdAt: now.toISOString(),
       customer: payload.customer,
       phone: payload.phone,
+      productId: resolved[0]?.product.id ?? payload.items[0]?.productId ?? "p-007",
       product: resolved.map(({ item, product }) => `${product.name} × ${item.quantity}`).join(", "),
       quantity: resolved.reduce((sum, { item }) => sum + item.quantity, 0),
       total,
+      color: payload.items.map(item => item.color).filter(Boolean).join(", "),
+      size: payload.items.map(item => item.size).filter(Boolean).join(", "),
+      delivery: payload.delivery,
       wilaya: payload.wilaya,
       commune: payload.commune,
       address: payload.address,
@@ -367,20 +445,34 @@ export async function listCheckoutOrders(): Promise<CheckoutOrder[]> {
   if (!db) return [...memoryOrders];
   const orders = await db.select().from(storeOrders).orderBy(desc(storeOrders.createdAt));
   if (!orders.length) return [];
-  const items = await db.select().from(storeOrderItems).where(inArray(storeOrderItems.orderId, orders.map(order => order.id)));
+  const orderIds = orders.map(order => order.id);
+  const items = await db.select().from(storeOrderItems).where(inArray(storeOrderItems.orderId, orderIds));
+  const sessions = await db.select().from(storeCheckoutSessions).where(inArray(storeCheckoutSessions.orderId, orderIds));
   const byOrder = new Map<number, typeof items>();
   for (const item of items) byOrder.set(item.orderId, [...(byOrder.get(item.orderId) ?? []), item]);
+  const sessionByOrder = new Map<number, CheckoutPayload>();
+  for (const s of sessions) {
+    if (s.orderId && s.payload) {
+      const parsed = checkoutPayloadSchema.safeParse(s.payload);
+      if (parsed.success) sessionByOrder.set(s.orderId, parsed.data);
+    }
+  }
   return orders.map(order => {
     const orderItems = byOrder.get(order.id) ?? [];
+    const payload = sessionByOrder.get(order.id);
     return {
       dbId: order.id,
       id: order.orderNumber,
       createdAt: iso(order.createdAt),
       customer: order.customerName,
       phone: order.phone,
+      productId: payload?.items[0]?.productId ?? "p-007",
       product: orderItems.map(item => `${item.productName} × ${item.quantity}`).join(", "),
       quantity: orderItems.reduce((sum, item) => sum + item.quantity, 0),
       total: order.total,
+      color: payload?.items.map(i => i.color).filter(Boolean).join(", ") ?? "",
+      size: payload?.items.map(i => i.size).filter(Boolean).join(", ") ?? "",
+      delivery: payload?.delivery ?? "home",
       wilaya: order.wilaya,
       commune: order.commune,
       address: order.address,

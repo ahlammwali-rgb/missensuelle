@@ -40,6 +40,10 @@ export type Order = {
   commune: string;
   address: string;
   note: string;
+  productId?: string;
+  color?: string;
+  size?: string;
+  delivery?: "home" | "office";
   status: OrderStatus;
 };
 

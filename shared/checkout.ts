@@ -30,6 +30,24 @@ export const discardDraftSchema = z.object({ token: z.string().uuid(), revision:
 export const recoveryStatusSchema = z.enum(["new", "called", "ignored"]);
 export const checkoutOrderStatusSchema = z.enum(["nouvelle", "confirmee", "annulee", "reportee", "ne_repond_pas", "transferee"]);
 
+export const updateOrderDetailsSchema = z.object({
+  id: z.number().int().positive(),
+  customer: z.string().trim().min(1).max(160),
+  phone: z.string().trim().min(4).max(40),
+  productId: z.string().trim().max(80).optional(),
+  product: z.string().trim().min(1).max(300),
+  quantity: z.number().int().min(1).max(100),
+  total: z.number().int().min(0).max(10000000),
+  color: z.string().trim().max(80).default(""),
+  size: z.string().trim().max(40).default(""),
+  delivery: z.enum(["home", "office"]).default("home"),
+  wilaya: z.string().trim().min(1).max(120),
+  commune: z.string().trim().min(1).max(120),
+  address: z.string().trim().max(500).default(""),
+  note: z.string().trim().max(1000).default(""),
+});
+
+export type UpdateOrderDetailsInput = z.infer<typeof updateOrderDetailsSchema>;
 export type CheckoutPayload = z.infer<typeof checkoutPayloadSchema>;
 export type SaveDraftInput = z.infer<typeof saveDraftSchema>;
 export type SubmitOrderInput = z.infer<typeof submitOrderSchema>;
@@ -39,6 +57,7 @@ export type SaveDraftResult = { sessionId: number; accepted: boolean };
 export type CheckoutOrder = {
   dbId: number; id: string; createdAt: string; customer: string; phone: string; product: string;
   quantity: number; total: number; wilaya: string; commune: string; address: string; note: string;
+  productId?: string; color?: string; size?: string; delivery?: "home" | "office";
   status: z.infer<typeof checkoutOrderStatusSchema>;
 };
 export type AbandonedCheckout = {

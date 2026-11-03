@@ -51,8 +51,20 @@ export function AdminDashboard({ orders, filtered, activeStatus, setActiveStatus
               <div className="order-row" key={order.id}>
                 <div data-label="Commande"><strong>{order.id}</strong><small>{formatOrderDate(order.createdAt)}</small></div>
                 <div data-label="Client"><strong>{order.customer}</strong><small>{order.phone}</small></div>
-                <div data-label="Article"><strong>{order.product}</strong><small>Quantité · {order.quantity}</small></div>
-                <div data-label="Livraison"><strong>{order.wilaya}</strong><small>{order.commune}</small></div>
+                <div data-label="Article">
+                  <strong>{order.product}</strong>
+                  <small>
+                    Quantité · {order.quantity}
+                    {(order.color || order.size) ? ` · ${[order.color, order.size].filter(Boolean).join(" / ")}` : ""}
+                  </small>
+                </div>
+                <div data-label="Livraison">
+                  <strong>{order.wilaya}</strong>
+                  <small>
+                    {order.commune}
+                    {order.delivery ? ` · ${order.delivery === "office" ? "🏢 Bureau" : "🏠 Domicile"}` : ""}
+                  </small>
+                </div>
                 <div data-label="Statut"><StatusPill status={order.status} /></div>
                 <div className="row-actions"><button className="icon-button" title="Appeler" aria-label={`Appeler ${order.customer}`} onClick={() => onCall(order.phone)}><Phone size={15} /></button><button className="row-more" aria-label={`Voir le détail de la commande ${order.id}`} onClick={() => onSelect(order)}>•••</button></div>
               </div>

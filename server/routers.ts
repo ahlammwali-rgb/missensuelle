@@ -16,6 +16,7 @@ import {
   saveDraftSchema,
   submitOrderSchema,
   checkoutOrderStatusSchema,
+  updateOrderDetailsSchema,
 } from "../shared/checkout";
 import {
   discardCheckoutDraft,
@@ -24,6 +25,7 @@ import {
   saveCheckoutDraft,
   submitCheckoutOrder,
   updateAbandonedCheckout,
+  updateCheckoutOrderDetails,
   updateMemoryOrderStatus,
 } from "./checkout";
 import { getDb, listStoreProducts, updateStoreOrderStatus } from "./db";
@@ -83,6 +85,9 @@ export const appRouter = router({
         if (!db) return updateMemoryOrderStatus(input.id, input.status);
         return updateStoreOrderStatus(input.id, input.status);
       }),
+    updateOrderDetails: adminProcedure
+      .input(updateOrderDetailsSchema)
+      .mutation(({ input }) => updateCheckoutOrderDetails(input)),
     updateAbandoned: adminProcedure
       .input(z.object({ id: z.number().int().positive(), status: recoveryStatusSchema }))
       .mutation(({ input }) => updateAbandonedCheckout(input.id, input.status)),
