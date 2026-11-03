@@ -134,7 +134,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2.6cqw;
-  margin: 4.5cqw 0 5cqw;
+  margin: 4.5cqw 0 3.5cqw;
 }
 
 .doudoune-template .f {
@@ -171,6 +171,11 @@
   -webkit-appearance: none;
 }
 
+.doudoune-template .f select:disabled {
+  color: #888;
+  cursor: not-allowed;
+}
+
 .doudoune-template .f input::placeholder {
   color: #666;
   opacity: 1;
@@ -178,6 +183,132 @@
 
 .doudoune-template .f select {
   cursor: pointer;
+}
+
+/* Offer selector inside form & banner under form */
+.doudoune-template .offer-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 2.2cqw;
+  margin-bottom: 4.2cqw;
+}
+
+.doudoune-template .offer-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2.5cqw;
+  background: rgba(255, 255, 255, 0.1);
+  border: 0.45cqw solid rgba(255, 255, 255, 0.28);
+  border-radius: 3.2cqw;
+  padding: 2.6cqw 3.4cqw;
+  color: #fff;
+  cursor: pointer;
+  text-align: right;
+  font-family: Cairo, Tahoma, sans-serif;
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    transform 0.15s;
+}
+
+.doudoune-template .offer-option.active {
+  background: linear-gradient(135deg, #162f87, #0d216b);
+  border-color: #ffd54a;
+  box-shadow: 0 0 0 0.4cqw rgba(255, 213, 74, 0.35);
+}
+
+.doudoune-template .offer-option-main {
+  display: flex;
+  align-items: center;
+  gap: 2.4cqw;
+}
+
+.doudoune-template .offer-radio {
+  width: 4.6cqw;
+  height: 4.6cqw;
+  border-radius: 50%;
+  border: 0.5cqw solid #ffd54a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.doudoune-template .offer-option.active .offer-radio::after {
+  content: "";
+  width: 2.4cqw;
+  height: 2.4cqw;
+  border-radius: 50%;
+  background: #ffd54a;
+}
+
+.doudoune-template .offer-text strong {
+  display: block;
+  font-size: 3.9cqw;
+  font-weight: 900;
+  line-height: 1.3;
+}
+
+.doudoune-template .offer-text small {
+  display: block;
+  font-size: 3.1cqw;
+  color: #ffdf7e;
+  font-weight: 700;
+}
+
+.doudoune-template .offer-price {
+  text-align: left;
+  flex-shrink: 0;
+}
+
+.doudoune-template .offer-price b {
+  display: block;
+  font-size: 4.2cqw;
+  font-weight: 900;
+  color: #ffd54a;
+}
+
+.doudoune-template .offer-price del {
+  display: block;
+  font-size: 2.9cqw;
+  color: #ffb3be;
+}
+
+.doudoune-template .offer-subform {
+  background: rgba(255, 255, 255, 0.12);
+  border: 0.35cqw dashed #ffd54a;
+  border-radius: 3.2cqw;
+  padding: 3cqw;
+  margin-top: 0.6cqw;
+}
+
+.doudoune-template .offer-subform-title {
+  font-size: 3.4cqw;
+  font-weight: 800;
+  color: #ffd54a;
+  margin-bottom: 2.2cqw;
+  text-align: center;
+}
+
+.doudoune-template .offer-subform-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2cqw;
+  margin-bottom: 2cqw;
+}
+
+.doudoune-template .offer-subform-row:last-child {
+  margin-bottom: 0;
+}
+
+.doudoune-template .offer-subform .f {
+  height: 10.8cqw;
+  padding: 0 3.2cqw;
+}
+
+.doudoune-template .offer-subform .f select {
+  font-size: 3.5cqw;
 }
 
 .doudoune-template .bt {
@@ -213,4 +344,63 @@
   margin-top: 4cqw;
   color: #9dffb5;
   line-height: 1.5;
+}
+
+/* Under-form promotional card ("sous le formulaire") */
+.doudoune-template .under-form-offer {
+  margin: 3cqw 2.3cqw 0;
+  background: linear-gradient(135deg, #fff8e1 0%, #ffe082 100%);
+  border: 0.6cqw solid #e0112b;
+  border-radius: 4cqw;
+  padding: 4cqw 4.2cqw;
+  color: #0a1a5c;
+  box-shadow: 0 1cqw 2.8cqw rgba(224, 17, 43, 0.22);
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.doudoune-template .under-form-offer:active {
+  transform: scale(0.99);
+}
+
+.doudoune-template .under-form-badge {
+  display: inline-block;
+  background: #e0112b;
+  color: #fff;
+  font-size: 3.6cqw;
+  font-weight: 900;
+  padding: 0.8cqw 3.6cqw;
+  border-radius: 9cqw;
+  margin-bottom: 2cqw;
+}
+
+.doudoune-template .under-form-offer h3 {
+  font-size: 5.4cqw;
+  font-weight: 900;
+  color: #0a1a5c;
+  line-height: 1.35;
+  margin-bottom: 1.4cqw;
+}
+
+.doudoune-template .under-form-offer h3 span {
+  color: #e0112b;
+}
+
+.doudoune-template .under-form-offer p {
+  font-size: 3.7cqw;
+  font-weight: 700;
+  color: #17307e;
+  line-height: 1.45;
+  margin-bottom: 2.6cqw;
+}
+
+.doudoune-template .under-form-cta {
+  display: inline-block;
+  background: #0a1a5c;
+  color: #ffd54a;
+  font-size: 3.9cqw;
+  font-weight: 900;
+  padding: 1.8cqw 4.8cqw;
+  border-radius: 9cqw;
 }
