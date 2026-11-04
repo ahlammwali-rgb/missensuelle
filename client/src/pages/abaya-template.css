@@ -10,7 +10,7 @@
   --red-dark: #9e0827;
   min-height: 100vh;
   margin: 0;
-  padding-bottom: 84px;
+  padding-bottom: 88px;
   font-family: Cairo, Tahoma, sans-serif;
   background: linear-gradient(180deg, #faf4e9 0%, #f2e4c9 100%);
   color: #222;
@@ -31,6 +31,23 @@
   overflow: hidden;
 }
 
+/* Top Free Delivery Announcement Bar */
+.abaya-template .top-promo-bar {
+  background: linear-gradient(90deg, #8f0622 0%, #d4123b 50%, #8f0622 100%);
+  color: #fff;
+  text-align: center;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 800;
+  border-bottom: 2px solid var(--gold-light);
+  line-height: 1.4;
+}
+
+.abaya-template .top-promo-bar span {
+  color: var(--gold-light);
+  font-weight: 900;
+}
+
 .abaya-template .hd {
   display: flex;
   align-items: center;
@@ -48,7 +65,7 @@
 }
 
 .abaya-template .hd .lg {
-  height: 52px;
+  height: 50px;
   object-fit: contain;
   object-position: left;
 }
@@ -111,20 +128,191 @@
   line-height: 1.25;
 }
 
-.abaya-template .hx > img {
-  display: block;
+.abaya-template .hero-poster-wrap {
+  position: relative;
   width: 100%;
-  height: auto;
-  aspect-ratio: 887/548;
-}
-
-.abaya-template .hx.hx-poster > img {
-  aspect-ratio: auto;
+  overflow: hidden;
   border-bottom: 3px solid var(--gold);
 }
 
-.abaya-template .hx.hx-poster > :not(img) {
-  position: static;
+.abaya-template .hero-poster-wrap > img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Cleanly replaces the old 9600 DA badge baked into the hero poster */
+.abaya-template .hero-price-badge-7500 {
+  position: absolute;
+  left: 37.5%;
+  top: 71.2%;
+  width: 31.8%;
+  height: 22.8%;
+  transform: rotate(-9.5deg);
+  background: linear-gradient(135deg, #eb1942 0%, #b8082a 65%, #8a041e 100%);
+  border: 0.5cqw solid var(--gold-light);
+  border-radius: 3.2cqw;
+  box-shadow:
+    0 1.4cqw 3.5cqw rgba(0, 0, 0, 0.42),
+    0 0 2cqw rgba(212, 175, 55, 0.55);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  text-align: center;
+  padding: 0.6cqw 1cqw;
+  z-index: 3;
+}
+
+.abaya-template .hero-price-badge-7500 strong {
+  font-size: 6.4cqw;
+  font-weight: 900;
+  line-height: 1.05;
+  color: #fff;
+  text-shadow: 0 0.4cqw 1cqw rgba(0, 0, 0, 0.35);
+}
+
+.abaya-template .hero-price-badge-7500 del {
+  font-size: 3.2cqw;
+  font-weight: 700;
+  color: #ffd3dc;
+  line-height: 1.15;
+}
+
+.abaya-template .hero-price-badge-7500 span {
+  margin-top: 0.4cqw;
+  background: linear-gradient(135deg, #f9e498, #d4af37);
+  color: #6b0418;
+  font-size: 2.55cqw;
+  font-weight: 900;
+  padding: 0.25cqw 1.6cqw;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+/* Above-the-fold Instant Conversion Card right below Hero */
+.abaya-template .hero-conversion-box {
+  margin: 12px 10px 8px;
+  padding: 14px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #fffdf9 0%, #fff4db 100%);
+  border: 2.5px solid var(--gold);
+  box-shadow: 0 8px 22px rgba(158, 8, 39, 0.14);
+  text-align: center;
+}
+
+.abaya-template .hero-conv-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.abaya-template .hero-conv-title {
+  text-align: right;
+  flex: 1;
+}
+
+.abaya-template .hero-conv-title h1 {
+  font-size: 18px;
+  font-weight: 900;
+  color: #1c1c1c;
+  margin: 0 0 3px;
+  line-height: 1.3;
+}
+
+.abaya-template .hero-conv-title small {
+  display: inline-block;
+  background: #e6f7ee;
+  color: #0b6b3a;
+  border: 1px solid #8adbb0;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 9px;
+  border-radius: 99px;
+}
+
+.abaya-template .hero-conv-price {
+  background: linear-gradient(135deg, #d4123b, #9e0827);
+  color: #fff;
+  padding: 7px 13px;
+  border-radius: 15px;
+  border: 2px solid var(--gold-light);
+  text-align: center;
+}
+
+.abaya-template .hero-conv-price b {
+  display: block;
+  font-size: 21px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: var(--gold-light);
+}
+
+.abaya-template .hero-conv-price del {
+  display: block;
+  font-size: 12px;
+  color: #ffc2cf;
+}
+
+.abaya-template .stock-urgency {
+  background: #fff;
+  border: 1.5px solid #f2d399;
+  border-radius: 12px;
+  padding: 8px 10px;
+  margin-bottom: 11px;
+  text-align: right;
+}
+
+.abaya-template .stock-urgency-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 800;
+  margin-bottom: 5px;
+  color: #8f0622;
+}
+
+.abaya-template .stock-urgency-row span:last-child {
+  color: #0d4b37;
+  font-size: 11.5px;
+}
+
+.abaya-template .stock-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 99px;
+  background: #f3e5cc;
+  overflow: hidden;
+}
+
+.abaya-template .stock-bar i {
+  display: block;
+  width: 82%;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #d4af37, #e51d45);
+}
+
+.abaya-template .hero-fast-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 999px;
+  border: 2px solid var(--gold-light);
+  background: linear-gradient(135deg, #f01e49 0%, #c40a2c 55%, #960520 100%);
+  color: #fff;
+  font: 900 17.5px Cairo, Tahoma, sans-serif;
+  box-shadow: 0 6px 18px rgba(212, 18, 59, 0.38);
+  cursor: pointer;
+  animation: abayaPulseBtn 2.2s infinite ease-in-out;
 }
 
 .abaya-template .vx-adv-bar {
@@ -133,6 +321,7 @@
   gap: 8px;
   padding: 12px 10px;
   background: linear-gradient(180deg, #fffdf8, #f4ead4);
+  border-top: 1px solid #ecd9b0;
   border-bottom: 2px solid var(--gold);
   text-align: center;
   font-size: 12px;
@@ -233,19 +422,91 @@
   font-size: 30px;
 }
 
+/* Social Proof Reviews Section */
+.abaya-template .reviews-sec {
+  margin: 14px 10px;
+  padding: 14px 12px;
+  background: #fffdf9;
+  border: 2px solid var(--gold);
+  border-radius: 20px;
+  box-shadow: 0 4px 14px rgba(212, 175, 55, 0.2);
+}
+
+.abaya-template .reviews-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.abaya-template .reviews-head strong {
+  font-size: 16px;
+  font-weight: 900;
+  color: #7a051d;
+}
+
+.abaya-template .reviews-head span {
+  background: linear-gradient(135deg, #f9e498, #d4af37);
+  color: #4a3408;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 3px 10px;
+  border-radius: 99px;
+}
+
+.abaya-template .reviews-list {
+  display: grid;
+  gap: 8px;
+}
+
+.abaya-template .review-item {
+  background: #fff;
+  border: 1.5px solid #edd9af;
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+.abaya-template .review-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.abaya-template .review-meta b {
+  color: #1f1f1f;
+  font-weight: 800;
+}
+
+.abaya-template .review-meta em {
+  font-style: normal;
+  color: #e59a00;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.abaya-template .review-item p {
+  margin: 0;
+  font-size: 13px;
+  color: #444;
+  line-height: 1.55;
+  font-weight: 600;
+}
+
 /* =========================================================
-   ROYAL GOLD & CRIMSON RED ORDER FORM (.o)
+   ROYAL GOLD & CRIMSON RED HIGH-CONVERTING ORDER FORM (.o)
    ========================================================= */
 .abaya-template .o {
   position: relative;
   margin: 18px 10px;
-  padding: 20px 14px 18px;
+  padding: 18px 14px;
   border-radius: 26px;
   background: linear-gradient(180deg, #fffdf7 0%, #fbf0d9 50%, #f5e2ba 100%);
   border: 3px solid var(--gold);
   box-shadow:
-    0 12px 32px rgba(158, 8, 39, 0.2),
-    0 0 0 4px rgba(212, 175, 55, 0.22),
+    0 12px 32px rgba(158, 8, 39, 0.22),
+    0 0 0 4px rgba(212, 175, 55, 0.24),
     inset 0 1px 0 #fff;
 }
 
@@ -258,14 +519,14 @@
   border: 2px solid var(--gold-light);
   border-radius: 18px;
   padding: 10px 14px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   color: #fff;
   box-shadow: 0 6px 18px rgba(212, 18, 59, 0.35);
 }
 
 .abaya-template .o-royal-ribbon-text strong {
   display: block;
-  font-size: 16px;
+  font-size: 15.5px;
   font-weight: 900;
   color: var(--gold-light);
 }
@@ -273,7 +534,7 @@
 .abaya-template .o-royal-ribbon-text span {
   display: block;
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 800;
   color: #fff;
 }
 
@@ -301,32 +562,67 @@
   color: #5a3e09;
 }
 
-.abaya-template .bt {
+/* Countdown inside form */
+.abaya-template .form-countdown {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin: 0 auto;
-  width: 88%;
-  padding: 10px 14px;
-  color: #fff;
-  font-size: 24px;
-  font-weight: 900;
-  background: linear-gradient(115deg, #9e0827 0%, #e51d45 50%, #9e0827 100%);
-  border: 2.5px solid var(--gold-light);
-  border-radius: 18px;
-  box-shadow:
-    0 6px 18px rgba(212, 18, 59, 0.4),
-    0 0 12px rgba(212, 175, 55, 0.5);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+  justify-content: space-between;
+  gap: 8px;
+  background: #fff;
+  border: 2px dashed var(--red);
+  border-radius: 14px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
 }
 
-.abaya-template .o h3 {
-  text-align: center;
-  margin: 10px 0 14px;
-  font-size: 17.5px;
+.abaya-template .form-countdown span {
+  font-size: 12.5px;
   font-weight: 800;
   color: #7a051d;
+}
+
+.abaya-template .form-countdown-digits {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  direction: ltr;
+}
+
+.abaya-template .form-countdown-digits b {
+  background: var(--red);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  padding: 3px 7px;
+  border-radius: 7px;
+  min-width: 28px;
+  text-align: center;
+}
+
+/* Zero-risk lead reassurance banner */
+.abaya-template .zero-risk-banner {
+  background: linear-gradient(135deg, #e8f8ef, #d1f2df);
+  border: 1.5px solid #2ca364;
+  border-radius: 16px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.abaya-template .zero-risk-banner strong {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 900;
+  color: #0a5c32;
+  margin-bottom: 2px;
+}
+
+.abaya-template .zero-risk-banner p {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #194d32;
+  line-height: 1.5;
 }
 
 .abaya-template .cols {
@@ -347,7 +643,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .abaya-template .sw.sw-thumbs button {
@@ -407,8 +703,8 @@
 }
 
 .abaya-template .form-color-preview img {
-  width: 78px;
-  height: 78px;
+  width: 74px;
+  height: 74px;
   border-radius: 14px;
   object-fit: cover;
   object-position: top center;
@@ -425,20 +721,46 @@
 
 .abaya-template .form-color-preview b {
   display: block;
-  font-size: 14px;
+  font-size: 13.5px;
   color: #1b1b1b;
   margin: 2px 0;
 }
 
 .abaya-template .form-color-preview span {
   display: inline-block;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 800;
   color: #fff;
-  background: linear-gradient(135deg, #d4123b, #9e0827);
+  background: linear-gradient(135deg, #0b6b3a, #128a4d);
   padding: 2px 10px;
   border-radius: 20px;
-  border: 1px solid var(--gold);
+}
+
+/* 1-tap Size pill buttons */
+.abaya-template .size-pills {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.abaya-template .size-pills button {
+  height: 46px;
+  border-radius: 14px;
+  border: 2px solid var(--gold);
+  background: #fff;
+  color: #222;
+  font: 900 15px Cairo, Tahoma, sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.abaya-template .size-pills button[aria-pressed="true"] {
+  background: linear-gradient(135deg, #d4123b, #9e0827);
+  border-color: var(--gold-light);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(212, 18, 59, 0.35);
+  transform: translateY(-1px);
 }
 
 .abaya-template .fld {
@@ -464,7 +786,6 @@
   pointer-events: none;
 }
 
-.abaya-template .fld textarea + i,
 .abaya-template .fld.fld-textarea i {
   top: 26px;
 }
@@ -511,13 +832,13 @@
 
 .abaya-template .sw button {
   flex: 1;
-  padding: 12px 8px;
+  padding: 11px 8px;
   border-radius: 28px;
   border: 2px solid var(--gold);
   background: #fff;
   color: #333;
   font: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 800;
   cursor: pointer;
   transition: all 0.2s;
@@ -536,26 +857,47 @@
   border-radius: 18px;
   padding: 12px 14px;
   font-size: 13.5px;
-  line-height: 1.7;
+  line-height: 1.75;
   background: linear-gradient(135deg, #fffdf9, #fff3d1);
   box-shadow: 0 4px 12px rgba(212, 175, 55, 0.22);
 }
 
-.abaya-template .sum b {
-  color: var(--red);
+.abaya-template .sum-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.abaya-template .sum-free {
+  background: #0b6b3a;
+  color: #fff;
+  padding: 1px 10px;
+  border-radius: 99px;
+  font-size: 12.5px;
+  font-weight: 900;
+}
+
+.abaya-template .sum-total {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1.5px dashed var(--gold);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 16px;
   font-weight: 900;
+  color: var(--red);
 }
 
 .abaya-template .btn {
   width: 100%;
   margin-top: 12px;
-  padding: 15px 18px;
+  padding: 15px 16px;
   border: 2.5px solid var(--gold-light);
   border-radius: 40px;
   background: linear-gradient(135deg, #f01e49 0%, #c40a2c 55%, #960520 100%);
   color: #fff;
-  font: 900 21px Cairo, Tahoma, sans-serif;
+  font: 900 19.5px Cairo, Tahoma, sans-serif;
   cursor: pointer;
   box-shadow:
     0 8px 22px rgba(212, 18, 59, 0.45),
@@ -577,6 +919,14 @@
 .abaya-template .btn:disabled {
   opacity: 0.6;
   animation: none;
+}
+
+.abaya-template .btn-subnote {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #0b6b3a;
+  margin-top: 8px;
 }
 
 .abaya-template .ft {
@@ -697,7 +1047,6 @@
   padding: 22px 12px;
 }
 
-/* Hide raw technical draft notice inside Abaya form since auto-draft is enabled */
 .abaya-template .checkout-draft-notice {
   display: none;
 }
@@ -734,35 +1083,35 @@
 .abaya-template .abaya-sticky-price small {
   display: block;
   font-size: 11.5px;
-  color: var(--gold-light);
-  font-weight: 700;
+  color: #7ef7b4;
+  font-weight: 800;
 }
 
 .abaya-template .abaya-sticky-price strong {
   font-size: 20px;
   font-weight: 900;
-  color: #fff;
+  color: var(--gold-light);
 }
 
 .abaya-template .abaya-sticky-price del {
-  font-size: 12.5px;
+  font-size: 12px;
   color: #ff9eb0;
   margin-right: 6px;
 }
 
 .abaya-template .abaya-sticky-btn {
   flex: 1;
-  max-width: 310px;
+  max-width: 300px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 12px 18px;
+  gap: 6px;
+  padding: 12px 16px;
   border-radius: 999px;
   border: 2px solid var(--gold-light);
   background: linear-gradient(135deg, #f3244b 0%, #c40a2c 60%, #960520 100%);
   color: #fff;
-  font: 900 17px Cairo, Tahoma, sans-serif;
+  font: 900 16.5px Cairo, Tahoma, sans-serif;
   cursor: pointer;
   box-shadow:
     0 4px 16px rgba(243, 36, 75, 0.5),

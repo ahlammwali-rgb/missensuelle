@@ -190,9 +190,9 @@ export const products: Product[] = [
     name: "Abaya Royal Emerald",
     category: "mode",
     categoryLabel: "Mode femme",
-    price: 9600,
+    price: 7500,
     oldPrice: 14000,
-    badge: "Offre spéciale",
+    badge: "Livraison Gratuite",
     description: "Une silhouette emerald majestueuse, fluide et confortable, avec une broderie signature qui attire tous les regards.",
     details: ["Velours emerald doux", "Broderie décorative premium", "Coupe ample et confortable", "Tailles S à XL"],
     colors: ["Emerald", "Noir"],
@@ -266,9 +266,15 @@ export function getCatalogProducts(): Product[] {
       const colors = product.colors.filter(color => color.trim().toLowerCase() !== "bordeaux");
       const gallery = product.gallery ? replaceAnnotatedAbayaPhotos(product.gallery) : product.gallery;
       const galleryChanged = gallery?.some((image, index) => image !== product.gallery?.[index]) ?? false;
-      if (colors.length === product.colors.length && !galleryChanged) return product;
+      const priceChanged = product.price === 9600;
+      if (colors.length === product.colors.length && !galleryChanged && !priceChanged) return product;
       colorsChanged = true;
-      return { ...product, colors, ...(galleryChanged ? { gallery } : {}) };
+      return {
+        ...product,
+        colors,
+        ...(galleryChanged ? { gallery } : {}),
+        ...(priceChanged ? { price: 7500 } : {}),
+      };
     });
     const savedIds = new Set(normalized.map(product => product.id));
     const missingBuiltIns = products.filter(

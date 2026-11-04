@@ -81,7 +81,7 @@ export async function restoreClientBackupOrders(orders: Array<Partial<CheckoutOr
   let added = 0;
   const existingIds = new Set(memoryOrders.map(o => o.id));
   for (const raw of orders) {
-    if (!raw || !raw.id || existingIds.has(raw.id)) continue;
+    if (!raw || !raw.id || raw.id === "MS-MW14EHHP-B39BD62352" || existingIds.has(raw.id)) continue;
     const dbId = nextMemoryOrderId++;
     memoryOrders.push({
       dbId,
