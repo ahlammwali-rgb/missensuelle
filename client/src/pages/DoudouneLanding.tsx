@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { type Order, type Product } from "@/lib/store-data";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
+import { trpc } from "@/lib/trpc";
+import { shippingFeeFor } from "@shared/shipping";
 import { useCheckoutDraft } from "@/components/useCheckoutDraft";
 import { submitCheckoutOrder } from "@/lib/checkout-api";
 import { trackPixelEvent } from "@/lib/tracking";
@@ -48,6 +50,11 @@ export default function DoudouneLanding({
   const communes = selectedWilaya
     ? (abayaCommunesByWilaya[selectedWilaya] ?? [])
     : [];
+  const ratesQuery = trpc.store.shippingRates.useQuery(undefined, { retry: false, staleTime: 10 * 60 * 1000, refetchOnWindowFocus: false });
+  const shippingFee = selectedWilaya
+    ? shippingFeeFor(ratesQuery.data?.rates, selectedWilaya, "home", [product.id])
+    : 0;
+  const goodsTotal = offerMode === "pack2" ? PACK_2_PRICE : product.price * Math.max(1, quantity || 1);
 
   useCheckoutDraft({
     formRef,
@@ -109,7 +116,7 @@ export default function DoudouneLanding({
 
     const isPack = offerMode === "pack2";
     const billedQty = isPack ? 2 : Math.max(1, quantity || 1);
-    const orderTotal = isPack ? PACK_2_PRICE : product.price * billedQty;
+    const orderTotal = (isPack ? PACK_2_PRICE : product.price * billedQty) + shippingFee;
     const summaryColor = isPack
       ? `1: ${colorLabel} | 2: ${AR[secondColor]}`
       : colorLabel;
@@ -482,6 +489,13 @@ export default function DoudouneLanding({
               </div>
             )}
           </div>
+
+          {selectedWilaya && shippingFee > 0 && (
+            <div className="shipping-fee-box" style={{ margin: "10px 0", padding: "10px 14px", borderRadius: 12, background: "rgba(212,175,55,.12)", border: "1px dashed #d4af37", fontWeight: 700, lineHeight: 1.9 }}>
+              <div>🚚 سعر التوصيل إلى {selectedWilaya} : <span style={{ color: "#e0112b" }}>{shippingFee.toLocaleString("en-US")} دج</span></div>
+              <div>💰 المبلغ الإجمالي عند الاستلام : <span style={{ color: "#e0112b" }}>{(goodsTotal + shippingFee).toLocaleString("en-US")} دج</span></div>
+            </div>
+          )}
 
           <div className="bt">
             <svg viewBox="0 0 60 50">

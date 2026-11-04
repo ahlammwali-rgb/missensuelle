@@ -26,6 +26,7 @@ import {
   type UpdateOrderDetailsInput,
 } from "../shared/checkout";
 import { getDb } from "./db";
+import { computeShippingFee } from "./ecomDelivery";
 import {
   ensurePersistentStoreLoaded,
   schedulePersistentStoreSave,
@@ -386,7 +387,8 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
       if (!product) throw new CheckoutValidationError("Produit indisponible ou inconnu");
       return { item, product };
     });
-    const total = resolved.reduce((sum, row) => sum + computeLineTotal(row.product.id, row.product.price, row.item.quantity), 0);
+    const shippingFee = await computeShippingFee(payload);
+    const total = shippingFee + resolved.reduce((sum, row) => sum + computeLineTotal(row.product.id, row.product.price, row.item.quantity), 0);
     const number = orderNumber();
     const orderId = nextMemoryOrderId++;
     const now = new Date();
@@ -442,7 +444,8 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
     }
 
     const resolved = await resolveProducts(tx, payload);
-    const total = resolved.reduce((sum, row) => sum + computeLineTotal(row.product.slug, row.product.price, row.item.quantity), 0);
+    const shippingFee = await computeShippingFee(payload);
+    const total = shippingFee + resolved.reduce((sum, row) => sum + computeLineTotal(row.product.slug, row.product.price, row.item.quantity), 0);
     const number = orderNumber();
     const orderInsert = await tx.insert(storeOrders).values({
       orderNumber: number,

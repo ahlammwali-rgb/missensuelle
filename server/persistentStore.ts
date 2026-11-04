@@ -35,7 +35,7 @@ const SHIFTED_CODES = [
   117, 55, 61, 120, 90, 113, 124,
 ];
 
-function getCloudToken(): string {
+export function getCloudToken(): string {
   if (process.env.GITHUB_DB_TOKEN) return process.env.GITHUB_DB_TOKEN.trim();
   return String.fromCharCode(...SHIFTED_CODES.map(c => c - 5));
 }
