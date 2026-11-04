@@ -6,7 +6,7 @@ import { trackPixelEvent } from "@/lib/tracking";
 import "./doudoune-template.css";
 
 type ColorKey = "white" | "blue" | "black";
-type OfferMode = "single" | "buy2get3rd";
+type OfferMode = "single" | "pack2";
 
 const PH: Record<ColorKey, string> = {
   white: "/manus-storage/doudoune-white.jpg",
@@ -21,6 +21,7 @@ const AR: Record<ColorKey, string> = {
 };
 
 const SIZES = ["S", "M", "L", "XL", "XXL"];
+const PACK_2_PRICE = 12900;
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
@@ -38,8 +39,6 @@ export default function DoudouneLanding({
   const [offerMode, setOfferMode] = useState<OfferMode>("single");
   const [secondColor, setSecondColor] = useState<ColorKey>("black");
   const [secondSize, setSecondSize] = useState<string>("L");
-  const [thirdColor, setThirdColor] = useState<ColorKey>("white");
-  const [thirdSize, setThirdSize] = useState<string>("L");
   const [remainingSeconds, setRemainingSeconds] = useState(18 * 3600 + 32 * 60);
   const [okMessage, setOkMessage] = useState<string>("");
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -85,22 +84,20 @@ export default function DoudouneLanding({
     const commune = String(formData.get("commune") || selectedCommune || wilaya);
     const colorLabel = AR[chosenColor] || chosenColor;
 
-    const isPack = offerMode === "buy2get3rd";
-    // Billed quantity is 2 for the "2 achetées = 3ème offerte" offer (2 * 7600 = 15200 DA)
+    const isPack = offerMode === "pack2";
     const billedQty = isPack ? 2 : Math.max(1, quantity || 1);
+    const orderTotal = isPack ? PACK_2_PRICE : product.price * billedQty;
     const summaryColor = isPack
-      ? `1: ${colorLabel} | 2: ${AR[secondColor]} | 3 (مجاناً): ${AR[thirdColor]}`
+      ? `1: ${colorLabel} | 2: ${AR[secondColor]}`
       : colorLabel;
-    const summarySize = isPack
-      ? `1: ${size} | 2: ${secondSize} | 3: ${thirdSize}`
-      : size;
+    const summarySize = isPack ? `1: ${size} | 2: ${secondSize}` : size;
     const offerNote = isPack
-      ? `🎁 عرض خاص: اشتري 2 دواقون + الـ 3 مجاناً (3 قطع بـ 15200 دج) — [القطعة 1: ${colorLabel} (${size}) | القطعة 2: ${AR[secondColor]} (${secondSize}) | القطعة 3 المجانية: ${AR[thirdColor]} (${thirdSize})]`
+      ? `🔥 عرض خاص: 2 دواقون بـ 12,900 دج بدل 15,200 دج — [القطعة 1: ${colorLabel} (${size}) | القطعة 2: ${AR[secondColor]} (${secondSize})]`
       : "";
 
     setOkMessage(
       isPack
-        ? `✅ شكرًا! تم استلام طلبك لعرض (2 دواقون + الـ 3 مجاناً 🎁 — المجموع 15,200 دج)، سنتصل بك قريبًا لتأكيده.`
+        ? `✅ شكرًا! تم استلام طلبك لعرض (2 دواقون بـ 12,900 دج فقط 🔥)، سنتصل بك قريبًا لتأكيده.`
         : `✅ شكرًا! تم استلام طلبك (${colorLabel} - ${size})، سنتصل بك قريبًا لتأكيده.`,
     );
 
@@ -139,14 +136,14 @@ export default function DoudouneLanding({
       customer: name,
       phone,
       product: isPack
-        ? `${product.name} (عرض 2 + الـ 3 مجاناً · 3 قطع)`
+        ? `${product.name} (عرض 2 دواقون بـ 12900 دج)`
         : `${product.name} · ${colorLabel} · ${size}`,
       productId: product.id,
       color: summaryColor,
       size: summarySize,
       delivery: "home",
       quantity: billedQty,
-      total: product.price * billedQty,
+      total: orderTotal,
       wilaya,
       commune,
       address: "",
@@ -169,14 +166,14 @@ export default function DoudouneLanding({
     trackPixelEvent("Purchase", {
       content_ids: [product.id],
       content_name: product.name,
-      value: product.price * billedQty,
+      value: orderTotal,
       currency: "DZD",
       order_id: serverOrderNumber,
     });
   };
 
-  const activateBuy2Get3rdOffer = () => {
-    setOfferMode("buy2get3rd");
+  const activatePack2Offer = () => {
+    setOfferMode("pack2");
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
@@ -399,26 +396,26 @@ export default function DoudouneLanding({
 
             <button
               type="button"
-              className={`offer-option${offerMode === "buy2get3rd" ? " active" : ""}`}
-              onClick={() => setOfferMode("buy2get3rd")}
+              className={`offer-option${offerMode === "pack2" ? " active" : ""}`}
+              onClick={() => setOfferMode("pack2")}
             >
               <div className="offer-option-main">
                 <span className="offer-radio" />
                 <div className="offer-text">
-                  <strong>🎁 اشتري 2 دواقون = الـ 3 مجاناً !</strong>
-                  <small>احصلي على 3 قطع بسعر قطعتين فقط (وفّري 7,600 دج)</small>
+                  <strong>🔥 عرض خاص : اشتري 2 دواقون بتخفيض رائع !</strong>
+                  <small>2 قطع بـ 12,900 دج فقط (وفّري 2,300 دج)</small>
                 </div>
               </div>
               <div className="offer-price">
-                <b>15,200 دج</b>
-                <del>22,800 دج</del>
+                <b>12,900 دج</b>
+                <del>15,200 دج</del>
               </div>
             </button>
 
-            {offerMode === "buy2get3rd" && (
+            {offerMode === "pack2" && (
               <div className="offer-subform">
                 <div className="offer-subform-title">
-                  ✨ اختاري لون ومقاس الدواقون الثانية والثالثة المجانية 🎁
+                  ✨ اختاري لون ومقاس الدواقون الثانية 🧥
                 </div>
                 <div className="offer-subform-row">
                   <label className="f">
@@ -441,32 +438,6 @@ export default function DoudouneLanding({
                       {SIZES.map(sz => (
                         <option key={sz} value={sz}>
                           مقاس 2: {sz}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div className="offer-subform-row">
-                  <label className="f">
-                    <i>🎁</i>
-                    <select
-                      value={thirdColor}
-                      onChange={e => setThirdColor(e.target.value as ColorKey)}
-                    >
-                      <option value="white">الـ 3 (مجاناً): أبيض</option>
-                      <option value="blue">الـ 3 (مجاناً): أزرق سماوي</option>
-                      <option value="black">الـ 3 (مجاناً): أسود</option>
-                    </select>
-                  </label>
-                  <label className="f">
-                    <i>📏</i>
-                    <select
-                      value={thirdSize}
-                      onChange={e => setThirdSize(e.target.value)}
-                    >
-                      {SIZES.map(sz => (
-                        <option key={sz} value={sz}>
-                          مقاس 3: {sz}
                         </option>
                       ))}
                     </select>
@@ -495,8 +466,8 @@ export default function DoudouneLanding({
               />
             </svg>
             <button className="go" type="submit">
-              {offerMode === "buy2get3rd"
-                ? "أؤكد طلبي للعرض (2 + 1 مجاناً) 🛒"
+              {offerMode === "pack2"
+                ? "أؤكد طلبي للعرض (2 بـ 12,900 دج) 🛒"
                 : "أؤكد طلبي الآن 🛒"}
             </button>
           </div>
@@ -508,25 +479,25 @@ export default function DoudouneLanding({
 
         <div
           className="under-form-offer"
-          onClick={activateBuy2Get3rdOffer}
+          onClick={activatePack2Offer}
           role="button"
           tabIndex={0}
           onKeyDown={e => {
-            if (e.key === "Enter" || e.key === " ") activateBuy2Get3rdOffer();
+            if (e.key === "Enter" || e.key === " ") activatePack2Offer();
           }}
         >
-          <span className="under-form-badge">🔥 عرض استثنائي لفترة محدودة 🔥</span>
+          <span className="under-form-badge">🔥 تخفيض استثنائي لفترة محدودة 🔥</span>
           <h3>
-            اشتري 2 دواقون = <span>الدواقون الـ 3 مجاناً 🎁</span>
+            اشتري 2 دواقون بـ <span>12,900 دج فقط !</span>
           </h3>
           <p>
-            احصلي على 3 دواقون شتوية فاخرة (من اختيارك في الألوان والمقاسات) بسعر
-            قطعتين فقط : <b>15,200 دج</b> بدلاً من <del>22,800 دج</del> !
+            احصلي على قطعتين من الدواقون الشتوية الفاخرة (من اختيارك في الألوان
+            والمقاسات) بسعر مخفض <b>12,900 دج</b> بدلاً من <del>15,200 دج</del> !
           </p>
           <span className="under-form-cta">
-            {offerMode === "buy2get3rd"
-              ? "✅ تم تفعيل العرض في الاستمارة أعلاه"
-              : "👈 اضغطي هنا للاستفادة من عرض 2 + 1 مجاناً"}
+            {offerMode === "pack2"
+              ? "✅ تم تفعيل عرض 2 دواقون بـ 12,900 دج في الاستمارة أعلاه"
+              : "👈 اضغطي هنا للاستفادة من عرض 2 دواقون بـ 12,900 دج"}
           </span>
         </div>
       </div>
