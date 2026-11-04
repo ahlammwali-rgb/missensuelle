@@ -56,7 +56,7 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
   function startCheckout() {
     if (checkoutStarted.current) return;
     checkoutStarted.current = true;
-    trackPixelEvent("InitiateCheckout", { content_ids: [product.id], value: total, currency: "DZD" });
+    trackPixelEvent("InitiateCheckout", { content_type: "product", content_id: product.id, content_ids: [product.id], content_name: product.name, value: total, currency: "DZD" });
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -78,7 +78,7 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
     const result = await checkout.submitOrder();
     if (!result) return;
     setOrderNumber(result.orderNumber);
-    trackPixelEvent("Purchase", { content_ids: [product.id], value: result.total, currency: "DZD", order_id: result.orderNumber });
+    trackPixelEvent("Purchase", { content_type: "product", content_id: product.id, content_ids: [product.id], content_name: product.name, value: result.total, currency: "DZD", order_id: result.orderNumber });
   }
 
   return (

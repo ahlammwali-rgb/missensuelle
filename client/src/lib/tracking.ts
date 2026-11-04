@@ -197,7 +197,35 @@ export function trackPixelEvent(name: PixelEvent, data: Record<string, unknown> 
   if (typeof window === "undefined") return;
   const config = getPixelConfig(); initializePixels(); const win = window as TrackingWindow;
   if (config.facebookPixelId) win.fbq?.("track", name, data);
-  if (config.tiktokPixelId || config.tiktokCode) win.ttq?.track?.(name, data);
+  if (config.tiktokPixelId || config.tiktokCode) {
+    win.ttq?.track?.(name, data);
+    if (name === "Purchase") {
+      const contentIds = Array.isArray(data.content_ids) ? data.content_ids : [];
+      const firstId = String(data.content_id ?? contentIds[0] ?? "product");
+      const contentName = String(data.content_name ?? firstId);
+      const numericValue = typeof data.value === "number" ? data.value : Number(data.value) || 0;
+      const tiktokPayload: Record<string, unknown> = {
+        content_type: "product",
+        content_id: firstId,
+        content_name: contentName,
+        contents: [
+          {
+            content_id: firstId,
+            content_type: "product",
+            content_name: contentName,
+            quantity: 1,
+            price: numericValue,
+          },
+        ],
+        value: numericValue,
+        currency: String(data.currency ?? "DZD"),
+        ...data,
+      };
+      win.ttq?.track?.("CompletePayment", tiktokPayload);
+      win.ttq?.track?.("PlaceAnOrder", tiktokPayload);
+      win.ttq?.track?.("SubmitForm", tiktokPayload);
+    }
+  }
   win.__missPixelEvents = [...(win.__missPixelEvents ?? []), { name, at: new Date().toISOString() }].slice(-10);
   win.dispatchEvent?.(new Event("miss-pixel-status"));
 }

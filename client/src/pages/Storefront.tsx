@@ -61,7 +61,7 @@ function ProductPage({ onAdd }: { onAdd: (product: typeof products[number]) => v
   const [activeImage, setActiveImage] = useState(gallery[0] ?? "");
   const { lang } = useLanguage();
   useEffect(() => { setActiveImage(gallery[0] ?? ""); }, [params?.slug]);
-  useEffect(() => { if (product) trackPixelEvent("ViewContent", { content_ids: [product.id], content_name: product.name, value: product.price, currency: "DZD" }); }, [product?.id]);
+  useEffect(() => { if (product) trackPixelEvent("ViewContent", { content_type: "product", content_id: product.id, content_ids: [product.id], content_name: product.name, value: product.price, currency: "DZD" }); }, [product?.id]);
   useEffect(() => { document.body.classList.toggle("vest-experience", Boolean(isVest)); return () => document.body.classList.remove("vest-experience"); }, [isVest]);
   if (!product) return <div className="not-found-inline"><h1>Cette pièce a disparu.</h1><Link href="/catalogue" className="button button-dark">Retour à la boutique</Link></div>;
   const displayName = lang === "ar" && product.arName ? product.arName : product.name;
