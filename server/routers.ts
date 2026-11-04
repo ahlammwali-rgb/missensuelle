@@ -22,6 +22,7 @@ import {
   discardCheckoutDraft,
   listAbandonedCheckouts,
   listCheckoutOrders,
+  restoreClientBackupOrders,
   saveCheckoutDraft,
   submitCheckoutOrder,
   updateAbandonedCheckout,
@@ -88,6 +89,32 @@ export const appRouter = router({
     updateOrderDetails: adminProcedure
       .input(updateOrderDetailsSchema)
       .mutation(({ input }) => updateCheckoutOrderDetails(input)),
+    restoreOrders: adminProcedure
+      .input(
+        z.object({
+          orders: z.array(
+            z.object({
+              id: z.string().min(1).max(64),
+              createdAt: z.string().optional(),
+              customer: z.string().optional(),
+              phone: z.string().optional(),
+              productId: z.string().optional(),
+              product: z.string().optional(),
+              quantity: z.number().optional(),
+              total: z.number().optional(),
+              color: z.string().optional(),
+              size: z.string().optional(),
+              delivery: z.enum(["home", "office"]).optional(),
+              wilaya: z.string().optional(),
+              commune: z.string().optional(),
+              address: z.string().optional(),
+              note: z.string().optional(),
+              status: checkoutOrderStatusSchema.optional(),
+            }),
+          ),
+        }),
+      )
+      .mutation(({ input }) => restoreClientBackupOrders(input.orders)),
     updateAbandoned: adminProcedure
       .input(z.object({ id: z.number().int().positive(), status: recoveryStatusSchema }))
       .mutation(({ input }) => updateAbandonedCheckout(input.id, input.status)),

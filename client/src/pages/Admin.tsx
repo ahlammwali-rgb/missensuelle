@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, Bell, ChevronDown, ClipboardList, Copy, ExternalLink, Facebook, Filter, ImagePlus, LayoutDashboard, Moon, Package, Pencil, Phone, Plus, RefreshCw, Save, Search, Settings2, Sun, Trash2, TrendingUp, Upload, Users, X } from "lucide-react";
 import { Link } from "wouter";
 import { AdminAuthGate } from "@/components/AdminAuthGate";
@@ -13,7 +13,7 @@ import { getPixelConfig, savePixelConfig, trackPixelEvent, hasGlobalTikTokPixel,
 import "./admin-responsive.css";
 import { PixelDiagnostics } from "@/components/PixelDiagnostics";
 import { AdminDashboard } from "@/components/AdminDashboard";
-import { orderMatchesPeriod } from "@/lib/admin-orders";
+import { loadRealOrders, orderMatchesPeriod } from "@/lib/admin-orders";
 
 const actionLabels: { status: OrderStatus; label: string }[] = [{ status: "confirmee", label: "Confirmer" }, { status: "annulee", label: "Annuler" }, { status: "reportee", label: "Reporter" }, { status: "ne_repond_pas", label: "Ne répond pas" }, { status: "transferee", label: "Transférer" }];
 type AdminSection = "dashboard" | "abandoned" | "catalogue" | "settings";
@@ -56,7 +56,48 @@ function AdminPageContent() {
   const utils = trpc.useUtils();
   const updateOrderStatus = trpc.admin.updateOrderStatus.useMutation();
   const updateOrderDetails = trpc.admin.updateOrderDetails.useMutation();
+  const restoreOrders = trpc.admin.restoreOrders.useMutation();
+  const restoredOnceRef = useRef(false);
   const serverOrders = ordersQuery.data ?? [];
+
+  useEffect(() => {
+    if (ordersQuery.isLoading || ordersQuery.error) return;
+    try {
+      const serverIds = new Set(serverOrders.map(o => o.id));
+      const localOrders = loadRealOrders();
+      const backupRaw = JSON.parse(
+        localStorage.getItem("miss-sensuelle-admin-orders-backup") || "[]",
+      ) as Order[];
+      const combined = [...localOrders, ...(Array.isArray(backupRaw) ? backupRaw : [])];
+      const uniqueMissing = new Map<string, Order>();
+      for (const item of combined) {
+        if (item && item.id && !serverIds.has(item.id) && !uniqueMissing.has(item.id)) {
+          uniqueMissing.set(item.id, item);
+        }
+      }
+      if (uniqueMissing.size > 0 && !restoredOnceRef.current) {
+        restoredOnceRef.current = true;
+        restoreOrders.mutate(
+          { orders: Array.from(uniqueMissing.values()) },
+          {
+            onSuccess: async res => {
+              if (res.restored > 0) {
+                await utils.admin.orders.invalidate();
+              }
+            },
+          },
+        );
+      }
+      if (serverOrders.length > 0) {
+        localStorage.setItem(
+          "miss-sensuelle-admin-orders-backup",
+          JSON.stringify(serverOrders),
+        );
+      }
+    } catch {
+      // Ignore storage error
+    }
+  }, [ordersQuery.isLoading, ordersQuery.error, serverOrders]);
   const orderById = useMemo(() => new Map(serverOrders.map(order => [order.id, order])), [serverOrders]);
   const orders = useMemo(() => serverOrders.map(toDashboardOrder), [serverOrders]);
   const periodOrders = useMemo(() => orders.filter(order => orderMatchesPeriod(order, period)), [orders, period]);

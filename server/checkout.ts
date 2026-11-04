@@ -26,6 +26,10 @@ import {
   type UpdateOrderDetailsInput,
 } from "../shared/checkout";
 import { getDb } from "./db";
+import {
+  ensurePersistentStoreLoaded,
+  schedulePersistentStoreSave,
+} from "./persistentStore";
 
 const APPROVED_BASELINE_IDS = new Set(products.map(product => product.id));
 const canonicalProducts = new Map(products.map(product => [product.id, product]));
@@ -49,16 +53,72 @@ const memoryOrders: CheckoutOrder[] = [];
 let nextMemorySessionId = 1;
 let nextMemoryOrderId = 1;
 
+const getCounters = () => ({
+  nextOrderId: nextMemoryOrderId,
+  nextSessionId: nextMemorySessionId,
+});
+const setCounters = (nextOrderId: number, nextSessionId: number) => {
+  nextMemoryOrderId = nextOrderId;
+  nextMemorySessionId = nextSessionId;
+};
+const loadStore = () =>
+  ensurePersistentStoreLoaded(memoryOrders, memorySessions, getCounters, setCounters);
+const saveStore = () =>
+  schedulePersistentStoreSave(memoryOrders, memorySessions, getCounters);
+void loadStore();
+
 export function updateMemoryOrderStatus(id: number, status: CheckoutOrder["status"]) {
   const found = memoryOrders.find(order => order.dbId === id);
-  if (found) found.status = status;
+  if (found) {
+    found.status = status;
+    saveStore();
+  }
   return found ? [found] : [];
+}
+
+export async function restoreClientBackupOrders(orders: Array<Partial<CheckoutOrder>>) {
+  await loadStore();
+  let added = 0;
+  const existingIds = new Set(memoryOrders.map(o => o.id));
+  for (const raw of orders) {
+    if (!raw || !raw.id || existingIds.has(raw.id)) continue;
+    const dbId = nextMemoryOrderId++;
+    memoryOrders.push({
+      dbId,
+      id: String(raw.id),
+      createdAt: String(raw.createdAt || new Date().toISOString()),
+      customer: String(raw.customer || "Cliente Miss Sensuelle"),
+      phone: String(raw.phone || ""),
+      productId: String(raw.productId || "p-007"),
+      product: String(raw.product || "Abaya Royal Emerald × 1"),
+      quantity: Number(raw.quantity || 1),
+      total: Number(raw.total || 9600),
+      color: String(raw.color || ""),
+      size: String(raw.size || ""),
+      delivery: raw.delivery === "office" ? "office" : "home",
+      wilaya: String(raw.wilaya || ""),
+      commune: String(raw.commune || ""),
+      address: String(raw.address || ""),
+      note: String(raw.note || ""),
+      status: raw.status || "nouvelle",
+    });
+    existingIds.add(raw.id);
+    added++;
+  }
+  if (added > 0) {
+    memoryOrders.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    saveStore();
+  }
+  return { restored: added, total: memoryOrders.length };
 }
 
 export async function updateCheckoutOrderDetails(input: UpdateOrderDetailsInput) {
   const parsed = updateOrderDetailsSchema.parse(input);
   const db = await getDb();
   if (!db) {
+    await loadStore();
     const found = memoryOrders.find(order => order.dbId === parsed.id);
     if (!found) throw new CheckoutValidationError("Commande introuvable");
     found.customer = parsed.customer;
@@ -74,6 +134,7 @@ export async function updateCheckoutOrderDetails(input: UpdateOrderDetailsInput)
     found.commune = parsed.commune;
     found.address = parsed.address;
     found.note = parsed.note;
+    saveStore();
     return found;
   }
   await db.transaction(async tx => {
@@ -247,6 +308,7 @@ export async function saveCheckoutDraft(input: SaveDraftInput): Promise<{ sessio
   const hash = tokenHash(token);
   const db = await getDb();
   if (!db) {
+    await loadStore();
     const current = memorySessions.get(hash);
     const now = new Date();
     if (current) {
@@ -255,6 +317,7 @@ export async function saveCheckoutDraft(input: SaveDraftInput): Promise<{ sessio
       current.revision = revision;
       current.consentedAt = current.consentedAt ?? now;
       current.updatedAt = now;
+      saveStore();
       return { sessionId: current.id, accepted: true };
     }
     const created: MemorySession = {
@@ -270,6 +333,7 @@ export async function saveCheckoutDraft(input: SaveDraftInput): Promise<{ sessio
       updatedAt: now,
     };
     memorySessions.set(hash, created);
+    saveStore();
     return { sessionId: created.id, accepted: true };
   }
   return db.transaction(async tx => {
@@ -310,6 +374,7 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
   const hash = tokenHash(parsed.data.token);
   const db = await getDb();
   if (!db) {
+    await loadStore();
     const current = memorySessions.get(hash);
     if (current?.state === "discarded") throw new CheckoutValidationError("Cette session a été annulée");
     if (current?.state === "submitted" && current.orderId) {
@@ -363,6 +428,7 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
         updatedAt: now,
       });
     }
+    saveStore();
     return { orderId, orderNumber: number, total, created: true };
   }
   return db.transaction(async tx => {
@@ -425,12 +491,14 @@ export async function discardCheckoutDraft(input: DiscardDraftInput): Promise<{ 
   const hash = tokenHash(parsed.data.token);
   const db = await getDb();
   if (!db) {
+    await loadStore();
     const current = memorySessions.get(hash);
     if (!current || current.state !== "draft" || parsed.data.revision < current.revision) return { discarded: false };
     current.state = "discarded";
     current.payload = null;
     current.consentedAt = null;
     current.updatedAt = new Date();
+    saveStore();
     return { discarded: true };
   }
   return db.transaction(async tx => {
@@ -449,7 +517,10 @@ function iso(value: Date) {
 
 export async function listCheckoutOrders(): Promise<CheckoutOrder[]> {
   const db = await getDb();
-  if (!db) return [...memoryOrders];
+  if (!db) {
+    await loadStore();
+    return [...memoryOrders];
+  }
   const orders = await db.select().from(storeOrders).orderBy(desc(storeOrders.createdAt));
   if (!orders.length) return [];
   const orderIds = orders.map(order => order.id);
@@ -492,6 +563,7 @@ export async function listCheckoutOrders(): Promise<CheckoutOrder[]> {
 export async function listAbandonedCheckouts(): Promise<AbandonedCheckout[]> {
   const db = await getDb();
   if (!db) {
+    await loadStore();
     const now = Date.now();
     return Array.from(memorySessions.values())
       .filter(session => session.state === "draft" && session.payload)
@@ -565,12 +637,14 @@ export async function updateAbandonedCheckout(id: number, recoveryStatus: Abando
   if (!Number.isInteger(id) || id <= 0 || !parsed.success) throw new CheckoutValidationError("Statut d'abandon invalide");
   const db = await getDb();
   if (!db) {
+    await loadStore();
     for (const session of memorySessions.values()) {
       if (session.id === id && session.state === "draft") {
         session.recoveryStatus = parsed.data;
         session.updatedAt = new Date();
       }
     }
+    saveStore();
     return { updated: true };
   }
   await db.update(storeCheckoutSessions).set({ recoveryStatus: parsed.data, updatedAt: new Date() })
