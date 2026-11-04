@@ -132,8 +132,18 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
         </div>
 
         <section className="o" id="order">
-          <div className="bt">اطلبي الآن 🛒</div>
-          <h3>و استمتعي بالأناقة و الراحة</h3>
+          <div className="o-royal-ribbon">
+            <div className="o-royal-ribbon-text">
+              <strong>👑 عرض ملكي خاص (عباية + جمبسوت)</strong>
+              <span>كمية محدودة جداً · الدفع عند الاستلام</span>
+            </div>
+            <div className="o-royal-ribbon-price">
+              <b>{total} دج</b>
+              <del>14000 دج</del>
+            </div>
+          </div>
+          <div className="bt">🔥 اطلبي الآن 🛒</div>
+          <h3>املئي الاستمارة أدناه لتأكيد طلبك فوراً</h3>
           {orderNumber ? (
             <div className="ok" role="status">
               <h2>✔ شكراً لك، تم تسجيل طلبك</h2>
@@ -147,7 +157,7 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
                 <input type="hidden" name="color" value={selectedColorChoice.storeValue} />
                 <input type="hidden" name="delivery" value={delivery} />
 
-                <label>اختاري لون العباية (مع الجمبسوت الأسود)</label>
+                <label>✨ اختاري لون العباية الملكية (مع الجمبسوت الأسود)</label>
                 <div className="sw sw-thumbs" id="cb">
                   {colorChoices.map(item => (
                     <button
@@ -208,13 +218,13 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
                 </div>
                 <div className="err" id="e_s" role={errors.size ? "alert" : undefined}>{errors.size}</div>
 
-                <label>نوع التوصيل</label>
+                <label>🚚 نوع التوصيل</label>
                 <div className="sw" id="dv">
                   <button type="button" data-d="home" aria-pressed={delivery === "home"} onClick={() => setDelivery("home")}>🏠 إلى المنزل</button>
                   <button type="button" data-d="office" aria-pressed={delivery === "office"} onClick={() => setDelivery("office")}>🏢 إلى المكتب</button>
                 </div>
 
-                <div className="fld">
+                <div className="fld fld-textarea">
                   <i aria-hidden="true">💬</i>
                   <textarea id="nt" name="note" aria-label="ملاحظة اختيارية" rows={2} maxLength={300} placeholder="ملاحظة (اختياري)" style={{ borderRadius: 20 }} />
                 </div>
@@ -229,13 +239,13 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
 
                 <div className="err" id="e_f" role={errors.form || checkout.draftError ? "alert" : undefined}>{errors.form || checkout.draftError}</div>
                 <button className="btn" id="b" type="submit" disabled={product.stock <= 0 || checkout.pending}>
-                  {checkout.pending ? "جارٍ إرسال الطلب…" : "أؤكد طلبي الآن 🛒"}
+                  {checkout.pending ? "جارٍ إرسال الطلب…" : `أؤكد طلبي الآن 🛒 — ${total} دج`}
                 </button>
               </form>
               <div className="ft">
                 <div><i>🛡️</i>طلبك آمن 100%</div>
-                <div><i>🚚</i>توصيل سريع لجميع الولايات</div>
-                <div><i>🎁</i>توصلكم في بيتك بأمان</div>
+                <div><i>🚚</i>توصيل سريع 58 ولاية</div>
+                <div><i>🎁</i>الدفع عند الاستلام</div>
               </div>
             </div>
           )}
@@ -252,6 +262,31 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
           <div><span>💛</span>الدفع عند الاستلام 100% أمان</div>
         </div>
         <div className="q">كوني دائماً مميزة ... اختاري ما يناسبك</div>
+
+        <div className="abaya-sticky-bar">
+          <div className="abaya-sticky-inner">
+            <div className="abaya-sticky-price">
+              <small>👑 عرض خاص (عباية + جمبسوت)</small>
+              <strong>{total} دج</strong>
+              <del>14000 دج</del>
+            </div>
+            <a
+              href="#order"
+              className="abaya-sticky-btn"
+              onClick={e => {
+                e.preventDefault();
+                startCheckout();
+                document.getElementById("order")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                window.setTimeout(() => {
+                  const firstInput = document.getElementById("n") as HTMLInputElement | null;
+                  firstInput?.focus({ preventScroll: true });
+                }, 450);
+              }}
+            >
+              🛒 اشتري الآن — اطلبي هنا
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   );

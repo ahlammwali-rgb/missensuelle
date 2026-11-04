@@ -78,12 +78,12 @@ function firstValue(form: FormData, names: string[]): string {
 function hasDraftData(payload: CheckoutPayload): boolean {
   return Boolean(
     payload.customer || payload.phone || payload.wilaya || payload.commune || payload.address || payload.note ||
-    payload.items.some(item => Boolean(item.color || item.size)) || payload.delivery === "office",
+    payload.items.some(item => Boolean(item.size)) || payload.delivery === "office",
   );
 }
 
 export function useCheckoutDraft({ formRef, source, getItems, watchKey, aliases = {} }: Options): HookResult {
-  const [consent, setConsentState] = useState(false);
+  const [consent, setConsentState] = useState(true);
   const [draftStatus, setDraftStatus] = useState<CheckoutDraftStatus>("idle");
   const [draftError, setDraftError] = useState("");
   const [pending, setPending] = useState(false);
@@ -92,7 +92,7 @@ export function useCheckoutDraft({ formRef, source, getItems, watchKey, aliases 
   const revisionRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef(false);
-  const consentRef = useRef(false);
+  const consentRef = useRef(true);
   const mountedRef = useRef(true);
   const getItemsRef = useRef(getItems);
   const optionsRef = useRef({ source, aliases });

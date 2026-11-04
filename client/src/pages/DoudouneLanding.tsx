@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { type Order, type Product } from "@/lib/store-data";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
+import { useCheckoutDraft } from "@/components/useCheckoutDraft";
 import { submitCheckoutOrder } from "@/lib/checkout-api";
 import { trackPixelEvent } from "@/lib/tracking";
 import "./doudoune-template.css";
@@ -34,6 +35,7 @@ export default function DoudouneLanding({
 }) {
   const [color, setColor] = useState<ColorKey>("blue");
   const [isThumbSelected, setIsThumbSelected] = useState(false);
+  const [selectedSize, setSelectedSize] = useState<string>("");
   const [selectedWilaya, setSelectedWilaya] = useState<string>("");
   const [selectedCommune, setSelectedCommune] = useState<string>("");
   const [offerMode, setOfferMode] = useState<OfferMode>("single");
@@ -46,6 +48,27 @@ export default function DoudouneLanding({
   const communes = selectedWilaya
     ? (abayaCommunesByWilaya[selectedWilaya] ?? [])
     : [];
+
+  useCheckoutDraft({
+    formRef,
+    source: "product",
+    aliases: { customer: ["name"] },
+    getItems: () => [
+      {
+        productId: product.id,
+        quantity: offerMode === "pack2" ? 2 : Math.max(1, quantity || 1),
+        color:
+          offerMode === "pack2"
+            ? `1: ${AR[color]} | 2: ${AR[secondColor]}`
+            : AR[color],
+        size:
+          offerMode === "pack2"
+            ? `1: ${selectedSize} | 2: ${secondSize}`
+            : selectedSize,
+      },
+    ],
+    watchKey: `${color}|${selectedSize}|${selectedWilaya}|${selectedCommune}|${offerMode}|${secondColor}|${secondSize}|${quantity}`,
+  });
 
   useEffect(() => {
     const prevTitle = document.title;
@@ -104,7 +127,11 @@ export default function DoudouneLanding({
     let serverOrderNumber = `MS-${Math.floor(1000 + Math.random() * 8999)}`;
 
     try {
+      const storedToken =
+        window.sessionStorage.getItem("miss-sensuelle-checkout-token") ||
+        window.localStorage.getItem("miss-sensuelle-checkout-token");
       const token =
+        storedToken ??
         globalThis.crypto?.randomUUID?.() ??
         `00000000-0000-4000-8000-${String(Date.now()).padStart(12, "0").slice(-12)}`;
       const res = await submitCheckoutOrder(token, {
@@ -126,6 +153,10 @@ export default function DoudouneLanding({
         ],
       });
       serverOrderNumber = res.orderNumber;
+      try {
+        window.sessionStorage.removeItem("miss-sensuelle-checkout-token");
+        window.localStorage.removeItem("miss-sensuelle-checkout-token");
+      } catch {}
     } catch {
       // Fallback local si hors-ligne
     }
@@ -326,7 +357,12 @@ export default function DoudouneLanding({
             </label>
             <label className="f">
               <i>📏</i>
-              <select name="size" required defaultValue="">
+              <select
+                name="size"
+                required
+                value={selectedSize}
+                onChange={e => setSelectedSize(e.target.value)}
+              >
                 <option value="">المقاس</option>
                 {SIZES.map(sz => (
                   <option key={sz} value={sz}>
