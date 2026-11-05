@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import {
   CheckCircle2,
   ExternalLink,
@@ -326,10 +326,10 @@ export function GoogleSheetPanel({
             }}
           >
             <h4 style={{ margin: "0 0 8px", fontSize: "15px", fontWeight: 800, color: "#10b981" }}>
-              2. Du Site vers le Google Sheet 🚀
+              2. Du Site vers le Google Sheet 🚀 (Optionnel)
             </h4>
             <p style={{ margin: 0, fontSize: "13px", color: "var(--app-text-muted)", lineHeight: 1.6 }}>
-              Si vous souhaitez que chaque nouvelle commande passée sur la boutique s'ajoute automatiquement en temps réel dans votre Google Sheet, collez simplement l'URL de votre Web App Google Script ci-dessus.
+              💡 <b>Important : Vous n'avez RIEN à faire ici pour recevoir vos commandes TikTok !</b> La synchronisation de votre Sheet vers l'Admin est 100% automatique toutes les 60 secondes.<br/>Cette case Webhook est facultative : elle sert uniquement si vous voulez aussi exporter les commandes passées sur le site vers votre tableau Google Sheet. Si vous n'en avez pas besoin, laissez simplement vide.
             </p>
             <button
               type="button"

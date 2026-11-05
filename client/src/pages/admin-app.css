@@ -385,24 +385,32 @@
 }
 
 /* ==========================================================================
-   APP ORDER CARD STREAM (ULTRA MODERN 3D MOBILE CARD)
+   APP ORDER CARD STREAM (ULTRA MODERN 3D MOBILE CARD - RESPONSIVE & COLOR-CODED)
    ========================================================================== */
 .app-orders-stream {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .app-order-card {
   position: relative;
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  border-radius: 24px;
-  padding: 18px 20px;
+  border-left: 5px solid var(--app-border);
+  border-radius: 22px;
+  padding: 16px 18px;
   box-shadow: var(--app-shadow-3d);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -411,20 +419,179 @@
   box-shadow: var(--app-shadow-lift);
 }
 
-.app-order-card.is-new-card {
+/* ==========================================================================
+   COLORING CARDS ACCORDING TO STATUS
+   ========================================================================== */
+
+/* NOUVELLE (Warm Amber) */
+.app-order-card.card-status-nouvelle {
   border-color: rgba(245, 158, 11, 0.4);
-  box-shadow: 0 14px 34px -4px rgba(245, 158, 11, 0.12), var(--app-shadow-3d);
+  border-left: 6px solid #f59e0b;
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.05) 0%, var(--app-surface) 70px);
+  box-shadow: 0 10px 28px -4px rgba(245, 158, 11, 0.12), var(--app-shadow-3d);
 }
 
-/* Card Top: ID + Status + Date */
+/* CONFIRMEE (Emerald Green) */
+.app-order-card.card-status-confirmee {
+  border-color: rgba(16, 185, 129, 0.45);
+  border-left: 6px solid #10b981;
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.06) 0%, var(--app-surface) 70px);
+  box-shadow: 0 10px 28px -4px rgba(16, 185, 129, 0.14), var(--app-shadow-3d);
+}
+
+/* TRANSFEREE (Vibrant Purple / Indigo) */
+.app-order-card.card-status-transferee {
+  border-color: rgba(139, 92, 246, 0.45);
+  border-left: 6px solid #8b5cf6;
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.07) 0%, var(--app-surface) 70px);
+  box-shadow: 0 10px 28px -4px rgba(139, 92, 246, 0.15), var(--app-shadow-3d);
+}
+
+/* REPORTEE (Sky Blue) */
+.app-order-card.card-status-reportee {
+  border-color: rgba(59, 130, 246, 0.4);
+  border-left: 6px solid #3b82f6;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.06) 0%, var(--app-surface) 70px);
+  box-shadow: 0 10px 28px -4px rgba(59, 130, 246, 0.12), var(--app-shadow-3d);
+}
+
+/* NE REPOND PAS (Deep Amber / Orange) */
+.app-order-card.card-status-ne_repond_pas {
+  border-color: rgba(234, 88, 12, 0.4);
+  border-left: 6px solid #ea580c;
+  background: linear-gradient(180deg, rgba(234, 88, 12, 0.06) 0%, var(--app-surface) 70px);
+  box-shadow: 0 10px 28px -4px rgba(234, 88, 12, 0.12), var(--app-shadow-3d);
+}
+
+/* ANNULEE (Crimson Red / Soft muted) */
+.app-order-card.card-status-annulee {
+  border-color: rgba(239, 68, 68, 0.35);
+  border-left: 6px solid #ef4444;
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.04) 0%, var(--app-surface) 70px);
+  opacity: 0.88;
+}
+.app-order-card.card-status-annulee:hover {
+  opacity: 1;
+}
+
+/* Card Top: Status Badge on Left + Date on Right */
 .aoc-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: 10px;
-  padding-bottom: 12px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--app-border);
+}
+.aoc-status-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.aoc-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.aoc-status-glow-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+  flex-shrink: 0;
+}
+.badge-status-nouvelle {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+.badge-status-confirmee {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+.badge-status-transferee {
+  background: rgba(139, 92, 246, 0.16);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+}
+.badge-status-reportee {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+.badge-status-ne_repond_pas {
+  background: rgba(234, 88, 12, 0.15);
+  color: #ea580c;
+  border: 1px solid rgba(234, 88, 12, 0.35);
+}
+.badge-status-annulee {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+[data-theme="dark"] .badge-status-nouvelle {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+}
+[data-theme="dark"] .badge-status-confirmee {
+  background: rgba(16, 185, 129, 0.22);
+  color: #34d399;
+}
+[data-theme="dark"] .badge-status-transferee {
+  background: rgba(139, 92, 246, 0.25);
+  color: #a78bfa;
+}
+[data-theme="dark"] .badge-status-reportee {
+  background: rgba(59, 130, 246, 0.22);
+  color: #60a5fa;
+}
+[data-theme="dark"] .badge-status-ne_repond_pas {
+  background: rgba(234, 88, 12, 0.22);
+  color: #fb923c;
+}
+[data-theme="dark"] .badge-status-annulee {
+  background: rgba(239, 68, 68, 0.22);
+  color: #f87171;
+}
+
+.aoc-carrier-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+[data-theme="dark"] .aoc-carrier-tag {
+  background: rgba(139, 92, 246, 0.2);
+  color: #c4b5fd;
+}
+
+.aoc-date {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--app-text-muted);
+  white-space: nowrap;
+}
+
+/* ID Row: Wrap-safe and compact */
+.aoc-id-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .aoc-id-btn {
   display: inline-flex;
@@ -433,70 +600,71 @@
   background: var(--app-surface-sub);
   border: 1px solid var(--app-border);
   border-radius: 10px;
-  padding: 5px 10px;
+  padding: 4px 10px;
   cursor: pointer;
   color: var(--app-text);
   font-family: inherit;
   transition: all 0.15s ease;
+  max-width: 100%;
 }
 .aoc-id-btn:hover {
   border-color: var(--app-brand);
   color: var(--app-brand);
 }
-.aoc-id-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--app-brand);
+.aoc-id-hash {
+  color: var(--app-brand);
+  font-weight: 800;
 }
 .aoc-id {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   letter-spacing: -0.01em;
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 .aoc-copy-hint {
   font-size: 11px;
   color: var(--app-text-muted);
-}
-.aoc-top-right {
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-.aoc-date {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--app-text-muted);
 }
 
-/* Customer Box with 1-Tap Direct Call */
+/* Customer Box: Compact call button alongside info */
 .aoc-customer-box {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 12px;
+  width: 100%;
+}
+.aoc-customer-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 200px;
 }
 .aoc-avatar {
-  width: 46px;
-  height: 46px;
-  border-radius: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
   background: var(--app-brand-gradient);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 16px;
-  box-shadow: 0 6px 16px var(--app-brand-glow);
+  font-size: 15px;
+  box-shadow: 0 4px 12px var(--app-brand-glow);
   flex-shrink: 0;
 }
 .aoc-customer-details {
   flex: 1;
-  min-width: 180px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 .aoc-customer-name-row {
   display: flex;
@@ -505,10 +673,11 @@
   flex-wrap: wrap;
 }
 .aoc-name {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--app-text);
   margin: 0;
+  word-break: break-word;
 }
 .aoc-delivery-pill {
   font-size: 11px;
@@ -518,6 +687,7 @@
   background: var(--app-surface-sub);
   border: 1px solid var(--app-border);
   color: var(--app-text-muted);
+  white-space: nowrap;
 }
 .aoc-loc-row {
   display: flex;
@@ -532,47 +702,40 @@
 }
 .aoc-wilaya {
   color: var(--app-text);
+  word-break: break-word;
 }
 .aoc-address-text {
   font-size: 12px;
   color: var(--app-text-sub);
+  word-break: break-word;
 }
 
-/* Direct 1-Tap Call Button (Massive Ergonomic Touch Target) */
-.aoc-call-action-btn {
+/* Compact, Sleek 1-Tap Call Button (NOT oversized!) */
+.aoc-call-compact-btn {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   background: var(--app-emerald-gradient);
   color: #fff;
   border: 0;
-  border-radius: 18px;
-  padding: 10px 18px;
+  border-radius: 14px;
+  height: 38px;
+  padding: 0 14px;
   cursor: pointer;
-  box-shadow: 0 8px 20px var(--app-emerald-glow);
-  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px var(--app-emerald-glow);
+  transition: all 0.15s ease;
   flex-shrink: 0;
 }
-.aoc-call-action-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 24px var(--app-emerald-glow);
+.aoc-call-compact-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+  box-shadow: 0 6px 18px var(--app-emerald-glow);
 }
-.aoc-call-action-btn:active {
+.aoc-call-compact-btn:active {
   transform: scale(0.97);
 }
-.aoc-call-text {
-  display: flex;
-  flex-direction: column;
-  text-align: left;
-}
-.aoc-call-text small {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  opacity: 0.85;
-}
-.aoc-call-text strong {
-  font-size: 14px;
+.aoc-call-num {
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.02em;
 }
@@ -583,23 +746,25 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 12px;
   background: var(--app-surface-sub);
   border: 1px solid var(--app-border);
-  border-radius: 18px;
-  padding: 12px 16px;
+  border-radius: 16px;
+  padding: 12px 14px;
+  width: 100%;
+  box-sizing: border-box;
 }
 .aoc-prod-main {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex: 1;
-  min-width: 200px;
+  min-width: 180px;
 }
 .aoc-prod-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   background: var(--app-surface);
   border: 1px solid var(--app-border);
   display: flex;
@@ -612,11 +777,13 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 .aoc-prod-title {
   font-size: 14px;
   font-weight: 800;
   color: var(--app-text);
+  word-break: break-word;
 }
 .aoc-prod-meta-tags {
   display: flex;
@@ -627,19 +794,24 @@
 .aoc-chip {
   font-size: 11px;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 2px 7px;
   border-radius: 6px;
   background: var(--app-surface);
   border: 1px solid var(--app-border);
   color: var(--app-text-muted);
+  white-space: nowrap;
 }
 .aoc-chip-qty b {
   color: var(--app-text);
 }
 .aoc-chip-color {
   color: #0d4b37;
-  background: rgba(16, 185, 129, 0.1);
+  background: rgba(16, 185, 129, 0.12);
   border-color: rgba(16, 185, 129, 0.3);
+}
+[data-theme="dark"] .aoc-chip-color {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.2);
 }
 .aoc-chip-size {
   color: var(--app-brand);
@@ -652,6 +824,7 @@
   flex-direction: column;
   align-items: flex-end;
   text-align: right;
+  flex-shrink: 0;
 }
 .aoc-price-tag small {
   font-size: 10px;
@@ -660,14 +833,14 @@
   font-weight: 700;
 }
 .aoc-price-tag strong {
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 900;
   color: #10b981;
 }
 
 /* Note Banner */
 .aoc-note-banner {
-  background: rgba(245, 158, 11, 0.1);
+  background: rgba(245, 158, 11, 0.08);
   border: 1px dashed rgba(245, 158, 11, 0.4);
   border-radius: 12px;
   padding: 8px 12px;
@@ -675,23 +848,26 @@
   display: flex;
   gap: 6px;
   align-items: center;
+  word-break: break-word;
 }
 .aoc-note-label {
   font-weight: 800;
   color: #d97706;
+  white-space: nowrap;
 }
 .aoc-note-content {
   color: var(--app-text);
   font-weight: 600;
 }
 
-/* Confirmation Bar (1-Tap Buttons) */
+/* Complete 1-Tap Actions Bar with ALL buttons: Confirmer, Ne répond pas, Reporter, Annuler, Modifier */
 .aoc-actions-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
-  padding-top: 4px;
+  padding-top: 2px;
+  width: 100%;
 }
 
 .aoc-btn {
@@ -699,15 +875,16 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 42px;
-  padding: 0 16px;
-  border-radius: 14px;
-  font-size: 13px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   border: 0;
   transition: all 0.15s ease;
   user-select: none;
+  white-space: nowrap;
 }
 .aoc-btn:active {
   transform: scale(0.96);
@@ -717,30 +894,57 @@
   background: var(--app-emerald-gradient);
   color: #fff;
   box-shadow: 0 4px 14px var(--app-emerald-glow);
-  flex: 1;
-  min-width: 120px;
+  flex: 1 1 auto;
 }
 .aoc-btn-confirm:hover {
   filter: brightness(1.08);
   box-shadow: 0 6px 18px var(--app-emerald-glow);
 }
 
+.aoc-tag-confirmed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  font-weight: 800;
+  font-size: 12px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
 .aoc-btn-noanswer {
-  background: rgba(245, 158, 11, 0.15);
+  background: rgba(245, 158, 11, 0.14);
   color: #d97706;
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
 .aoc-btn-noanswer:hover {
-  background: rgba(245, 158, 11, 0.25);
+  background: rgba(245, 158, 11, 0.22);
 }
 
 .aoc-btn-postpone {
-  background: rgba(59, 130, 246, 0.15);
+  background: rgba(59, 130, 246, 0.14);
   color: #2563eb;
   border: 1px solid rgba(59, 130, 246, 0.3);
 }
 .aoc-btn-postpone:hover {
-  background: rgba(59, 130, 246, 0.25);
+  background: rgba(59, 130, 246, 0.22);
+}
+
+.aoc-btn-cancel {
+  background: rgba(239, 68, 68, 0.14);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.aoc-btn-cancel:hover {
+  background: rgba(239, 68, 68, 0.22);
+}
+
+.aoc-btn-reopen {
+  background: rgba(245, 158, 11, 0.14);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .aoc-btn-edit {
@@ -752,20 +956,6 @@
   border-color: var(--app-brand);
   color: var(--app-brand);
 }
-
-.aoc-tag-confirmed {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border-radius: 12px;
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  font-weight: 800;
-  font-size: 13px;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
 /* ==========================================================================
    MODAL ORDER EDIT (RESPONSIVE TOUCH-FRIENDLY BOTTOM SHEET / 3D MODAL)
    ========================================================================== */
@@ -902,6 +1092,62 @@
 }
 
 @media (max-width: 768px) {
+  .admin-shell, .admin-main, .admin-content, .admin-app-dashboard, .app-main-grid, .app-orders-container, .app-orders-stream {
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+  .app-order-card {
+    padding: 14px 14px !important;
+    border-radius: 18px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .aoc-customer-box {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  .aoc-customer-left {
+    min-width: 0 !important;
+  }
+  .aoc-call-compact-btn {
+    align-self: flex-start !important;
+  }
+  .aoc-product-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  .aoc-prod-main {
+    min-width: 0 !important;
+  }
+  .aoc-price-tag {
+    align-items: flex-start !important;
+    text-align: left !important;
+    border-top: 1px dashed var(--app-border) !important;
+    padding-top: 6px !important;
+  }
+  .aoc-actions-bar {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+    width: 100% !important;
+  }
+  .aoc-actions-bar .aoc-btn-confirm,
+  .aoc-actions-bar .aoc-tag-confirmed {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    height: 40px !important;
+  }
+  .aoc-actions-bar .aoc-btn {
+    width: 100% !important;
+    height: 36px !important;
+    padding: 0 8px !important;
+    font-size: 11px !important;
+    min-width: 0 !important;
+  }
+
   .admin-shell .admin-mobile-nav {
     position: fixed !important;
     left: 12px !important;

@@ -12,13 +12,14 @@ import {
   Package,
   Phone,
   PhoneOff,
+  RotateCcw,
   Search,
   Sparkles,
   TrendingUp,
+  XCircle,
 } from "lucide-react";
 import { formatDZD, type Order, type OrderStatus } from "@/lib/store-data";
 import { formatOrderDate, getOrderStats, parseOrderDate } from "@/lib/admin-orders";
-import { StatusPill } from "./StoreLayout";
 
 type Props = {
   orders: Order[];
@@ -37,12 +38,45 @@ type Props = {
 };
 
 const labels: Record<OrderStatus, { label: string; icon: string }> = {
-  nouvelle: { label: "Nouvelles", icon: "🔥" },
-  confirmee: { label: "Confirmées", icon: "✅" },
-  reportee: { label: "Reportées", icon: "⏳" },
-  ne_repond_pas: { label: "Sans réponse", icon: "📵" },
-  transferee: { label: "Transférées", icon: "🚚" },
-  annulee: { label: "Annulées", icon: "❌" },
+  nouvelle: { label: "Nouvelles", icon: "🟡" },
+  confirmee: { label: "Confirmées", icon: "🟢" },
+  transferee: { label: "Transférées", icon: "🟣" },
+  reportee: { label: "Reportées", icon: "🔵" },
+  ne_repond_pas: { label: "Sans réponse", icon: "🟠" },
+  annulee: { label: "Annulées", icon: "🔴" },
+};
+
+const statusMeta: Record<OrderStatus, { label: string; badgeClass: string; cardClass: string }> = {
+  nouvelle: {
+    label: "Nouvelle commande",
+    badgeClass: "badge-status-nouvelle",
+    cardClass: "card-status-nouvelle",
+  },
+  confirmee: {
+    label: "Confirmée",
+    badgeClass: "badge-status-confirmee",
+    cardClass: "card-status-confirmee",
+  },
+  transferee: {
+    label: "Transférée E-com",
+    badgeClass: "badge-status-transferee",
+    cardClass: "card-status-transferee",
+  },
+  reportee: {
+    label: "Reportée",
+    badgeClass: "badge-status-reportee",
+    cardClass: "card-status-reportee",
+  },
+  ne_repond_pas: {
+    label: "Sans réponse",
+    badgeClass: "badge-status-ne_repond_pas",
+    cardClass: "card-status-ne_repond_pas",
+  },
+  annulee: {
+    label: "Annulée",
+    badgeClass: "badge-status-annulee",
+    cardClass: "card-status-annulee",
+  },
 };
 
 export function AdminDashboard({
@@ -223,73 +257,85 @@ export function AdminDashboard({
           <div className="app-orders-stream">
             {filtered.map(order => {
               const isNew = order.status === "nouvelle";
+              const meta = statusMeta[order.status] ?? statusMeta.nouvelle;
+
               return (
                 <article
                   key={order.id}
-                  className={`app-order-card status-${order.status} ${isNew ? "is-new-card" : ""}`}
+                  className={`app-order-card ${meta.cardClass} ${isNew ? "is-new-card" : ""}`}
                 >
-                  {/* Top Bar: ID + Status + Date */}
+                  {/* Top Bar: Dedicated Status Badge on Left + Date on Right */}
                   <div className="aoc-top">
+                    <div className="aoc-status-badge-wrap">
+                      <span className={`aoc-status-pill ${meta.badgeClass}`}>
+                        <span className="aoc-status-glow-dot" />
+                        <span className="aoc-status-text">{meta.label}</span>
+                      </span>
+                      {order.status === "transferee" && (
+                        <span className="aoc-carrier-tag">E-com Delivery</span>
+                      )}
+                    </div>
+
+                    <span className="aoc-date">{formatOrderDate(order.createdAt)}</span>
+                  </div>
+
+                  {/* ID Row: Wrap-Safe, Break-All, Clean Copy */}
+                  <div className="aoc-id-row">
                     <button
                       type="button"
                       className="aoc-id-btn"
                       onClick={() => copyId(order.id)}
-                      title="Cliquez pour copier l'ID"
+                      title="Cliquer pour copier l'identifiant"
                     >
-                      <span className="aoc-id-dot" />
+                      <span className="aoc-id-hash">#</span>
                       <strong className="aoc-id">{order.id}</strong>
                       <span className="aoc-copy-hint">
-                        {copiedId === order.id ? "Copié !" : <Copy size={12} />}
+                        {copiedId === order.id ? "Copié !" : <Copy size={11} />}
                       </span>
                     </button>
-
-                    <div className="aoc-top-right">
-                      <span className="aoc-date">{formatOrderDate(order.createdAt)}</span>
-                      <StatusPill status={order.status} />
-                    </div>
                   </div>
 
-                  {/* Customer Block with 1-Tap Call */}
+                  {/* Customer Block with Sleek (Compact) Call Button */}
                   <div className="aoc-customer-box">
-                    <div className="aoc-avatar">
-                      {order.customer ? order.customer.slice(0, 2).toUpperCase() : "CL"}
-                    </div>
-
-                    <div className="aoc-customer-details">
-                      <div className="aoc-customer-name-row">
-                        <h3 className="aoc-name">{order.customer || "Cliente"}</h3>
-                        <span className="aoc-delivery-pill">
-                          {order.delivery === "office" ? "🏢 Stopdesk / Bureau" : "🏠 À domicile"}
-                        </span>
+                    <div className="aoc-customer-left">
+                      <div className="aoc-avatar">
+                        {order.customer ? order.customer.slice(0, 2).toUpperCase() : "CL"}
                       </div>
 
-                      <div className="aoc-loc-row">
-                        <MapPin size={14} className="aoc-pin-icon" />
-                        <span className="aoc-wilaya">
-                          <b>{order.wilaya || "Wilaya non spécifiée"}</b>
-                          {order.commune ? ` · ${order.commune}` : ""}
-                        </span>
-                      </div>
-
-                      {order.address && (
-                        <div className="aoc-address-text">
-                          <small>Adresse : {order.address}</small>
+                      <div className="aoc-customer-details">
+                        <div className="aoc-customer-name-row">
+                          <h3 className="aoc-name">{order.customer || "Cliente"}</h3>
+                          <span className="aoc-delivery-pill">
+                            {order.delivery === "office" ? "🏢 Bureau / Stopdesk" : "🏠 À domicile"}
+                          </span>
                         </div>
-                      )}
+
+                        <div className="aoc-loc-row">
+                          <MapPin size={13} className="aoc-pin-icon" />
+                          <span className="aoc-wilaya">
+                            <b>{order.wilaya || "Wilaya non spécifiée"}</b>
+                            {order.commune ? ` — ${order.commune}` : ""}
+                          </span>
+                        </div>
+
+                        {order.address && (
+                          <div className="aoc-address-text">
+                            <small>Adresse : {order.address}</small>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Prominent Direct 1-Tap Call Button */}
+                    {/* Compact, Sleek 1-Tap Call Button (Not oversized) */}
                     <button
                       type="button"
-                      className="aoc-call-action-btn"
+                      className="aoc-call-compact-btn"
                       onClick={() => onCall(order.phone)}
                       aria-label={`Appeler ${order.customer || order.phone}`}
+                      title="Appeler la cliente"
                     >
-                      <Phone size={17} />
-                      <div className="aoc-call-text">
-                        <small>Appel Direct</small>
-                        <strong>{order.phone}</strong>
-                      </div>
+                      <Phone size={14} />
+                      <span className="aoc-call-num">{order.phone}</span>
                     </button>
                   </div>
 
@@ -307,12 +353,12 @@ export function AdminDashboard({
                           </span>
                           {order.color && (
                             <span className="aoc-chip aoc-chip-color">
-                              🎨 <b>{order.color}</b>
+                              Couleur : <b>{order.color}</b>
                             </span>
                           )}
-                          {order.size && (
+                          {order.size && order.size.trim() !== "" && (
                             <span className="aoc-chip aoc-chip-size">
-                              📏 Taille : <b>{order.size}</b>
+                              Taille : <b>{order.size}</b>
                             </span>
                           )}
                         </div>
@@ -327,12 +373,12 @@ export function AdminDashboard({
 
                   {order.note && (
                     <div className="aoc-note-banner">
-                      <span className="aoc-note-label">💬 Note client :</span>
+                      <span className="aoc-note-label">📝 Note :</span>
                       <span className="aoc-note-content">{order.note}</span>
                     </div>
                   )}
 
-                  {/* Fluid 1-Tap Confirmation Actions Bar */}
+                  {/* Complete 1-Tap Confirmation Actions Bar with ALL buttons: Confirmer, Ne répond pas, Reporter, Annuler, Modifier */}
                   <div className="aoc-actions-bar">
                     {order.status !== "confirmee" ? (
                       <button
@@ -340,7 +386,7 @@ export function AdminDashboard({
                         className="aoc-btn aoc-btn-confirm"
                         onClick={() => onUpdateStatus?.(order.id, "confirmee")}
                       >
-                        <CheckCircle2 size={16} />
+                        <CheckCircle2 size={15} />
                         <span>Confirmer</span>
                       </button>
                     ) : (
@@ -355,8 +401,9 @@ export function AdminDashboard({
                         type="button"
                         className="aoc-btn aoc-btn-noanswer"
                         onClick={() => onUpdateStatus?.(order.id, "ne_repond_pas")}
+                        title="Marquer sans réponse"
                       >
-                        <PhoneOff size={15} />
+                        <PhoneOff size={14} />
                         <span>Ne répond pas</span>
                       </button>
                     )}
@@ -366,9 +413,32 @@ export function AdminDashboard({
                         type="button"
                         className="aoc-btn aoc-btn-postpone"
                         onClick={() => onUpdateStatus?.(order.id, "reportee")}
+                        title="Reporter la confirmation"
                       >
-                        <Clock size={15} />
+                        <Clock size={14} />
                         <span>Reporter</span>
+                      </button>
+                    )}
+
+                    {order.status !== "annulee" ? (
+                      <button
+                        type="button"
+                        className="aoc-btn aoc-btn-cancel"
+                        onClick={() => onUpdateStatus?.(order.id, "annulee")}
+                        title="Annuler la commande"
+                      >
+                        <XCircle size={14} />
+                        <span>Annuler</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="aoc-btn aoc-btn-reopen"
+                        onClick={() => onUpdateStatus?.(order.id, "nouvelle")}
+                        title="Rétablir en nouvelle commande"
+                      >
+                        <RotateCcw size={14} />
+                        <span>Rétablir</span>
                       </button>
                     )}
 
@@ -376,8 +446,9 @@ export function AdminDashboard({
                       type="button"
                       className="aoc-btn aoc-btn-edit"
                       onClick={() => onSelect(order)}
+                      title="Modifier les détails de la commande"
                     >
-                      <Edit3 size={15} />
+                      <Edit3 size={14} />
                       <span>Modifier</span>
                     </button>
                   </div>
@@ -391,17 +462,15 @@ export function AdminDashboard({
                 <p>
                   {orders.length
                     ? "Modifie la recherche, la période ou le statut."
-                    : "Les commandes enregistrées apparaîtront ici. Aucune donnée de démonstration n’est affichée."}
+                    : "Les commandes enregistrées apparaîtront ici. Aucune donnée de démonstration n'est affichée."}
                 </p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Stock Panel / Sidebar Widget */}
-        <aside className="app-stock-sidebar">
-          {stockPanel}
-        </aside>
+        {/* Sidebar Stocks / Quick Links */}
+        <div className="app-stock-sidebar">{stockPanel}</div>
       </section>
     </div>
   );

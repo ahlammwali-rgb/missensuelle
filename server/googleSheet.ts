@@ -1,4 +1,4 @@
-import type { CheckoutOrder } from "../shared/checkout";
+﻿import type { CheckoutOrder } from "../shared/checkout";
 import { getDb } from "./db";
 import { getCloudToken } from "./persistentStore";
 
@@ -129,6 +129,13 @@ export async function importGoogleSheetToOrders(
   const existingOrderIds = new Set(memoryOrders.map(o => o.id));
   const existingPhones = new Set(memoryOrders.map(o => cleanPhone(o.phone)));
 
+    // Clean up any previously imported orders that had size: "L" mistakenly set
+  for (const o of memoryOrders) {
+    if (o.size === "L" && (o.id.startsWith("MS-GS-") || o.id.startsWith("MS-TT-") || o.product.includes("EXTENTION"))) {
+      o.size = "";
+    }
+  }
+
   let added = 0;
   let skipped = 0;
 
@@ -170,7 +177,7 @@ export async function importGoogleSheetToOrders(
       quantity: qty,
       total,
       color: variant.trim(),
-      size: "L",
+      size: "",
       delivery: "home",
       wilaya: wilaya.trim(),
       commune: commune.trim(),

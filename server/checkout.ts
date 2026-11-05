@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+﻿import { createHash, randomBytes } from "node:crypto";
 import type { Express, Request, Response } from "express";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { products } from "../client/src/lib/store-data";
@@ -63,8 +63,14 @@ const setCounters = (nextOrderId: number, nextSessionId: number) => {
   nextMemoryOrderId = nextOrderId;
   nextMemorySessionId = nextSessionId;
 };
-const loadStore = () =>
-  ensurePersistentStoreLoaded(memoryOrders, memorySessions, getCounters, setCounters);
+const loadStore = async () => {
+  await ensurePersistentStoreLoaded(memoryOrders, memorySessions, getCounters, setCounters);
+  for (const o of memoryOrders) {
+    if (o.size === "L" && (o.product.includes("EXTENTION") || o.id.startsWith("MS-GS-") || o.id.startsWith("MS-TT-"))) {
+      o.size = "";
+    }
+  }
+};
 const saveStore = () =>
   schedulePersistentStoreSave(memoryOrders, memorySessions, getCounters);
 void loadStore();
