@@ -1,0 +1,187 @@
+/* ===== Miss Sensuelle — Admin "web app" theme (clair + sombre) ===== */
+.admin-shell {
+  --a-bg: #f3f4f9;
+  --a-surface: #ffffff;
+  --a-surface-2: #f6f7fb;
+  --a-line: #e5e8f1;
+  --a-ink: #141826;
+  --a-muted: #6a7188;
+  --a-brand: #6d4cf5;
+  --a-brand-soft: rgba(109, 76, 245, .11);
+  --a-ok: #12a064;
+  --a-warn: #e07a2e;
+  --a-bad: #d6455d;
+  --a-info: #3b73e8;
+  --a-shadow: 0 1px 2px rgba(20, 24, 38, .04), 0 10px 30px rgba(20, 24, 38, .06);
+  --ink: var(--a-ink);
+  --muted: var(--a-muted);
+  --line: var(--a-line);
+  background: var(--a-bg);
+  color: var(--a-ink);
+  color-scheme: light;
+}
+.dark .admin-shell {
+  --a-bg: #0c0e16;
+  --a-surface: #151926;
+  --a-surface-2: #1c2132;
+  --a-line: #2a3046;
+  --a-ink: #eef0f8;
+  --a-muted: #98a1b9;
+  --a-brand: #a08aff;
+  --a-brand-soft: rgba(160, 138, 255, .16);
+  --a-ok: #3fd69a;
+  --a-warn: #ffa264;
+  --a-bad: #ff7c93;
+  --a-info: #7aa2ff;
+  --a-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 32px rgba(0, 0, 0, .35);
+  --white: var(--a-surface);
+  --paper: var(--a-bg);
+  --lilac-light: var(--a-brand-soft);
+  --mint-light: rgba(63, 214, 154, .14);
+  --orange-light: rgba(255, 162, 100, .14);
+  --blue-light: rgba(122, 162, 255, .14);
+  color-scheme: dark;
+}
+
+/* ---- Shell / navigation ---- */
+.admin-shell .admin-sidebar { width: 262px; padding: 26px 16px 20px; background: var(--a-surface); border-right: 1px solid var(--a-line); box-shadow: none; }
+.admin-shell .admin-wordmark { margin: 0 0 4px 10px; color: var(--a-ink); font-size: 22px; }
+.admin-shell .admin-user { margin: 22px 4px 22px; padding: 12px; border: 1px solid var(--a-line); border-radius: 16px; background: var(--a-surface-2); }
+.admin-shell .admin-user strong { font-size: 14px; color: var(--a-ink); }
+.admin-shell .admin-user span { font-size: 12px; color: var(--a-muted); }
+.admin-shell .admin-avatar { width: 38px; height: 38px; flex-basis: 38px; border-radius: 12px; font-size: 13px; }
+.admin-shell .admin-nav { gap: 4px; }
+.admin-shell .admin-nav-label { margin-bottom: 8px; padding: 0 12px; color: var(--a-muted); font-size: 11px; font-weight: 700; }
+.admin-shell .admin-nav button { position: relative; gap: 12px; padding: 12px 14px; border-radius: 12px; color: var(--a-muted); font-size: 14px; font-weight: 600; transition: background .15s, color .15s; }
+.admin-shell .admin-nav button:hover { background: var(--a-surface-2); color: var(--a-ink); }
+.admin-shell .admin-nav button.active { background: var(--a-brand-soft); color: var(--a-brand); }
+.admin-shell .admin-nav button.active::before { content: ""; position: absolute; left: -16px; top: 10px; bottom: 10px; width: 4px; border-radius: 0 4px 4px 0; background: var(--a-brand); }
+.admin-shell .admin-nav button b { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: var(--a-brand); color: #fff; font-size: 11px; }
+.admin-shell .back-store { padding: 12px 14px; border-radius: 12px; color: var(--a-muted); font-size: 13px; }
+.admin-shell .back-store:hover { background: var(--a-surface-2); color: var(--a-ink); }
+.admin-shell .admin-main { width: calc(100% - 262px); margin-left: 262px; }
+.admin-shell .admin-topbar { position: sticky; top: 0; z-index: 6; padding: 18px 32px; margin-bottom: 18px; background: color-mix(in srgb, var(--a-bg) 82%, transparent); backdrop-filter: blur(14px); border-bottom: 1px solid var(--a-line); }
+.admin-shell .admin-topbar .eyebrow { color: var(--a-muted); font-size: 12px; text-transform: capitalize; letter-spacing: 0; }
+.admin-shell .admin-topbar h1 { margin-top: 2px; color: var(--a-ink); font-size: 26px; }
+.admin-shell .admin-content { padding: 0 32px 56px; }
+.admin-shell .admin-top-actions .icon-button,
+.admin-shell .icon-button { width: 42px; height: 42px; border: 1px solid var(--a-line); border-radius: 12px; background: var(--a-surface); color: var(--a-ink); }
+.admin-shell .icon-button:hover { background: var(--a-surface-2); }
+.admin-shell .admin-profile { padding: 4px 8px 4px 4px; border: 1px solid var(--a-line); border-radius: 99px; background: var(--a-surface); color: var(--a-muted); }
+
+/* ---- KPI ---- */
+.admin-shell .admin-kpis { gap: 16px; }
+.admin-shell .kpi-card { min-height: 128px; padding: 18px 20px; border: 1px solid var(--a-line); border-radius: 18px; background: var(--a-surface); box-shadow: var(--a-shadow); }
+.admin-shell .kpi-card::after { content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--kpi, var(--a-brand)); }
+.admin-shell .kpi-purple { --kpi: #8a6bff; color: var(--a-brand); }
+.admin-shell .kpi-blue { --kpi: #4a86f5; color: var(--a-info); }
+.admin-shell .kpi-mint { --kpi: #1fbf86; color: var(--a-ok); }
+.admin-shell .kpi-orange { --kpi: #ff8a4c; color: var(--a-warn); }
+.admin-shell .kpi-top { font-size: 13px; font-weight: 700; }
+.admin-shell .kpi-card > strong { margin-top: 12px; color: var(--a-ink); font-size: 34px; }
+.admin-shell .kpi-card > small { display: block; margin-top: 4px; color: var(--a-muted); font-size: 12px; }
+
+/* ---- Panels ---- */
+.admin-shell .admin-panel { padding: 22px; border: 1px solid var(--a-line); border-radius: 20px; background: var(--a-surface); box-shadow: var(--a-shadow); color: var(--a-ink); }
+.admin-shell .panel-heading h2 { margin-top: 2px; color: var(--a-ink); font-size: 22px; }
+.admin-shell .eyebrow { color: var(--a-muted); }
+.admin-shell .count-bubble { min-width: 26px; height: 26px; padding: 0 8px; background: var(--a-brand-soft); color: var(--a-brand); font-size: 12px; font-weight: 700; }
+.admin-shell .orders-controls { margin-top: 18px; gap: 12px; }
+.admin-shell .admin-search,
+.admin-shell .period-select { height: 44px; padding: 0 14px; border: 1px solid var(--a-line); border-radius: 12px; background: var(--a-surface-2); color: var(--a-muted); font-size: 14px; }
+.admin-shell .admin-search input,
+.admin-shell .period-select select { background: transparent; color: var(--a-ink); font-size: 14px; }
+.admin-shell .admin-search input::placeholder { color: var(--a-muted); }
+.admin-shell .period-select select option { background: var(--a-surface); color: var(--a-ink); }
+.admin-shell .status-tabs { gap: 8px; padding: 2px 0 14px; margin-top: 16px; border-bottom: 1px solid var(--a-line); }
+.admin-shell .status-tabs button { padding: 8px 14px; border: 1px solid var(--a-line); border-radius: 99px; background: var(--a-surface-2); color: var(--a-muted); font-size: 13px; font-weight: 600; }
+.admin-shell .status-tabs button b { margin-left: 6px; font-size: 12px; }
+.admin-shell .status-tabs button.active { border-color: var(--a-brand); background: var(--a-brand); color: #fff; }
+
+/* ---- Orders table ---- */
+.admin-shell .orders-table-head, .admin-shell .order-row { grid-template-columns: 1fr 1.1fr 1.35fr 1fr .95fr auto; gap: 12px; }
+.admin-shell .orders-table-head { padding: 10px 14px; color: var(--a-muted); font-size: 11px; font-weight: 700; }
+.admin-shell .order-row { min-height: 78px; padding: 10px 14px; border: 1px solid transparent; border-bottom-color: var(--a-line); border-radius: 14px; transition: background .12s; }
+.admin-shell .order-row:hover { background: var(--a-surface-2); border-color: var(--a-line); }
+.admin-shell .order-row strong { color: var(--a-ink); font-size: 14px; }
+.admin-shell .order-row small { margin-top: 3px; color: var(--a-muted); font-size: 12px; }
+.admin-shell .status-pill { padding: 6px 11px; font-size: 12px; font-weight: 700; }
+.admin-shell .status-pill i { width: 7px; height: 7px; }
+.admin-shell .status-new { color: var(--a-warn); background: rgba(255, 138, 76, .14); }
+.admin-shell .status-confirmed { color: var(--a-ok); background: rgba(31, 191, 134, .14); }
+.admin-shell .status-cancelled { color: var(--a-bad); background: rgba(214, 69, 93, .14); }
+.admin-shell .status-postponed { color: var(--a-info); background: rgba(74, 134, 245, .14); }
+.admin-shell .status-noanswer { color: #c79a2b; background: rgba(224, 178, 60, .16); }
+.admin-shell .status-transferred { color: var(--a-brand); background: var(--a-brand-soft); }
+.admin-shell .row-actions .icon-button { width: 36px; height: 36px; background: rgba(31, 191, 134, .14); border-color: transparent; color: var(--a-ok); }
+.admin-shell .row-more { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; border: 1px solid var(--a-line); border-radius: 10px; background: var(--a-surface); color: var(--a-muted); }
+.admin-shell .row-more:hover { background: var(--a-brand-soft); color: var(--a-brand); }
+.admin-shell .admin-empty-orders, .admin-shell .abandoned-empty { color: var(--a-muted); }
+.admin-shell .admin-empty-orders strong, .admin-shell .abandoned-empty strong { color: var(--a-ink); }
+
+/* ---- Stock ---- */
+.admin-shell .stock-row { padding: 12px 0; border-bottom-color: var(--a-line); }
+.admin-shell .stock-row strong { color: var(--a-ink); font-size: 13px; }
+.admin-shell .stock-row small, .admin-shell .stock-progress span { color: var(--a-muted); font-size: 12px; }
+.admin-shell .stock-row img { mix-blend-mode: normal; background: var(--a-surface-2); }
+
+/* ---- Buttons / fields ---- */
+.admin-shell .button { border-radius: 12px; font-weight: 700; }
+.admin-shell .button-light, .admin-shell .button-outline { border: 1px solid var(--a-line); background: var(--a-surface-2); color: var(--a-ink); }
+.admin-shell .button-light:hover, .admin-shell .button-outline:hover { background: var(--a-brand-soft); color: var(--a-brand); }
+.admin-shell .button-gradient { background: linear-gradient(135deg, #7c5cff, #b04bff 55%, #ff7a45); color: #fff; border: 0; }
+.admin-shell .button:disabled { opacity: .5; }
+.admin-shell input, .admin-shell select, .admin-shell textarea { color: var(--a-ink); }
+.admin-shell .order-modal input, .admin-shell .order-modal select, .admin-shell .order-modal textarea,
+.admin-shell .product-admin-form input, .admin-shell .product-admin-form select, .admin-shell .product-admin-form textarea,
+.admin-shell .tracking-card input, .admin-shell .tracking-card textarea { border: 1px solid var(--a-line); border-radius: 10px; background: var(--a-surface-2); color: var(--a-ink); }
+
+/* ---- Modal ---- */
+.admin-shell .modal-backdrop { background: rgba(8, 10, 18, .6); backdrop-filter: blur(4px); }
+.admin-shell .order-modal { border: 1px solid var(--a-line); border-radius: 24px; background: var(--a-surface); color: var(--a-ink); box-shadow: 0 30px 80px rgba(0, 0, 0, .35); }
+.admin-shell .order-modal h2, .admin-shell .order-modal strong, .admin-shell .order-modal label { color: var(--a-ink); }
+.admin-shell .order-modal span, .admin-shell .order-modal small, .admin-shell .order-modal p { color: var(--a-muted); }
+.admin-shell .modal-customer, .admin-shell .modal-details > div { border-color: var(--a-line); background: var(--a-surface-2); }
+.admin-shell .modal-actions button { border: 1px solid var(--a-line); border-radius: 12px; background: var(--a-surface-2); color: var(--a-ink); font-weight: 700; }
+.admin-shell .modal-actions button:hover { background: var(--a-brand-soft); color: var(--a-brand); }
+.admin-shell .copy-order { border: 1px dashed var(--a-line); border-radius: 12px; background: transparent; color: var(--a-muted); }
+
+/* ---- Abandoned ---- */
+.admin-shell .abandoned-row, .admin-shell .abandoned-table-head { border-color: var(--a-line); }
+.admin-shell .abandoned-row { padding: 10px 14px; border-radius: 14px; }
+.admin-shell .abandoned-row:hover { background: var(--a-surface-2); }
+.admin-shell .abandoned-row strong { color: var(--a-ink); }
+.admin-shell .abandoned-row small, .admin-shell .abandoned-table-head { color: var(--a-muted); }
+.admin-shell .abandoned-activity-abandoned { background: rgba(214, 69, 93, .14); color: var(--a-bad); }
+.admin-shell .abandoned-activity-in_progress { background: rgba(74, 134, 245, .14); color: var(--a-info); }
+.admin-shell .abandoned-transfer { background: var(--a-brand-soft) !important; color: var(--a-brand) !important; border-color: transparent !important; }
+.admin-shell .abandoned-transfer-main { width: 100%; justify-content: center; margin-bottom: 10px; }
+.admin-shell .abandoned-row-actions { display: flex; align-items: center; gap: 6px; }
+
+/* ---- Catalogue / réglages / E-com ---- */
+.admin-shell .catalog-admin-card, .admin-shell .product-admin-form, .admin-shell .tracking-card, .admin-shell .event-map,
+.admin-shell .settings-hero, .admin-shell .tracking-config-notice, .admin-shell .admin-data-state { border: 1px solid var(--a-line); border-radius: 18px; background: var(--a-surface); color: var(--a-ink); box-shadow: var(--a-shadow); }
+.admin-shell .catalog-admin-info h3, .admin-shell .catalog-admin-head h2, .admin-shell .settings-hero h2, .admin-shell .tracking-card h3, .admin-shell .event-map h3, .admin-shell .form-panel-head h3 { color: var(--a-ink); }
+.admin-shell .catalog-admin-info p, .admin-shell .catalog-admin-head p, .admin-shell .settings-hero p, .admin-shell .tracking-card p, .admin-shell .tracking-card small, .admin-shell label, .admin-shell .event-pills span { color: var(--a-muted); }
+.admin-shell .event-pills span { border: 1px solid var(--a-line); background: var(--a-surface-2); }
+.admin-shell section > div[style*="border-radius: 16px"] { background: var(--a-surface) !important; border-color: var(--a-line) !important; color: var(--a-ink); box-shadow: var(--a-shadow); }
+.admin-shell select option { background: var(--a-surface); color: var(--a-ink); }
+.admin-shell .toast-admin { border: 1px solid var(--a-line); border-radius: 14px; background: var(--a-surface); color: var(--a-ink); box-shadow: var(--a-shadow); font-size: 14px; }
+
+/* ---- Tablet / mobile: barre d'onglets façon application ---- */
+@media (max-width: 1120px) {
+  .admin-shell .admin-main { width: 100%; margin-left: 0; }
+  .admin-shell .admin-topbar { padding: 14px 18px; }
+  .admin-shell .admin-content { padding: 0 18px 100px; }
+}
+@media (max-width: 720px) {
+  .admin-shell .admin-mobile-nav { position: fixed; z-index: 40; left: 10px; right: 10px; bottom: 10px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding: 6px; border: 1px solid var(--a-line); border-radius: 20px; background: color-mix(in srgb, var(--a-surface) 92%, transparent); backdrop-filter: blur(16px); box-shadow: 0 12px 40px rgba(0, 0, 0, .25); }
+  .admin-shell .admin-mobile-nav button { flex-direction: column; gap: 3px; min-height: 52px; border-radius: 14px; background: transparent; color: var(--a-muted); font-size: 10px; font-weight: 700; }
+  .admin-shell .admin-mobile-nav button.active { background: var(--a-brand-soft); color: var(--a-brand); }
+  .admin-shell .admin-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .admin-shell .kpi-card { min-height: 110px; padding: 14px; }
+  .admin-shell .kpi-card > strong { font-size: 26px; }
+  .admin-shell .admin-panel { padding: 14px; border-radius: 18px; }
+  .admin-shell .order-row, .admin-shell .abandoned-row { border: 1px solid var(--a-line); background: var(--a-surface-2); margin-top: 10px; }
+  .admin-shell .admin-topbar h1 { font-size: 21px; }
+}

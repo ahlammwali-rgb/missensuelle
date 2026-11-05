@@ -45,6 +45,17 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
   const checkoutStarted = useRef(false);
 
   useEffect(() => {
+    trackPixelEvent("ViewContent", {
+      content_type: "product",
+      content_id: product.id,
+      content_ids: [product.id],
+      content_name: product.name,
+      value: 7500,
+      currency: "DZD",
+    });
+  }, [product.id]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => {
       setSecondsLeft(prev => (prev > 0 ? prev - 1 : 0));
     }, 1000);

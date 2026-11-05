@@ -20,7 +20,9 @@ import {
 } from "../shared/checkout";
 import {
   discardCheckoutDraft,
+  convertAbandonedToOrder,
   listAbandonedCheckouts,
+  purgeAbandonedWithoutPhone,
   listCheckoutOrders,
   restoreClientBackupOrders,
   saveCheckoutDraft,
@@ -134,6 +136,17 @@ export const appRouter = router({
         }),
       )
       .mutation(({ input }) => restoreClientBackupOrders(input.orders)),
+    convertAbandoned: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(async ({ input }) => {
+        try {
+          return await convertAbandonedToOrder(input.id);
+        } catch (error) {
+          if (error instanceof Error && error.name === "CheckoutValidationError") throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+          throw error;
+        }
+      }),
+    purgeAbandonedNoPhone: adminProcedure.mutation(() => purgeAbandonedWithoutPhone(0)),
     updateAbandoned: adminProcedure
       .input(z.object({ id: z.number().int().positive(), status: recoveryStatusSchema }))
       .mutation(({ input }) => updateAbandonedCheckout(input.id, input.status)),

@@ -5,7 +5,7 @@ import type { AbandonedCheckout, CheckoutOrder, CheckoutPayload } from "../share
 export type PersistentMemorySession = {
   id: number;
   tokenHash: string;
-  state: "draft" | "submitted" | "discarded";
+  state: "draft" | "submitted" | "discarded" | "purged";
   payload: CheckoutPayload | null;
   revision: number;
   orderId: number | null;
@@ -141,7 +141,7 @@ async function pushCloudState(state: PersistedState): Promise<void> {
     for (const s of state.sessions) {
       if (s && s.tokenHash) {
         const prev = mergedSessionsMap.get(s.tokenHash);
-        if (!prev || s.revision >= prev.revision || s.state === "submitted" || s.state === "discarded") {
+        if (!prev || s.revision >= prev.revision || s.state === "submitted" || s.state === "discarded" || s.state === "purged") {
           mergedSessionsMap.set(s.tokenHash, s);
         }
       }

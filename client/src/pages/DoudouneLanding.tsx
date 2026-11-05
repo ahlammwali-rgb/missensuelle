@@ -78,6 +78,17 @@ export default function DoudouneLanding({
   });
 
   useEffect(() => {
+    trackPixelEvent("ViewContent", {
+      content_type: "product",
+      content_id: product.id,
+      content_ids: [product.id],
+      content_name: product.name,
+      value: product.price,
+      currency: "DZD",
+    });
+  }, [product.id]);
+
+  useEffect(() => {
     const prevTitle = document.title;
     document.title = "Miss Sensuelle – دواقون شتوية فاخرة";
     return () => {

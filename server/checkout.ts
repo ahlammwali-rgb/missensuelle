@@ -40,7 +40,7 @@ const TEN_MINUTES = 10 * 60 * 1000;
 type MemorySession = {
   id: number;
   tokenHash: string;
-  state: "draft" | "submitted" | "discarded";
+  state: "draft" | "submitted" | "discarded" | "purged";
   payload: CheckoutPayload | null;
   revision: number;
   orderId: number | null;
@@ -313,6 +313,11 @@ export async function saveCheckoutDraft(input: SaveDraftInput): Promise<{ sessio
     const current = memorySessions.get(hash);
     const now = new Date();
     if (current) {
+      // A draft purged for lacking a phone number comes back to life as soon as the visitor keeps typing.
+      if (current.state === "purged" && revision > current.revision) {
+        current.state = "draft";
+        current.consentedAt = null;
+      }
       if (current.state !== "draft" || revision <= current.revision) return { sessionId: current.id, accepted: false };
       current.payload = payload;
       current.revision = revision;
@@ -563,13 +568,123 @@ export async function listCheckoutOrders(): Promise<CheckoutOrder[]> {
   });
 }
 
+const hasPhone = (phone: string | undefined | null) => /\d/.test(phone ?? "");
+
+/** Drafts that never received a phone number are useless for recovery: purge them (and hide fresh ones). */
+export async function purgeAbandonedWithoutPhone(maxAgeMs = TEN_MINUTES) {
+  const db = await getDb();
+  const now = Date.now();
+  if (!db) {
+    await loadStore();
+    let purged = 0;
+    for (const session of memorySessions.values()) {
+      if (session.state !== "draft" || (session.payload && hasPhone(session.payload.phone))) continue;
+      if (now - session.updatedAt.getTime() < maxAgeMs) continue;
+      session.state = "purged";
+      session.payload = null;
+      session.consentedAt = null;
+      purged++;
+    }
+    if (purged) saveStore();
+    return { purged };
+  }
+  const drafts = await db.select().from(storeCheckoutSessions).where(eq(storeCheckoutSessions.state, "draft"));
+  let purged = 0;
+  for (const session of drafts) {
+    const parsed = session.payload ? checkoutPayloadSchema.safeParse(session.payload) : null;
+    if (parsed?.success && hasPhone(parsed.data.phone)) continue;
+    if (now - new Date(session.updatedAt).getTime() < maxAgeMs) continue;
+    await db.update(storeCheckoutSessions).set({ state: "discarded", payload: null, consentedAt: null, updatedAt: new Date() })
+      .where(eq(storeCheckoutSessions.id, session.id));
+    purged++;
+  }
+  return { purged };
+}
+
+/** Turn an abandoned draft into a real order (lenient: missing optional fields stay empty). */
+export async function convertAbandonedToOrder(id: number): Promise<{ orderNumber: string; total: number }> {
+  const db = await getDb();
+  if (!db) {
+    await loadStore();
+    const session = Array.from(memorySessions.values()).find(s => s.id === id && s.state === "draft" && s.payload);
+    if (!session || !session.payload) throw new CheckoutValidationError("Brouillon introuvable ou déjà transféré");
+    const payload = session.payload;
+    if (!hasPhone(payload.phone)) throw new CheckoutValidationError("Impossible : aucun numéro de téléphone");
+    const shippingFee = await computeShippingFee(payload);
+    const rows = payload.items.map(item => ({ item, product: getCanonicalProduct(item.productId) }));
+    const total = shippingFee + rows.reduce((sum, { item, product }) => sum + (product ? computeLineTotal(product.id, product.price, item.quantity) : 0), 0);
+    const number = orderNumber();
+    const orderId = nextMemoryOrderId++;
+    const now = new Date();
+    memoryOrders.unshift({
+      dbId: orderId,
+      id: number,
+      createdAt: now.toISOString(),
+      customer: payload.customer || "Cliente",
+      phone: normalizePhone(payload.phone),
+      productId: rows[0]?.product?.id ?? payload.items[0]?.productId ?? "p-007",
+      product: rows.map(({ item, product }) => `${product?.name ?? item.productId} × ${item.quantity}`).join(", "),
+      quantity: rows.reduce((sum, { item }) => sum + item.quantity, 0),
+      total,
+      color: payload.items.map(item => item.color).filter(Boolean).join(", "),
+      size: payload.items.map(item => item.size).filter(Boolean).join(", "),
+      delivery: payload.delivery,
+      wilaya: payload.wilaya,
+      commune: payload.commune,
+      address: payload.address,
+      note: [payload.note, "(transférée depuis commande abandonnée)"].filter(Boolean).join(" "),
+      status: "nouvelle",
+    });
+    session.state = "submitted";
+    session.orderId = orderId;
+    session.updatedAt = now;
+    saveStore();
+    return { orderNumber: number, total };
+  }
+  return db.transaction(async tx => {
+    const locked = await tx.select().from(storeCheckoutSessions).where(eq(storeCheckoutSessions.id, id)).for("update");
+    const session = locked[0];
+    const parsed = session?.state === "draft" && session.payload ? checkoutPayloadSchema.safeParse(session.payload) : null;
+    if (!session || !parsed?.success) throw new CheckoutValidationError("Brouillon introuvable ou déjà transféré");
+    const payload = parsed.data;
+    if (!hasPhone(payload.phone)) throw new CheckoutValidationError("Impossible : aucun numéro de téléphone");
+    const resolved = await resolveProducts(tx, payload);
+    const shippingFee = await computeShippingFee(payload);
+    const total = shippingFee + resolved.reduce((sum, row) => sum + computeLineTotal(row.product.slug, row.product.price, row.item.quantity), 0);
+    const number = orderNumber();
+    const orderInsert = await tx.insert(storeOrders).values({
+      orderNumber: number,
+      customerName: payload.customer || "Cliente",
+      phone: normalizePhone(payload.phone),
+      wilaya: payload.wilaya,
+      commune: payload.commune,
+      address: payload.address,
+      note: [payload.note, "(transférée depuis commande abandonnée)"].filter(Boolean).join(" "),
+      total,
+      status: "nouvelle",
+    });
+    const orderId = Number(orderInsert[0].insertId);
+    await tx.insert(storeOrderItems).values(resolved.map(({ item, product }) => ({
+      orderId,
+      productId: product.id,
+      productName: product.name,
+      unitPrice: product.price,
+      quantity: item.quantity,
+    })));
+    await tx.update(storeCheckoutSessions).set({ state: "submitted", orderId, updatedAt: new Date() })
+      .where(eq(storeCheckoutSessions.id, session.id));
+    return { orderNumber: number, total };
+  });
+}
+
 export async function listAbandonedCheckouts(): Promise<AbandonedCheckout[]> {
+  await purgeAbandonedWithoutPhone().catch(() => undefined);
   const db = await getDb();
   if (!db) {
     await loadStore();
     const now = Date.now();
     return Array.from(memorySessions.values())
-      .filter(session => session.state === "draft" && session.payload)
+      .filter(session => session.state === "draft" && session.payload && hasPhone(session.payload.phone))
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
       .map(session => {
         const payload = session.payload!;
@@ -603,7 +718,7 @@ export async function listAbandonedCheckouts(): Promise<AbandonedCheckout[]> {
   const now = Date.now();
   return sessions.flatMap(session => {
     const parsed = session.payload ? checkoutPayloadSchema.safeParse(session.payload) : null;
-    if (!parsed?.success) return [];
+    if (!parsed?.success || !hasPhone(parsed.data.phone)) return [];
     const payload = parsed.data;
     const rows = payload.items.map(item => {
       const canonical = getCanonicalProduct(item.productId);
