@@ -128,7 +128,7 @@ function AdminPageContent() {
   const abandonedCount = abandonedQuery.data?.length;
   const go = (next: AdminSection) => setSection(next);
 
-  return <div className="admin-shell"><aside className="admin-sidebar"><Link href="/" className="wordmark admin-wordmark"><span className="wordmark-star">✦</span><span>miss</span><em>sensuelle</em></Link><nav className="admin-mobile-nav" aria-label="Navigation admin mobile"><button className={section === "dashboard" ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => go("dashboard")}><LayoutDashboard size={17} />Dashboard</button><button className={section === "abandoned" ? "active" : ""} aria-current={section === "abandoned" ? "page" : undefined} onClick={() => go("abandoned")}><ClipboardList size={17} />Abandonnées {abandonedCount === undefined ? "—" : abandonedCount}</button><button className={section === "catalogue" ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => go("catalogue")}><Package size={17} />Catalogue</button><button className={section === "ecom" ? "active" : ""} aria-current={section === "ecom" ? "page" : undefined} onClick={() => go("ecom")}><Truck size={17} />Livraison</button><button className={section === "settings" ? "active" : ""} aria-current={section === "settings" ? "page" : undefined} onClick={() => go("settings")}><Settings2 size={17} />Réglages</button></nav><div className="admin-user"><div className="admin-avatar">MS</div><div><strong>Miss Sensuelle</strong><span>Administratrice</span></div></div><nav className="admin-nav"><span className="admin-nav-label">Workspace</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue <b>{getCatalogProducts().length}</b></button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes <b>{orders.filter(order => order.status === "nouvelle").length}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com Delivery <b>{orders.filter(order => order.status === "confirmee").length}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button><BarChart3 size={18} />Rapports</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "catalogue" ? "Catalogue produits" : section === "ecom" ? "E-com Delivery" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : "Bonjour, Miss"} <span>✦</span></h1></div><div className="admin-top-actions"><button className="icon-button theme-toggle-admin" onClick={toggleTheme} title="Changer le thème" aria-label="Changer le thème">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" aria-label="Notifications"><Bell size={19} />{orders.some(order => order.status === "nouvelle") && <i />}</button><div className="admin-profile"><div className="admin-avatar small">MS</div><ChevronDown size={16} /></div></div></header><div className="admin-content">{section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onExport={exportOrders} stockPanel={<StockPanel onManageCatalog={() => go("catalogue")} />} />}</div></main>{selected && <OrderModal order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={callCustomer} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{toast && <div className="toast-admin"><span>✦</span>{toast}</div>}</div>;
+  return <div className="admin-shell"><aside className="admin-sidebar"><Link href="/" className="wordmark admin-wordmark"><span className="wordmark-star">✦</span><span>miss</span><em>sensuelle</em></Link><nav className="admin-mobile-nav" aria-label="Navigation admin mobile"><button className={section === "dashboard" ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => go("dashboard")}><LayoutDashboard size={17} />Dashboard</button><button className={section === "abandoned" ? "active" : ""} aria-current={section === "abandoned" ? "page" : undefined} onClick={() => go("abandoned")}><ClipboardList size={17} />Abandonnées {abandonedCount === undefined ? "—" : abandonedCount}</button><button className={section === "catalogue" ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => go("catalogue")}><Package size={17} />Catalogue</button><button className={section === "ecom" ? "active" : ""} aria-current={section === "ecom" ? "page" : undefined} onClick={() => go("ecom")}><Truck size={17} />Livraison</button><button className={section === "settings" ? "active" : ""} aria-current={section === "settings" ? "page" : undefined} onClick={() => go("settings")}><Settings2 size={17} />Réglages</button></nav><div className="admin-user"><div className="admin-avatar">MS</div><div><strong>Miss Sensuelle</strong><span>Administratrice</span></div></div><nav className="admin-nav"><span className="admin-nav-label">Workspace</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue <b>{getCatalogProducts().length}</b></button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes <b>{orders.filter(order => order.status === "nouvelle").length}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com Delivery <b>{orders.filter(order => order.status === "confirmee").length}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button><BarChart3 size={18} />Rapports</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "catalogue" ? "Catalogue produits" : section === "ecom" ? "E-com Delivery" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : "Bonjour, Miss"} <span>✦</span></h1></div><div className="admin-top-actions"><button className="icon-button theme-toggle-admin" onClick={toggleTheme} title="Changer le thème" aria-label="Changer le thème">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" aria-label="Notifications"><Bell size={19} />{orders.some(order => order.status === "nouvelle") && <i />}</button><div className="admin-profile"><div className="admin-avatar small">MS</div><ChevronDown size={16} /></div></div></header><div className="admin-content">{section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onExport={exportOrders} onUpdateStatus={updateStatus} stockPanel={<StockPanel onManageCatalog={() => go("catalogue")} />} />}</div></main>{selected && <OrderModal order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={callCustomer} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{toast && <div className="toast-admin"><span>✦</span>{toast}</div>}</div>;
 }
 
 async function copyOrderDetails(order: CheckoutOrder, notify: (message: string) => void) { const value = `${order.id} · ${order.customer} · ${order.phone}`; try { if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(value); notify("Détails copiés"); return; } } catch {} try { const area = document.createElement("textarea"); area.value = value; area.style.position = "fixed"; area.style.opacity = "0"; document.body.appendChild(area); area.select(); document.execCommand("copy"); area.remove(); notify("Détails copiés"); } catch { notify("Copie indisponible dans ce navigateur"); } }
@@ -279,22 +279,22 @@ function OrderModal({
           </button>
         </div>
 
-        <form className="order-edit-form" onSubmit={handleSubmitEdit} style={{ display: "grid", gap: "12px", marginTop: "12px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            <label style={{ display: "grid", gap: "4px", fontSize: "13px", fontWeight: 600 }}>
+        <form className="order-edit-form" onSubmit={handleSubmitEdit} style={{ display: "grid", gap: "14px", marginTop: "14px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Client(e)
-              <input value={customer} onChange={e => setCustomer(e.target.value)} required style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--border, #ddd)" }} />
+              <input value={customer} onChange={e => setCustomer(e.target.value)} required />
             </label>
-            <label style={{ display: "grid", gap: "4px", fontSize: "13px", fontWeight: 600 }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Téléphone
-              <input value={phone} onChange={e => setPhone(e.target.value)} required style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--border, #ddd)" }} />
+              <input value={phone} onChange={e => setPhone(e.target.value)} required />
             </label>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 110px", gap: "10px" }}>
-            <label style={{ display: "grid", gap: "4px", fontSize: "13px", fontWeight: 600 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Produit
-              <select value={productId} onChange={e => handleProductChange(e.target.value)} style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--border, #ddd)" }}>
+              <select value={productId} onChange={e => handleProductChange(e.target.value)}>
                 {catalog.map(item => (
                   <option key={item.id} value={item.id}>
                     {item.name} ({formatDZD(item.price)})
@@ -302,24 +302,24 @@ function OrderModal({
                 ))}
               </select>
             </label>
-            <label style={{ display: "grid", gap: "4px", fontSize: "13px", fontWeight: 600 }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Quantité
-              <input type="number" min={1} max={100} value={quantity} onChange={e => handleQuantityChange(Number(e.target.value))} required style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--border, #ddd)" }} />
+              <input type="number" min={1} max={100} value={quantity} onChange={e => handleQuantityChange(Number(e.target.value))} required />
             </label>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            <label style={{ display: "grid", gap: "4px", fontSize: "13px", fontWeight: 600 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Variante · Couleur
-              <select value={color} onChange={e => setColor(e.target.value)} style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--border, #ddd)" }}>
+              <select value={color} onChange={e => setColor(e.target.value)}>
                 {Array.from(new Set([color, ...availableColors, "Emerald (أخضر)", "Noir (أسود)"].filter(Boolean))).map(c => (
                   <option key={c} value={c}>{c === "Emerald" ? "Emerald (أخضر)" : c === "Noir" ? "Noir (أسود)" : c}</option>
                 ))}
               </select>
             </label>
-            <label style={{ display: "grid", gap: "4px", fontSize: "13px", fontWeight: 600 }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Variante · Taille
-              <select value={size} onChange={e => setSize(e.target.value)} style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--border, #ddd)" }}>
+              <select value={size} onChange={e => setSize(e.target.value)}>
                 {["S", "M", "L", "XL", "XXL", "Standard"].map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
@@ -327,8 +327,8 @@ function OrderModal({
             </label>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            <label style={{ display: "grid", gap: "4px", fontSize: "13px", fontWeight: 600 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Wilaya
               <select
                 value={wilaya}
@@ -338,54 +338,53 @@ function OrderModal({
                   const nextList = abayaCommunesByWilaya[nextW];
                   if (nextList?.length) setCommune(nextList[0]);
                 }}
-                style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--border, #ddd)" }}
               >
                 {allWilayas.map(w => (
                   <option key={w} value={w}>{w}</option>
                 ))}
               </select>
             </label>
-            <label style={{ display: "grid", gap: "4px", fontSize: "13px", fontWeight: 600 }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Commune
               {arabicCommunes.length > 0 ? (
-                <select value={commune} onChange={e => setCommune(e.target.value)} style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--border, #ddd)" }}>
+                <select value={commune} onChange={e => setCommune(e.target.value)}>
                   {Array.from(new Set([commune, ...arabicCommunes].filter(Boolean))).map(c => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
               ) : (
-                <input value={commune} onChange={e => setCommune(e.target.value)} required style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--border, #ddd)" }} />
+                <input value={commune} onChange={e => setCommune(e.target.value)} required />
               )}
             </label>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            <label style={{ display: "grid", gap: "4px", fontSize: "13px", fontWeight: 600 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Type de livraison
-              <select value={delivery} onChange={e => setDelivery(e.target.value as "home" | "office")} style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--border, #ddd)" }}>
+              <select value={delivery} onChange={e => setDelivery(e.target.value as "home" | "office")}>
                 <option value="home">🏠 À domicile (إلى المنزل)</option>
                 <option value="office">🏢 Au bureau / Stop Desk (إلى المكتب)</option>
               </select>
             </label>
-            <label style={{ display: "grid", gap: "4px", fontSize: "13px", fontWeight: 600 }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Total (DA)
-              <input type="number" min={0} value={total} onChange={e => setTotal(Number(e.target.value))} required style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--border, #ddd)", fontWeight: 700 }} />
+              <input type="number" min={0} value={total} onChange={e => setTotal(Number(e.target.value))} required style={{ fontWeight: 800, color: "#10b981" }} />
             </label>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            <label style={{ display: "grid", gap: "4px", fontSize: "13px", fontWeight: 600 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Adresse
-              <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Adresse / Précision" style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--border, #ddd)" }} />
+              <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Adresse / Précision" />
             </label>
-            <label style={{ display: "grid", gap: "4px", fontSize: "13px", fontWeight: 600 }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Note
-              <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note client / appel" style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid var(--border, #ddd)" }} />
+              <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note client / appel" />
             </label>
           </div>
 
-          <button type="submit" className="button button-gradient full" disabled={isSaving} style={{ marginTop: "4px" }}>
-            <Save size={16} /> {isSaving ? "Enregistrement…" : "Enregistrer les modifications"}
+          <button type="submit" className="button button-gradient full" disabled={isSaving} style={{ marginTop: "6px", height: "48px", borderRadius: "14px", fontSize: "15px" }}>
+            <Save size={17} /> {isSaving ? "Enregistrement…" : "Enregistrer les modifications"}
           </button>
         </form>
 

@@ -1,5 +1,21 @@
-import React, { type ReactNode } from "react";
-import { Bell, ChevronDown, ExternalLink, Filter, Phone, Search, TrendingUp } from "lucide-react";
+import React, { useState, type ReactNode } from "react";
+import {
+  Bell,
+  CheckCircle2,
+  ChevronDown,
+  Clock,
+  Copy,
+  Edit3,
+  ExternalLink,
+  Filter,
+  MapPin,
+  Package,
+  Phone,
+  PhoneOff,
+  Search,
+  Sparkles,
+  TrendingUp,
+} from "lucide-react";
 import { formatDZD, type Order, type OrderStatus } from "@/lib/store-data";
 import { formatOrderDate, getOrderStats, parseOrderDate } from "@/lib/admin-orders";
 import { StatusPill } from "./StoreLayout";
@@ -16,64 +32,377 @@ type Props = {
   onSelect: (order: Order) => void;
   onCall: (phone: string) => void;
   onExport: () => void;
+  onUpdateStatus?: (id: string, status: OrderStatus) => void;
   stockPanel: ReactNode;
 };
 
-const labels: Record<OrderStatus, string> = {
-  nouvelle: "Nouvelles", confirmee: "Confirmées", reportee: "Reportées", ne_repond_pas: "Sans réponse", transferee: "Transférées", annulee: "Annulées",
+const labels: Record<OrderStatus, { label: string; icon: string }> = {
+  nouvelle: { label: "Nouvelles", icon: "🔥" },
+  confirmee: { label: "Confirmées", icon: "✅" },
+  reportee: { label: "Reportées", icon: "⏳" },
+  ne_repond_pas: { label: "Sans réponse", icon: "📵" },
+  transferee: { label: "Transférées", icon: "🚚" },
+  annulee: { label: "Annulées", icon: "❌" },
 };
 
-export function AdminDashboard({ orders, filtered, activeStatus, setActiveStatus, query, setQuery, period, setPeriod, onSelect, onCall, onExport, stockPanel }: Props) {
+export function AdminDashboard({
+  orders,
+  filtered,
+  activeStatus,
+  setActiveStatus,
+  query,
+  setQuery,
+  period,
+  setPeriod,
+  onSelect,
+  onCall,
+  onExport,
+  onUpdateStatus,
+  stockPanel,
+}: Props) {
   const stats = getOrderStats(orders);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyId = async (id: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(id);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 1800);
+      }
+    } catch {}
+  };
+
   return (
-    <>
-      <section className="admin-kpis">
-        <div className="kpi-card kpi-purple"><div className="kpi-top"><span>Commandes enregistrées</span><TrendingUp size={18} /></div><strong>{stats.count}</strong><small>{period === "Toutes les dates" ? "Toutes les commandes enregistrées" : period}</small></div>
-        <div className="kpi-card kpi-blue"><div className="kpi-top"><span>Montant confirmé</span><TrendingUp size={18} /></div><strong>{formatDZD(stats.confirmedAmount)}</strong><small>Valeur confirmée · pas un montant encaissé</small></div>
-        <div className="kpi-card kpi-mint"><div className="kpi-top"><span>Taux de confirmation</span><TrendingUp size={18} /></div><strong>{stats.confirmationRate === null ? "—" : `${new Intl.NumberFormat("fr-DZ", { maximumFractionDigits: 1 }).format(stats.confirmationRate)} %`}</strong><small>{stats.count ? `${stats.confirmedCount} confirmée(s) sur ${stats.count}` : "Aucune commande à mesurer"}</small></div>
-        <div className="kpi-card kpi-orange"><div className="kpi-top"><span>À traiter maintenant</span><Bell size={18} /></div><strong>{stats.pending}</strong><small>{stats.pending ? "En attente de confirmation" : "Aucune commande à traiter"}</small></div>
-      </section>
-      <section className="admin-grid">
-        <div className="orders-panel admin-panel">
-          <div className="panel-heading"><div><span className="eyebrow">Activité enregistrée</span><h2>Commandes <span className="count-bubble">{orders.length}</span></h2></div><button className="button button-outline" onClick={onExport} disabled={!filtered.length}><ExternalLink size={15} />Exporter</button></div>
-          <div className="orders-controls">
-            <label className="admin-search"><Search size={17} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="ID ou numéro de téléphone" /></label>
-            <div className="period-select"><Filter size={15} /><select value={period} onChange={event => setPeriod(event.target.value)}><option>Toutes les dates</option><option>30 derniers jours</option><option>7 derniers jours</option><option>Aujourd'hui</option></select><ChevronDown size={15} /></div>
+    <div className="admin-app-dashboard">
+      {/* ===== KPI CARDS 3D ===== */}
+      <section className="app-kpi-grid">
+        <div className="app-kpi-card kpi-gradient-purple">
+          <div className="app-kpi-header">
+            <span className="app-kpi-title">Total Commandes</span>
+            <span className="app-kpi-icon-pill"><TrendingUp size={16} /></span>
           </div>
-          {orders.some(order => !parseOrderDate(order.createdAt)) && <p className="admin-order-date-note">Les anciennes commandes sans date précise sont conservées sous « Toutes les dates ».</p>}
-          <div className="status-tabs">
-            <button className={activeStatus === "all" ? "active" : ""} onClick={() => setActiveStatus("all")}>Toutes <b>{orders.length}</b></button>
-            {(Object.keys(labels) as OrderStatus[]).map(status => <button key={status} className={activeStatus === status ? "active" : ""} onClick={() => setActiveStatus(status)}>{labels[status]} <b>{orders.filter(order => order.status === status).length}</b></button>)}
-          </div>
-          <div className="orders-table">
-            <div className="orders-table-head"><span>Commande</span><span>Client</span><span>Article</span><span>Livraison</span><span>Statut</span><span /></div>
-            {filtered.map(order => (
-              <div className="order-row" key={order.id}>
-                <div data-label="Commande"><strong>{order.id}</strong><small>{formatOrderDate(order.createdAt)}</small></div>
-                <div data-label="Client"><strong>{order.customer}</strong><small>{order.phone}</small></div>
-                <div data-label="Article">
-                  <strong>{order.product}</strong>
-                  <small>
-                    Quantité · {order.quantity}
-                    {(order.color || order.size) ? ` · ${[order.color, order.size].filter(Boolean).join(" / ")}` : ""}
-                  </small>
-                </div>
-                <div data-label="Livraison">
-                  <strong>{order.wilaya}</strong>
-                  <small>
-                    {order.commune}
-                    {order.delivery ? ` · ${order.delivery === "office" ? "🏢 Bureau" : "🏠 Domicile"}` : ""}
-                  </small>
-                </div>
-                <div data-label="Statut"><StatusPill status={order.status} /></div>
-                <div className="row-actions"><button className="icon-button" title="Appeler" aria-label={`Appeler ${order.customer}`} onClick={() => onCall(order.phone)}><Phone size={15} /></button><button className="row-more" aria-label={`Voir le détail de la commande ${order.id}`} onClick={() => onSelect(order)}>•••</button></div>
-              </div>
-            ))}
-            {!filtered.length && <div className="admin-empty-orders" role="status"><strong>{orders.length ? "Aucune commande pour ces filtres" : "Aucune commande enregistrée"}</strong><p>{orders.length ? "Modifie la recherche, la période ou le statut." : "Les commandes enregistrées apparaîtront ici. Aucune donnée de démonstration n’est affichée."}</p></div>}
+          <div className="app-kpi-body">
+            <strong className="app-kpi-num">{stats.count}</strong>
+            <span className="app-kpi-sub">
+              {period === "Toutes les dates" ? "Période globale" : period}
+            </span>
           </div>
         </div>
-        {stockPanel}
+
+        <div className="app-kpi-card kpi-gradient-orange">
+          <div className="app-kpi-header">
+            <span className="app-kpi-title">À traiter d'urgence</span>
+            <span className="app-kpi-icon-pill pulse-orange"><Bell size={16} /></span>
+          </div>
+          <div className="app-kpi-body">
+            <strong className="app-kpi-num">{stats.pending}</strong>
+            <span className="app-kpi-sub">
+              {stats.pending ? "Nouvelles en attente d'appel" : "Toutes traitées ! 🎉"}
+            </span>
+          </div>
+        </div>
+
+        <div className="app-kpi-card kpi-gradient-mint">
+          <div className="app-kpi-header">
+            <span className="app-kpi-title">Taux Confirmation</span>
+            <span className="app-kpi-icon-pill"><Sparkles size={16} /></span>
+          </div>
+          <div className="app-kpi-body">
+            <strong className="app-kpi-num">
+              {stats.confirmationRate === null ? "—" : `${new Intl.NumberFormat("fr-DZ", { maximumFractionDigits: 1 }).format(stats.confirmationRate)} %`}
+            </strong>
+            <span className="app-kpi-sub">
+              {stats.count ? `${stats.confirmedCount} confirmée(s) sur ${stats.count}` : "0 commande"}
+            </span>
+          </div>
+        </div>
+
+        <div className="app-kpi-card kpi-gradient-blue">
+          <div className="app-kpi-header">
+            <span className="app-kpi-title">Montant Confirmé</span>
+            <span className="app-kpi-icon-pill"><CheckCircle2 size={16} /></span>
+          </div>
+          <div className="app-kpi-body">
+            <strong className="app-kpi-num">{formatDZD(stats.confirmedAmount)}</strong>
+            <span className="app-kpi-sub">Prêt pour expédition COD</span>
+          </div>
+        </div>
       </section>
-    </>
+
+      {/* ===== MAIN GRID: ORDERS + SIDEBAR ===== */}
+      <section className="app-main-grid">
+        <div className="app-orders-container">
+          {/* Header Bar */}
+          <div className="app-panel-head">
+            <div className="app-head-left">
+              <span className="app-head-badge">Gestion Directe</span>
+              <h2 className="app-head-title">
+                Flux Commandes <span className="app-count-bubble">{filtered.length}</span>
+              </h2>
+            </div>
+            <button
+              type="button"
+              className="app-export-btn"
+              onClick={onExport}
+              disabled={!filtered.length}
+            >
+              <ExternalLink size={15} />
+              <span>Exporter CSV</span>
+            </button>
+          </div>
+
+          {/* Search & Period Filter */}
+          <div className="app-filter-bar">
+            <div className="app-search-box">
+              <Search size={18} className="app-search-icon" />
+              <input
+                value={query}
+                onChange={event => setQuery(event.target.value)}
+                placeholder="Rechercher par client, téléphone ou ID..."
+                className="app-search-input"
+              />
+              {query && (
+                <button
+                  type="button"
+                  className="app-clear-search"
+                  onClick={() => setQuery("")}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <div className="app-period-select">
+              <Filter size={15} />
+              <select value={period} onChange={event => setPeriod(event.target.value)}>
+                <option>Toutes les dates</option>
+                <option>Aujourd'hui</option>
+                <option>7 derniers jours</option>
+                <option>30 derniers jours</option>
+              </select>
+              <ChevronDown size={14} className="app-select-arrow" />
+            </div>
+          </div>
+
+          {orders.some(order => !parseOrderDate(order.createdAt)) && (
+            <p className="admin-order-date-note">
+              Les anciennes commandes sans date précise sont conservées sous « Toutes les dates ».
+            </p>
+          )}
+
+          {/* Status Tabs Carousel */}
+          <div className="app-status-carousel" role="tablist">
+            <button
+              type="button"
+              className={`app-status-tab ${activeStatus === "all" ? "active" : ""}`}
+              onClick={() => setActiveStatus("all")}
+            >
+              <span>Toutes</span>
+              <b className="app-tab-count">{orders.length}</b>
+            </button>
+            {(Object.keys(labels) as OrderStatus[]).map(status => {
+              const count = orders.filter(order => order.status === status).length;
+              const meta = labels[status];
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  className={`app-status-tab tab-${status} ${activeStatus === status ? "active" : ""}`}
+                  onClick={() => setActiveStatus(status)}
+                >
+                  <span className="app-tab-icon">{meta.icon}</span>
+                  <span>{meta.label}</span>
+                  <b className="app-tab-count">{count}</b>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Orders Stream Cards */}
+          <div className="app-orders-stream">
+            {filtered.map(order => {
+              const isNew = order.status === "nouvelle";
+              return (
+                <article
+                  key={order.id}
+                  className={`app-order-card status-${order.status} ${isNew ? "is-new-card" : ""}`}
+                >
+                  {/* Top Bar: ID + Status + Date */}
+                  <div className="aoc-top">
+                    <button
+                      type="button"
+                      className="aoc-id-btn"
+                      onClick={() => copyId(order.id)}
+                      title="Cliquez pour copier l'ID"
+                    >
+                      <span className="aoc-id-dot" />
+                      <strong className="aoc-id">{order.id}</strong>
+                      <span className="aoc-copy-hint">
+                        {copiedId === order.id ? "Copié !" : <Copy size={12} />}
+                      </span>
+                    </button>
+
+                    <div className="aoc-top-right">
+                      <span className="aoc-date">{formatOrderDate(order.createdAt)}</span>
+                      <StatusPill status={order.status} />
+                    </div>
+                  </div>
+
+                  {/* Customer Block with 1-Tap Call */}
+                  <div className="aoc-customer-box">
+                    <div className="aoc-avatar">
+                      {order.customer ? order.customer.slice(0, 2).toUpperCase() : "CL"}
+                    </div>
+
+                    <div className="aoc-customer-details">
+                      <div className="aoc-customer-name-row">
+                        <h3 className="aoc-name">{order.customer || "Cliente"}</h3>
+                        <span className="aoc-delivery-pill">
+                          {order.delivery === "office" ? "🏢 Stopdesk / Bureau" : "🏠 À domicile"}
+                        </span>
+                      </div>
+
+                      <div className="aoc-loc-row">
+                        <MapPin size={14} className="aoc-pin-icon" />
+                        <span className="aoc-wilaya">
+                          <b>{order.wilaya || "Wilaya non spécifiée"}</b>
+                          {order.commune ? ` · ${order.commune}` : ""}
+                        </span>
+                      </div>
+
+                      {order.address && (
+                        <div className="aoc-address-text">
+                          <small>Adresse : {order.address}</small>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Prominent Direct 1-Tap Call Button */}
+                    <button
+                      type="button"
+                      className="aoc-call-action-btn"
+                      onClick={() => onCall(order.phone)}
+                      aria-label={`Appeler ${order.customer || order.phone}`}
+                    >
+                      <Phone size={17} />
+                      <div className="aoc-call-text">
+                        <small>Appel Direct</small>
+                        <strong>{order.phone}</strong>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Order Content / Variants */}
+                  <div className="aoc-product-row">
+                    <div className="aoc-prod-main">
+                      <div className="aoc-prod-badge">
+                        <Package size={15} />
+                      </div>
+                      <div className="aoc-prod-name-wrap">
+                        <strong className="aoc-prod-title">{order.product}</strong>
+                        <div className="aoc-prod-meta-tags">
+                          <span className="aoc-chip aoc-chip-qty">
+                            Qté : <b>{order.quantity}</b>
+                          </span>
+                          {order.color && (
+                            <span className="aoc-chip aoc-chip-color">
+                              🎨 <b>{order.color}</b>
+                            </span>
+                          )}
+                          {order.size && (
+                            <span className="aoc-chip aoc-chip-size">
+                              📏 Taille : <b>{order.size}</b>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="aoc-price-tag">
+                      <small>Total à encaisser</small>
+                      <strong>{formatDZD(order.total)}</strong>
+                    </div>
+                  </div>
+
+                  {order.note && (
+                    <div className="aoc-note-banner">
+                      <span className="aoc-note-label">💬 Note client :</span>
+                      <span className="aoc-note-content">{order.note}</span>
+                    </div>
+                  )}
+
+                  {/* Fluid 1-Tap Confirmation Actions Bar */}
+                  <div className="aoc-actions-bar">
+                    {order.status !== "confirmee" ? (
+                      <button
+                        type="button"
+                        className="aoc-btn aoc-btn-confirm"
+                        onClick={() => onUpdateStatus?.(order.id, "confirmee")}
+                      >
+                        <CheckCircle2 size={16} />
+                        <span>Confirmer</span>
+                      </button>
+                    ) : (
+                      <div className="aoc-tag-confirmed">
+                        <CheckCircle2 size={15} />
+                        <span>Confirmée</span>
+                      </div>
+                    )}
+
+                    {order.status !== "ne_repond_pas" && (
+                      <button
+                        type="button"
+                        className="aoc-btn aoc-btn-noanswer"
+                        onClick={() => onUpdateStatus?.(order.id, "ne_repond_pas")}
+                      >
+                        <PhoneOff size={15} />
+                        <span>Ne répond pas</span>
+                      </button>
+                    )}
+
+                    {order.status !== "reportee" && (
+                      <button
+                        type="button"
+                        className="aoc-btn aoc-btn-postpone"
+                        onClick={() => onUpdateStatus?.(order.id, "reportee")}
+                      >
+                        <Clock size={15} />
+                        <span>Reporter</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      className="aoc-btn aoc-btn-edit"
+                      onClick={() => onSelect(order)}
+                    >
+                      <Edit3 size={15} />
+                      <span>Modifier</span>
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+
+            {!filtered.length && (
+              <div className="admin-empty-orders" role="status">
+                <strong>{orders.length ? "Aucune commande pour ces filtres" : "Aucune commande enregistrée"}</strong>
+                <p>
+                  {orders.length
+                    ? "Modifie la recherche, la période ou le statut."
+                    : "Les commandes enregistrées apparaîtront ici. Aucune donnée de démonstration n’est affichée."}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Stock Panel / Sidebar Widget */}
+        <aside className="app-stock-sidebar">
+          {stockPanel}
+        </aside>
+      </section>
+    </div>
   );
 }

@@ -1,187 +1,1093 @@
-/* ===== Miss Sensuelle — Admin "web app" theme (clair + sombre) ===== */
+/* ==========================================================================
+   MISS SENSUELLE — MODERN 3D MOBILE APP DASHBOARD & CRM CONFIRMATION SUITE
+   Ultra-fluid, tactile 3D cards, vivid status glow, zero-overlap layout.
+   ========================================================================== */
+
+:root {
+  --app-bg: #f3f5fa;
+  --app-surface: #ffffff;
+  --app-surface-sub: #f8fafd;
+  --app-surface-elevated: #ffffff;
+  --app-border: rgba(222, 228, 240, 0.85);
+  --app-border-focus: #7c3aed;
+  --app-text: #0f172a;
+  --app-text-muted: #64748b;
+  --app-text-sub: #94a3b8;
+  
+  --app-brand: #7c3aed;
+  --app-brand-gradient: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  --app-brand-glow: rgba(124, 58, 237, 0.25);
+  
+  --app-emerald: #10b981;
+  --app-emerald-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --app-emerald-glow: rgba(16, 185, 129, 0.28);
+  
+  --app-amber: #f59e0b;
+  --app-amber-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  --app-amber-glow: rgba(245, 158, 11, 0.25);
+  
+  --app-blue: #3b82f6;
+  --app-blue-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --app-blue-glow: rgba(59, 130, 246, 0.25);
+
+  --app-rose: #f43f5e;
+  --app-rose-gradient: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+
+  --app-shadow-3d: 0 14px 34px -4px rgba(22, 33, 62, 0.08), 0 4px 12px -2px rgba(22, 33, 62, 0.03);
+  --app-shadow-lift: 0 20px 40px -6px rgba(22, 33, 62, 0.12), 0 8px 16px -3px rgba(22, 33, 62, 0.04);
+  --app-shadow-inner: inset 0 1px 1px rgba(255, 255, 255, 0.9);
+}
+
+.dark {
+  --app-bg: #090c15;
+  --app-surface: #121726;
+  --app-surface-sub: #171e30;
+  --app-surface-elevated: #1a2236;
+  --app-border: rgba(255, 255, 255, 0.08);
+  --app-border-focus: #a78bfa;
+  --app-text: #f8fafc;
+  --app-text-muted: #94a3b8;
+  --app-text-sub: #64748b;
+  
+  --app-shadow-3d: 0 16px 36px -4px rgba(0, 0, 0, 0.45), 0 6px 14px -2px rgba(0, 0, 0, 0.3);
+  --app-shadow-lift: 0 24px 48px -6px rgba(0, 0, 0, 0.6), 0 10px 20px -3px rgba(0, 0, 0, 0.4);
+  --app-shadow-inner: inset 0 1px 1px rgba(255, 255, 255, 0.08);
+}
+
+/* Base App Shell Styling */
 .admin-shell {
-  --a-bg: #f3f4f9;
-  --a-surface: #ffffff;
-  --a-surface-2: #f6f7fb;
-  --a-line: #e5e8f1;
-  --a-ink: #141826;
-  --a-muted: #6a7188;
-  --a-brand: #6d4cf5;
-  --a-brand-soft: rgba(109, 76, 245, .11);
-  --a-ok: #12a064;
-  --a-warn: #e07a2e;
-  --a-bad: #d6455d;
-  --a-info: #3b73e8;
-  --a-shadow: 0 1px 2px rgba(20, 24, 38, .04), 0 10px 30px rgba(20, 24, 38, .06);
-  --ink: var(--a-ink);
-  --muted: var(--a-muted);
-  --line: var(--a-line);
-  background: var(--a-bg);
-  color: var(--a-ink);
-  color-scheme: light;
-}
-.dark .admin-shell {
-  --a-bg: #0c0e16;
-  --a-surface: #151926;
-  --a-surface-2: #1c2132;
-  --a-line: #2a3046;
-  --a-ink: #eef0f8;
-  --a-muted: #98a1b9;
-  --a-brand: #a08aff;
-  --a-brand-soft: rgba(160, 138, 255, .16);
-  --a-ok: #3fd69a;
-  --a-warn: #ffa264;
-  --a-bad: #ff7c93;
-  --a-info: #7aa2ff;
-  --a-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 32px rgba(0, 0, 0, .35);
-  --white: var(--a-surface);
-  --paper: var(--a-bg);
-  --lilac-light: var(--a-brand-soft);
-  --mint-light: rgba(63, 214, 154, .14);
-  --orange-light: rgba(255, 162, 100, .14);
-  --blue-light: rgba(122, 162, 255, .14);
-  color-scheme: dark;
+  background: var(--app-bg) !important;
+  color: var(--app-text) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
 }
 
-/* ---- Shell / navigation ---- */
-.admin-shell .admin-sidebar { width: 262px; padding: 26px 16px 20px; background: var(--a-surface); border-right: 1px solid var(--a-line); box-shadow: none; }
-.admin-shell .admin-wordmark { margin: 0 0 4px 10px; color: var(--a-ink); font-size: 22px; }
-.admin-shell .admin-user { margin: 22px 4px 22px; padding: 12px; border: 1px solid var(--a-line); border-radius: 16px; background: var(--a-surface-2); }
-.admin-shell .admin-user strong { font-size: 14px; color: var(--a-ink); }
-.admin-shell .admin-user span { font-size: 12px; color: var(--a-muted); }
-.admin-shell .admin-avatar { width: 38px; height: 38px; flex-basis: 38px; border-radius: 12px; font-size: 13px; }
-.admin-shell .admin-nav { gap: 4px; }
-.admin-shell .admin-nav-label { margin-bottom: 8px; padding: 0 12px; color: var(--a-muted); font-size: 11px; font-weight: 700; }
-.admin-shell .admin-nav button { position: relative; gap: 12px; padding: 12px 14px; border-radius: 12px; color: var(--a-muted); font-size: 14px; font-weight: 600; transition: background .15s, color .15s; }
-.admin-shell .admin-nav button:hover { background: var(--a-surface-2); color: var(--a-ink); }
-.admin-shell .admin-nav button.active { background: var(--a-brand-soft); color: var(--a-brand); }
-.admin-shell .admin-nav button.active::before { content: ""; position: absolute; left: -16px; top: 10px; bottom: 10px; width: 4px; border-radius: 0 4px 4px 0; background: var(--a-brand); }
-.admin-shell .admin-nav button b { min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: var(--a-brand); color: #fff; font-size: 11px; }
-.admin-shell .back-store { padding: 12px 14px; border-radius: 12px; color: var(--a-muted); font-size: 13px; }
-.admin-shell .back-store:hover { background: var(--a-surface-2); color: var(--a-ink); }
-.admin-shell .admin-main { width: calc(100% - 262px); margin-left: 262px; }
-.admin-shell .admin-topbar { position: sticky; top: 0; z-index: 6; padding: 18px 32px; margin-bottom: 18px; background: color-mix(in srgb, var(--a-bg) 82%, transparent); backdrop-filter: blur(14px); border-bottom: 1px solid var(--a-line); }
-.admin-shell .admin-topbar .eyebrow { color: var(--a-muted); font-size: 12px; text-transform: capitalize; letter-spacing: 0; }
-.admin-shell .admin-topbar h1 { margin-top: 2px; color: var(--a-ink); font-size: 26px; }
-.admin-shell .admin-content { padding: 0 32px 56px; }
-.admin-shell .admin-top-actions .icon-button,
-.admin-shell .icon-button { width: 42px; height: 42px; border: 1px solid var(--a-line); border-radius: 12px; background: var(--a-surface); color: var(--a-ink); }
-.admin-shell .icon-button:hover { background: var(--a-surface-2); }
-.admin-shell .admin-profile { padding: 4px 8px 4px 4px; border: 1px solid var(--a-line); border-radius: 99px; background: var(--a-surface); color: var(--a-muted); }
-
-/* ---- KPI ---- */
-.admin-shell .admin-kpis { gap: 16px; }
-.admin-shell .kpi-card { min-height: 128px; padding: 18px 20px; border: 1px solid var(--a-line); border-radius: 18px; background: var(--a-surface); box-shadow: var(--a-shadow); }
-.admin-shell .kpi-card::after { content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--kpi, var(--a-brand)); }
-.admin-shell .kpi-purple { --kpi: #8a6bff; color: var(--a-brand); }
-.admin-shell .kpi-blue { --kpi: #4a86f5; color: var(--a-info); }
-.admin-shell .kpi-mint { --kpi: #1fbf86; color: var(--a-ok); }
-.admin-shell .kpi-orange { --kpi: #ff8a4c; color: var(--a-warn); }
-.admin-shell .kpi-top { font-size: 13px; font-weight: 700; }
-.admin-shell .kpi-card > strong { margin-top: 12px; color: var(--a-ink); font-size: 34px; }
-.admin-shell .kpi-card > small { display: block; margin-top: 4px; color: var(--a-muted); font-size: 12px; }
-
-/* ---- Panels ---- */
-.admin-shell .admin-panel { padding: 22px; border: 1px solid var(--a-line); border-radius: 20px; background: var(--a-surface); box-shadow: var(--a-shadow); color: var(--a-ink); }
-.admin-shell .panel-heading h2 { margin-top: 2px; color: var(--a-ink); font-size: 22px; }
-.admin-shell .eyebrow { color: var(--a-muted); }
-.admin-shell .count-bubble { min-width: 26px; height: 26px; padding: 0 8px; background: var(--a-brand-soft); color: var(--a-brand); font-size: 12px; font-weight: 700; }
-.admin-shell .orders-controls { margin-top: 18px; gap: 12px; }
-.admin-shell .admin-search,
-.admin-shell .period-select { height: 44px; padding: 0 14px; border: 1px solid var(--a-line); border-radius: 12px; background: var(--a-surface-2); color: var(--a-muted); font-size: 14px; }
-.admin-shell .admin-search input,
-.admin-shell .period-select select { background: transparent; color: var(--a-ink); font-size: 14px; }
-.admin-shell .admin-search input::placeholder { color: var(--a-muted); }
-.admin-shell .period-select select option { background: var(--a-surface); color: var(--a-ink); }
-.admin-shell .status-tabs { gap: 8px; padding: 2px 0 14px; margin-top: 16px; border-bottom: 1px solid var(--a-line); }
-.admin-shell .status-tabs button { padding: 8px 14px; border: 1px solid var(--a-line); border-radius: 99px; background: var(--a-surface-2); color: var(--a-muted); font-size: 13px; font-weight: 600; }
-.admin-shell .status-tabs button b { margin-left: 6px; font-size: 12px; }
-.admin-shell .status-tabs button.active { border-color: var(--a-brand); background: var(--a-brand); color: #fff; }
-
-/* ---- Orders table ---- */
-.admin-shell .orders-table-head, .admin-shell .order-row { grid-template-columns: 1fr 1.1fr 1.35fr 1fr .95fr auto; gap: 12px; }
-.admin-shell .orders-table-head { padding: 10px 14px; color: var(--a-muted); font-size: 11px; font-weight: 700; }
-.admin-shell .order-row { min-height: 78px; padding: 10px 14px; border: 1px solid transparent; border-bottom-color: var(--a-line); border-radius: 14px; transition: background .12s; }
-.admin-shell .order-row:hover { background: var(--a-surface-2); border-color: var(--a-line); }
-.admin-shell .order-row strong { color: var(--a-ink); font-size: 14px; }
-.admin-shell .order-row small { margin-top: 3px; color: var(--a-muted); font-size: 12px; }
-.admin-shell .status-pill { padding: 6px 11px; font-size: 12px; font-weight: 700; }
-.admin-shell .status-pill i { width: 7px; height: 7px; }
-.admin-shell .status-new { color: var(--a-warn); background: rgba(255, 138, 76, .14); }
-.admin-shell .status-confirmed { color: var(--a-ok); background: rgba(31, 191, 134, .14); }
-.admin-shell .status-cancelled { color: var(--a-bad); background: rgba(214, 69, 93, .14); }
-.admin-shell .status-postponed { color: var(--a-info); background: rgba(74, 134, 245, .14); }
-.admin-shell .status-noanswer { color: #c79a2b; background: rgba(224, 178, 60, .16); }
-.admin-shell .status-transferred { color: var(--a-brand); background: var(--a-brand-soft); }
-.admin-shell .row-actions .icon-button { width: 36px; height: 36px; background: rgba(31, 191, 134, .14); border-color: transparent; color: var(--a-ok); }
-.admin-shell .row-more { display: inline-flex; align-items: center; justify-content: center; min-width: 36px; height: 36px; border: 1px solid var(--a-line); border-radius: 10px; background: var(--a-surface); color: var(--a-muted); }
-.admin-shell .row-more:hover { background: var(--a-brand-soft); color: var(--a-brand); }
-.admin-shell .admin-empty-orders, .admin-shell .abandoned-empty { color: var(--a-muted); }
-.admin-shell .admin-empty-orders strong, .admin-shell .abandoned-empty strong { color: var(--a-ink); }
-
-/* ---- Stock ---- */
-.admin-shell .stock-row { padding: 12px 0; border-bottom-color: var(--a-line); }
-.admin-shell .stock-row strong { color: var(--a-ink); font-size: 13px; }
-.admin-shell .stock-row small, .admin-shell .stock-progress span { color: var(--a-muted); font-size: 12px; }
-.admin-shell .stock-row img { mix-blend-mode: normal; background: var(--a-surface-2); }
-
-/* ---- Buttons / fields ---- */
-.admin-shell .button { border-radius: 12px; font-weight: 700; }
-.admin-shell .button-light, .admin-shell .button-outline { border: 1px solid var(--a-line); background: var(--a-surface-2); color: var(--a-ink); }
-.admin-shell .button-light:hover, .admin-shell .button-outline:hover { background: var(--a-brand-soft); color: var(--a-brand); }
-.admin-shell .button-gradient { background: linear-gradient(135deg, #7c5cff, #b04bff 55%, #ff7a45); color: #fff; border: 0; }
-.admin-shell .button:disabled { opacity: .5; }
-.admin-shell input, .admin-shell select, .admin-shell textarea { color: var(--a-ink); }
-.admin-shell .order-modal input, .admin-shell .order-modal select, .admin-shell .order-modal textarea,
-.admin-shell .product-admin-form input, .admin-shell .product-admin-form select, .admin-shell .product-admin-form textarea,
-.admin-shell .tracking-card input, .admin-shell .tracking-card textarea { border: 1px solid var(--a-line); border-radius: 10px; background: var(--a-surface-2); color: var(--a-ink); }
-
-/* ---- Modal ---- */
-.admin-shell .modal-backdrop { background: rgba(8, 10, 18, .6); backdrop-filter: blur(4px); }
-.admin-shell .order-modal { border: 1px solid var(--a-line); border-radius: 24px; background: var(--a-surface); color: var(--a-ink); box-shadow: 0 30px 80px rgba(0, 0, 0, .35); }
-.admin-shell .order-modal h2, .admin-shell .order-modal strong, .admin-shell .order-modal label { color: var(--a-ink); }
-.admin-shell .order-modal span, .admin-shell .order-modal small, .admin-shell .order-modal p { color: var(--a-muted); }
-.admin-shell .modal-customer, .admin-shell .modal-details > div { border-color: var(--a-line); background: var(--a-surface-2); }
-.admin-shell .modal-actions button { border: 1px solid var(--a-line); border-radius: 12px; background: var(--a-surface-2); color: var(--a-ink); font-weight: 700; }
-.admin-shell .modal-actions button:hover { background: var(--a-brand-soft); color: var(--a-brand); }
-.admin-shell .copy-order { border: 1px dashed var(--a-line); border-radius: 12px; background: transparent; color: var(--a-muted); }
-
-/* ---- Abandoned ---- */
-.admin-shell .abandoned-row, .admin-shell .abandoned-table-head { border-color: var(--a-line); }
-.admin-shell .abandoned-row { padding: 10px 14px; border-radius: 14px; }
-.admin-shell .abandoned-row:hover { background: var(--a-surface-2); }
-.admin-shell .abandoned-row strong { color: var(--a-ink); }
-.admin-shell .abandoned-row small, .admin-shell .abandoned-table-head { color: var(--a-muted); }
-.admin-shell .abandoned-activity-abandoned { background: rgba(214, 69, 93, .14); color: var(--a-bad); }
-.admin-shell .abandoned-activity-in_progress { background: rgba(74, 134, 245, .14); color: var(--a-info); }
-.admin-shell .abandoned-transfer { background: var(--a-brand-soft) !important; color: var(--a-brand) !important; border-color: transparent !important; }
-.admin-shell .abandoned-transfer-main { width: 100%; justify-content: center; margin-bottom: 10px; }
-.admin-shell .abandoned-row-actions { display: flex; align-items: center; gap: 6px; }
-
-/* ---- Catalogue / réglages / E-com ---- */
-.admin-shell .catalog-admin-card, .admin-shell .product-admin-form, .admin-shell .tracking-card, .admin-shell .event-map,
-.admin-shell .settings-hero, .admin-shell .tracking-config-notice, .admin-shell .admin-data-state { border: 1px solid var(--a-line); border-radius: 18px; background: var(--a-surface); color: var(--a-ink); box-shadow: var(--a-shadow); }
-.admin-shell .catalog-admin-info h3, .admin-shell .catalog-admin-head h2, .admin-shell .settings-hero h2, .admin-shell .tracking-card h3, .admin-shell .event-map h3, .admin-shell .form-panel-head h3 { color: var(--a-ink); }
-.admin-shell .catalog-admin-info p, .admin-shell .catalog-admin-head p, .admin-shell .settings-hero p, .admin-shell .tracking-card p, .admin-shell .tracking-card small, .admin-shell label, .admin-shell .event-pills span { color: var(--a-muted); }
-.admin-shell .event-pills span { border: 1px solid var(--a-line); background: var(--a-surface-2); }
-.admin-shell section > div[style*="border-radius: 16px"] { background: var(--a-surface) !important; border-color: var(--a-line) !important; color: var(--a-ink); box-shadow: var(--a-shadow); }
-.admin-shell select option { background: var(--a-surface); color: var(--a-ink); }
-.admin-shell .toast-admin { border: 1px solid var(--a-line); border-radius: 14px; background: var(--a-surface); color: var(--a-ink); box-shadow: var(--a-shadow); font-size: 14px; }
-
-/* ---- Tablet / mobile: barre d'onglets façon application ---- */
-@media (max-width: 1120px) {
-  .admin-shell .admin-main { width: 100%; margin-left: 0; }
-  .admin-shell .admin-topbar { padding: 14px 18px; }
-  .admin-shell .admin-content { padding: 0 18px 100px; }
+/* Topbar Sticky Glass Header */
+.admin-shell .admin-topbar {
+  background: color-mix(in srgb, var(--app-bg) 85%, transparent) !important;
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--app-border) !important;
+  padding: 16px 28px !important;
+  position: sticky;
+  top: 0;
+  z-index: 30;
 }
-@media (max-width: 720px) {
-  .admin-shell .admin-mobile-nav { position: fixed; z-index: 40; left: 10px; right: 10px; bottom: 10px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; padding: 6px; border: 1px solid var(--a-line); border-radius: 20px; background: color-mix(in srgb, var(--a-surface) 92%, transparent); backdrop-filter: blur(16px); box-shadow: 0 12px 40px rgba(0, 0, 0, .25); }
-  .admin-shell .admin-mobile-nav button { flex-direction: column; gap: 3px; min-height: 52px; border-radius: 14px; background: transparent; color: var(--a-muted); font-size: 10px; font-weight: 700; }
-  .admin-shell .admin-mobile-nav button.active { background: var(--a-brand-soft); color: var(--a-brand); }
-  .admin-shell .admin-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .admin-shell .kpi-card { min-height: 110px; padding: 14px; }
-  .admin-shell .kpi-card > strong { font-size: 26px; }
-  .admin-shell .admin-panel { padding: 14px; border-radius: 18px; }
-  .admin-shell .order-row, .admin-shell .abandoned-row { border: 1px solid var(--a-line); background: var(--a-surface-2); margin-top: 10px; }
-  .admin-shell .admin-topbar h1 { font-size: 21px; }
+.admin-shell .admin-topbar h1 {
+  font-size: 24px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em;
+  color: var(--app-text) !important;
+}
+
+/* ==========================================================================
+   3D KPI CARDS
+   ========================================================================== */
+.app-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.app-kpi-card {
+  position: relative;
+  border-radius: 22px;
+  padding: 20px 22px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  box-shadow: var(--app-shadow-3d);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.app-kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--app-shadow-lift);
+}
+
+.app-kpi-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+}
+.kpi-gradient-purple::before { background: var(--app-brand-gradient); }
+.kpi-gradient-orange::before { background: var(--app-amber-gradient); }
+.kpi-gradient-mint::before   { background: var(--app-emerald-gradient); }
+.kpi-gradient-blue::before   { background: var(--app-blue-gradient); }
+
+.app-kpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.app-kpi-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--app-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.app-kpi-icon-pill {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.kpi-gradient-purple .app-kpi-icon-pill { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
+.kpi-gradient-orange .app-kpi-icon-pill { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+.kpi-gradient-mint .app-kpi-icon-pill   { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.kpi-gradient-blue .app-kpi-icon-pill   { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+
+.pulse-orange {
+  animation: pulse-glow 2s infinite;
+}
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.app-kpi-num {
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  color: var(--app-text);
+  line-height: 1.1;
+  display: block;
+}
+.app-kpi-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--app-text-sub);
+  margin-top: 6px;
+  display: block;
+}
+
+/* ==========================================================================
+   MAIN DASHBOARD GRID & APP ORDERS CONTAINER
+   ========================================================================== */
+.app-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+.app-orders-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Head Bar */
+.app-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 4px 2px;
+}
+.app-head-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.app-head-badge {
+  background: var(--app-brand-glow);
+  color: var(--app-brand);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.app-head-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--app-text);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.app-count-bubble {
+  background: var(--app-brand-gradient);
+  color: #fff;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 4px 12px var(--app-brand-glow);
+}
+.app-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 14px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--app-shadow-3d);
+  transition: all 0.2s ease;
+}
+.app-export-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--app-brand);
+  color: var(--app-brand);
+}
+.app-export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Search & Period Filter Bar */
+.app-filter-bar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.app-search-box {
+  flex: 1;
+  min-width: 240px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.app-search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--app-text-muted);
+  pointer-events: none;
+}
+.app-search-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 40px 0 44px;
+  border-radius: 16px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--app-shadow-3d);
+  outline: none;
+  transition: all 0.2s ease;
+}
+.app-search-input:focus {
+  border-color: var(--app-border-focus);
+  box-shadow: 0 0 0 3px var(--app-brand-glow);
+}
+.app-clear-search {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: 0;
+  color: var(--app-text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.app-period-select {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 16px;
+  border-radius: 16px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: var(--app-shadow-3d);
+}
+.app-period-select select {
+  appearance: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding-right: 18px;
+}
+.app-select-arrow {
+  position: absolute;
+  right: 12px;
+  color: var(--app-text-muted);
+  pointer-events: none;
+}
+
+/* Status Tabs Carousel */
+.app-status-carousel {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.app-status-carousel::-webkit-scrollbar {
+  display: none;
+}
+.app-status-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.app-status-tab:hover {
+  background: var(--app-surface-sub);
+  color: var(--app-text);
+}
+.app-status-tab.active {
+  background: var(--app-brand-gradient);
+  color: #fff !important;
+  border-color: transparent;
+  box-shadow: 0 6px 16px var(--app-brand-glow);
+}
+.app-tab-count {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  font-weight: 800;
+}
+.app-status-tab.active .app-tab-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+/* ==========================================================================
+   APP ORDER CARD STREAM (ULTRA MODERN 3D MOBILE CARD)
+   ========================================================================== */
+.app-orders-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-order-card {
+  position: relative;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 24px;
+  padding: 18px 20px;
+  box-shadow: var(--app-shadow-3d);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.app-order-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--app-shadow-lift);
+}
+
+.app-order-card.is-new-card {
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 14px 34px -4px rgba(245, 158, 11, 0.12), var(--app-shadow-3d);
+}
+
+/* Card Top: ID + Status + Date */
+.aoc-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--app-border);
+}
+.aoc-id-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--app-surface-sub);
+  border: 1px solid var(--app-border);
+  border-radius: 10px;
+  padding: 5px 10px;
+  cursor: pointer;
+  color: var(--app-text);
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+.aoc-id-btn:hover {
+  border-color: var(--app-brand);
+  color: var(--app-brand);
+}
+.aoc-id-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--app-brand);
+}
+.aoc-id {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.aoc-copy-hint {
+  font-size: 11px;
+  color: var(--app-text-muted);
+}
+.aoc-top-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.aoc-date {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--app-text-muted);
+}
+
+/* Customer Box with 1-Tap Direct Call */
+.aoc-customer-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.aoc-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  background: var(--app-brand-gradient);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  box-shadow: 0 6px 16px var(--app-brand-glow);
+  flex-shrink: 0;
+}
+.aoc-customer-details {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.aoc-customer-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.aoc-name {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--app-text);
+  margin: 0;
+}
+.aoc-delivery-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--app-surface-sub);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+}
+.aoc-loc-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--app-text-muted);
+}
+.aoc-pin-icon {
+  color: var(--app-rose);
+  flex-shrink: 0;
+}
+.aoc-wilaya {
+  color: var(--app-text);
+}
+.aoc-address-text {
+  font-size: 12px;
+  color: var(--app-text-sub);
+}
+
+/* Direct 1-Tap Call Button (Massive Ergonomic Touch Target) */
+.aoc-call-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--app-emerald-gradient);
+  color: #fff;
+  border: 0;
+  border-radius: 18px;
+  padding: 10px 18px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px var(--app-emerald-glow);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.aoc-call-action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px var(--app-emerald-glow);
+}
+.aoc-call-action-btn:active {
+  transform: scale(0.97);
+}
+.aoc-call-text {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+.aoc-call-text small {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.85;
+}
+.aoc-call-text strong {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+/* Product Box */
+.aoc-product-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  background: var(--app-surface-sub);
+  border: 1px solid var(--app-border);
+  border-radius: 18px;
+  padding: 12px 16px;
+}
+.aoc-prod-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 200px;
+}
+.aoc-prod-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--app-brand);
+  flex-shrink: 0;
+}
+.aoc-prod-name-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.aoc-prod-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--app-text);
+}
+.aoc-prod-meta-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.aoc-chip {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+}
+.aoc-chip-qty b {
+  color: var(--app-text);
+}
+.aoc-chip-color {
+  color: #0d4b37;
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+.aoc-chip-size {
+  color: var(--app-brand);
+  background: var(--app-brand-glow);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
+.aoc-price-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+.aoc-price-tag small {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--app-text-sub);
+  font-weight: 700;
+}
+.aoc-price-tag strong {
+  font-size: 19px;
+  font-weight: 900;
+  color: #10b981;
+}
+
+/* Note Banner */
+.aoc-note-banner {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px dashed rgba(245, 158, 11, 0.4);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 12px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.aoc-note-label {
+  font-weight: 800;
+  color: #d97706;
+}
+.aoc-note-content {
+  color: var(--app-text);
+  font-weight: 600;
+}
+
+/* Confirmation Bar (1-Tap Buttons) */
+.aoc-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.aoc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 0;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.aoc-btn:active {
+  transform: scale(0.96);
+}
+
+.aoc-btn-confirm {
+  background: var(--app-emerald-gradient);
+  color: #fff;
+  box-shadow: 0 4px 14px var(--app-emerald-glow);
+  flex: 1;
+  min-width: 120px;
+}
+.aoc-btn-confirm:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 18px var(--app-emerald-glow);
+}
+
+.aoc-btn-noanswer {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.aoc-btn-noanswer:hover {
+  background: rgba(245, 158, 11, 0.25);
+}
+
+.aoc-btn-postpone {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.aoc-btn-postpone:hover {
+  background: rgba(59, 130, 246, 0.25);
+}
+
+.aoc-btn-edit {
+  background: var(--app-surface-sub);
+  border: 1px solid var(--app-border);
+  color: var(--app-text);
+}
+.aoc-btn-edit:hover {
+  border-color: var(--app-brand);
+  color: var(--app-brand);
+}
+
+.aoc-tag-confirmed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  font-weight: 800;
+  font-size: 13px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* ==========================================================================
+   MODAL ORDER EDIT (RESPONSIVE TOUCH-FRIENDLY BOTTOM SHEET / 3D MODAL)
+   ========================================================================== */
+.admin-shell .modal-layer {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.admin-shell .modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 7, 14, 0.65) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 0;
+}
+.admin-shell .order-modal {
+  position: relative;
+  width: 100%;
+  max-width: 580px;
+  background: var(--app-surface) !important;
+  border: 1px solid var(--app-border) !important;
+  border-radius: 28px !important;
+  padding: 24px !important;
+  box-shadow: 0 25px 60px -10px rgba(0, 0, 0, 0.5) !important;
+  color: var(--app-text) !important;
+  z-index: 2;
+}
+
+.admin-shell .modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--app-border);
+}
+.admin-shell .modal-head h2 {
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  margin: 2px 0 0 !important;
+  color: var(--app-text) !important;
+}
+
+.admin-shell .modal-customer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: var(--app-surface-sub);
+  border: 1px solid var(--app-border);
+  margin-bottom: 16px;
+}
+.admin-shell .call-button {
+  background: var(--app-emerald-gradient) !important;
+  color: #fff !important;
+  border: 0 !important;
+  box-shadow: 0 4px 12px var(--app-emerald-glow) !important;
+  font-weight: 700;
+}
+
+.admin-shell .order-edit-form label {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.admin-shell .order-edit-form input,
+.admin-shell .order-edit-form select,
+.admin-shell .order-edit-form textarea {
+  height: 44px;
+  border-radius: 14px !important;
+  border: 1px solid var(--app-border) !important;
+  background: var(--app-surface-sub) !important;
+  color: var(--app-text) !important;
+  font-size: 14px !important;
+  font-weight: 600;
+  outline: none;
+  padding: 0 12px !important;
+}
+.admin-shell .order-edit-form input:focus,
+.admin-shell .order-edit-form select:focus,
+.admin-shell .order-edit-form textarea:focus {
+  border-color: var(--app-border-focus) !important;
+  box-shadow: 0 0 0 3px var(--app-brand-glow);
+}
+
+.admin-shell .modal-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+  border-top: 1px solid var(--app-border);
+}
+.admin-shell .modal-actions button {
+  flex: 1;
+  min-width: 90px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-sub);
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.admin-shell .modal-actions button:hover {
+  background: var(--app-brand-glow);
+  border-color: var(--app-brand);
+  color: var(--app-brand);
+}
+.admin-shell .modal-actions .action-confirmee {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+/* ==========================================================================
+   MOBILE DOCK NAVIGATION (FLOATING NATIVE APP BAR)
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .app-main-grid {
+    grid-template-columns: 1fr;
+  }
+  .app-stock-sidebar {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-shell .admin-mobile-nav {
+    position: fixed !important;
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 12px !important;
+    height: 64px !important;
+    border-radius: 22px !important;
+    background: color-mix(in srgb, var(--app-surface) 92%, transparent) !important;
+    backdrop-filter: blur(24px) !important;
+    border: 1px solid var(--app-border) !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3) !important;
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 4px !important;
+    padding: 6px !important;
+    z-index: 45 !important;
+  }
+  
+  .admin-shell .admin-mobile-nav button {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 3px !important;
+    border-radius: 14px !important;
+    background: transparent !important;
+    border: 0 !important;
+    color: var(--app-text-muted) !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+  }
+  
+  .admin-shell .admin-mobile-nav button.active {
+    background: var(--app-brand-glow) !important;
+    color: var(--app-brand) !important;
+  }
+
+  .admin-shell .admin-content {
+    padding: 0 14px 100px !important;
+  }
+  
+  .app-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .app-kpi-card {
+    padding: 14px 16px;
+    border-radius: 18px;
+  }
+  .app-kpi-num {
+    font-size: 24px;
+  }
+  
+  .app-order-card {
+    padding: 14px 16px;
+    border-radius: 20px;
+  }
+  .aoc-customer-box {
+    align-items: flex-start;
+  }
+  .aoc-call-action-btn {
+    width: 100%;
+    justify-content: center;
+    border-radius: 14px;
+  }
+  .aoc-btn {
+    flex: 1 1 calc(50% - 6px);
+  }
+}
+
+/* ==========================================================================
+   ABANDONED ORDERS � MOBILE 3D CARD STREAM STYLING
+   ========================================================================== */
+.abandoned-admin-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.abandoned-admin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.abandoned-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.abandoned-table {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.abandoned-table-head {
+  display: none;
+}
+.abandoned-row {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 20px;
+  padding: 16px 18px;
+  box-shadow: var(--app-shadow-3d);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) auto;
+  align-items: center;
+  gap: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.abandoned-row:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--app-shadow-lift);
+}
+.abandoned-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.abandoned-row strong {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--app-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.abandoned-row small {
+  font-size: 12px;
+  color: var(--app-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.abandoned-activity {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+.abandoned-status {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  margin-top: 4px;
+  background: var(--app-surface-sub);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-muted);
+}
+.abandoned-status-new {
+  color: var(--app-amber);
+  background: rgba(245, 158, 11, 0.12);
+}
+.abandoned-status-called {
+  color: var(--app-emerald);
+  background: rgba(16, 185, 129, 0.12);
+}
+.abandoned-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.abandoned-transfer {
+  background: var(--app-brand-gradient) !important;
+  color: #fff !important;
+  border: 0 !important;
+  box-shadow: 0 4px 12px var(--app-brand-glow) !important;
+}
+.abandoned-transfer:hover {
+  transform: scale(1.05);
+}
+.abandoned-feedback {
+  background: var(--app-surface);
+  border: 1px solid var(--app-brand);
+  border-radius: 14px;
+  padding: 10px 14px;
+  color: var(--app-brand);
+  font-weight: 700;
+  font-size: 13px;
 }
