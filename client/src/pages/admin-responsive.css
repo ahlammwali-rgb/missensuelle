@@ -1,4 +1,4 @@
-.admin-shell.admin-shell {
+﻿.admin-shell.admin-shell {
   overflow-x: clip;
 }
 
@@ -673,8 +673,8 @@
     padding-inline: 10px;
   }
 
-  .admin-shell .admin-top-actions .theme-toggle-admin {
-    display: none;
+  .admin-shell .admin-top-actions .theme-toggle-admin, .admin-shell .admin-top-actions .neo-darkmode-btn {
+    display: inline-flex !important;
   }
 
   .admin-shell .admin-top-actions .icon-button,

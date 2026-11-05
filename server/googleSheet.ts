@@ -129,10 +129,13 @@ export async function importGoogleSheetToOrders(
   const existingOrderIds = new Set(memoryOrders.map(o => o.id));
   const existingPhones = new Set(memoryOrders.map(o => cleanPhone(o.phone)));
 
-    // Clean up any previously imported orders that had size: "L" mistakenly set
+    // Clean up any previously imported orders that had size: "L" or default 7500 DA mistakenly set
   for (const o of memoryOrders) {
     if (o.size === "L" && (o.id.startsWith("MS-GS-") || o.id.startsWith("MS-TT-") || o.product.includes("EXTENTION"))) {
       o.size = "";
+    }
+    if (o.total === 7500 && (o.id.startsWith("MS-GS-") || o.id.startsWith("MS-TT-") || o.product.includes("EXTENTION"))) {
+      o.total = 0;
     }
   }
 
@@ -163,8 +166,8 @@ export async function importGoogleSheetToOrders(
     const qty = Math.max(1, parseInt(idxQty >= 0 ? row[idxQty] : "1", 10) || 1);
     const wilaya = (idxWil >= 0 ? row[idxWil] : row[5]) || "Alger";
     const commune = (idxCom >= 0 ? row[idxCom] : row[6]) || "";
-    const rawPrice = idxPrix >= 0 ? parseInt(row[idxPrix].replace(/\D/g, ""), 10) : 7500;
-    const total = rawPrice && rawPrice > 1000 ? rawPrice : 7500;
+    const rawPriceStr = idxPrix >= 0 && row[idxPrix] ? row[idxPrix].replace(/\D/g, "") : "";
+    const total = rawPriceStr ? (parseInt(rawPriceStr, 10) || 0) : 0;
 
     const newOrder: CheckoutOrder = {
       dbId: getNextOrderId(),

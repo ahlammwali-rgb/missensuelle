@@ -1,11 +1,11 @@
-import "dotenv/config";
+﻿import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { publicPlatformScript } from "./publicConfig";
 import { appRouter } from "../routers";
-import { registerCheckoutHttpRoutes } from "../checkout";
+import { registerCheckoutHttpRoutes, startGoogleSheetAutoSync } from "../checkout";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { publicTrackingScript } from "./siteTracking";
@@ -45,6 +45,7 @@ async function startServer() {
   server.on("error", error => { console.error("Server failed:", error.message); process.exit(1); });
   server.listen(port, "0.0.0.0", () => {
     console.log(`Server listening on port ${port}`);
+    startGoogleSheetAutoSync();
     if (process.env.NODE_ENV === "production") {
       const publicUrl = (process.env.RENDER_EXTERNAL_URL || "https://missensuelle.onrender.com").replace(/\/$/, "");
       setInterval(() => {

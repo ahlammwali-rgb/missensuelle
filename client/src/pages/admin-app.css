@@ -38,20 +38,131 @@
   --app-shadow-inner: inset 0 1px 1px rgba(255, 255, 255, 0.9);
 }
 
-.dark {
-  --app-bg: #090c15;
-  --app-surface: #121726;
-  --app-surface-sub: #171e30;
-  --app-surface-elevated: #1a2236;
-  --app-border: rgba(255, 255, 255, 0.08);
-  --app-border-focus: #a78bfa;
+html.dark, .dark {
+  --app-bg: #07090e;
+  --app-surface: #0e1322;
+  --app-surface-sub: #13192c;
+  --app-surface-elevated: #18213a;
+  --app-border: rgba(139, 92, 246, 0.22);
+  --app-border-focus: #a855f7;
   --app-text: #f8fafc;
   --app-text-muted: #94a3b8;
   --app-text-sub: #64748b;
   
-  --app-shadow-3d: 0 16px 36px -4px rgba(0, 0, 0, 0.45), 0 6px 14px -2px rgba(0, 0, 0, 0.3);
-  --app-shadow-lift: 0 24px 48px -6px rgba(0, 0, 0, 0.6), 0 10px 20px -3px rgba(0, 0, 0, 0.4);
-  --app-shadow-inner: inset 0 1px 1px rgba(255, 255, 255, 0.08);
+  --app-shadow-3d: 0 16px 40px -4px rgba(0, 0, 0, 0.8), 0 0 24px -2px rgba(139, 92, 246, 0.15);
+  --app-shadow-lift: 0 24px 50px -4px rgba(0, 0, 0, 0.9), 0 0 35px rgba(168, 85, 247, 0.3);
+  --app-shadow-inner: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+}
+
+/* Neo Dark Mode Toggle Button */
+.neo-darkmode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(168, 85, 247, 0.05) 100%);
+  color: #7c3aed;
+  box-shadow: 0 0 14px rgba(139, 92, 246, 0.15);
+  transition: all 0.2s ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+.neo-darkmode-btn:hover {
+  transform: translateY(-1px);
+  border-color: #a855f7;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.35);
+}
+.neo-glow-badge {
+  font-size: 8px;
+  font-weight: 900;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  color: #fff;
+  letter-spacing: 0.05em;
+  box-shadow: 0 0 8px rgba(236, 72, 153, 0.6);
+}
+.neo-moon-glow {
+  color: #8b5cf6;
+  filter: drop-shadow(0 0 4px #8b5cf6);
+}
+.neo-sun-glow {
+  color: #f59e0b;
+  filter: drop-shadow(0 0 5px #f59e0b);
+}
+
+html.dark .neo-darkmode-btn,
+.dark .neo-darkmode-btn {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.08) 100%);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.28);
+}
+html.dark .neo-darkmode-btn:hover,
+.dark .neo-darkmode-btn:hover {
+  border-color: #f59e0b;
+  box-shadow: 0 0 24px rgba(245, 158, 11, 0.45);
+}
+
+/* Neo Dark Mode Global Atmosphere */
+html.dark .admin-shell,
+.dark .admin-shell {
+  background: radial-gradient(circle at 10% 15%, rgba(139, 92, 246, 0.08) 0%, transparent 45%),
+              radial-gradient(circle at 90% 85%, rgba(16, 185, 129, 0.06) 0%, transparent 45%),
+              #07090e !important;
+}
+
+html.dark .admin-shell .admin-topbar,
+.dark .admin-shell .admin-topbar {
+  background: rgba(10, 14, 25, 0.9) !important;
+  backdrop-filter: blur(24px) !important;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.25) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Neo Status Badges Laser Glow in Dark Mode */
+html.dark .badge-status-nouvelle, .dark .badge-status-nouvelle {
+  background: rgba(245, 158, 11, 0.18) !important;
+  color: #fef08a !important;
+  border: 1px solid rgba(245, 158, 11, 0.55) !important;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.35) !important;
+}
+html.dark .badge-status-confirmee, .dark .badge-status-confirmee {
+  background: rgba(16, 185, 129, 0.18) !important;
+  color: #a7f3d0 !important;
+  border: 1px solid rgba(16, 185, 129, 0.55) !important;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.35) !important;
+}
+html.dark .badge-status-transferee, .dark .badge-status-transferee {
+  background: rgba(168, 85, 247, 0.22) !important;
+  color: #e9d5ff !important;
+  border: 1px solid rgba(168, 85, 247, 0.6) !important;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.45) !important;
+}
+html.dark .badge-status-reportee, .dark .badge-status-reportee {
+  background: rgba(59, 130, 246, 0.18) !important;
+  color: #bfdbfe !important;
+  border: 1px solid rgba(59, 130, 246, 0.55) !important;
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.35) !important;
+}
+html.dark .badge-status-ne_repond_pas, .dark .badge-status-ne_repond_pas {
+  background: rgba(249, 115, 22, 0.18) !important;
+  color: #fed7aa !important;
+  border: 1px solid rgba(249, 115, 22, 0.55) !important;
+  box-shadow: 0 0 14px rgba(249, 115, 22, 0.35) !important;
+}
+html.dark .badge-status-annulee, .dark .badge-status-annulee {
+  background: rgba(239, 68, 68, 0.18) !important;
+  color: #fecaca !important;
+  border: 1px solid rgba(239, 68, 68, 0.5) !important;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.3) !important;
 }
 
 /* Base App Shell Styling */
@@ -335,42 +446,73 @@
   pointer-events: none;
 }
 
-/* Status Tabs Carousel */
+/* Status Tabs Carousel (Smooth Mobile Swipe, Zero Distortion) */
 .app-status-carousel {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 6px;
+  overflow-y: hidden;
+  padding: 4px 4px 10px 4px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .app-status-carousel::-webkit-scrollbar {
   display: none;
 }
 .app-status-tab {
+  flex: 0 0 auto !important;
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 9px 16px;
+  height: 40px;
+  padding: 0 16px;
   border-radius: 999px;
   background: var(--app-surface);
   border: 1px solid var(--app-border);
-  color: var(--app-text-muted);
+  color: var(--app-text);
   font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
+  user-select: none;
 }
 .app-status-tab:hover {
   background: var(--app-surface-sub);
-  color: var(--app-text);
+  border-color: var(--app-brand);
 }
 .app-status-tab.active {
   background: var(--app-brand-gradient);
   color: #fff !important;
   border-color: transparent;
-  box-shadow: 0 6px 16px var(--app-brand-glow);
+  box-shadow: 0 6px 18px var(--app-brand-glow);
+}
+.app-status-tab.tab-nouvelle.active {
+  background: var(--app-amber-gradient) !important;
+  box-shadow: 0 6px 18px var(--app-amber-glow) !important;
+}
+.app-status-tab.tab-confirmee.active {
+  background: var(--app-emerald-gradient) !important;
+  box-shadow: 0 6px 18px var(--app-emerald-glow) !important;
+}
+.app-status-tab.tab-transferee.active {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9) !important;
+  box-shadow: 0 6px 18px rgba(139, 92, 246, 0.45) !important;
+}
+.app-status-tab.tab-reportee.active {
+  background: var(--app-blue-gradient) !important;
+  box-shadow: 0 6px 18px var(--app-blue-glow) !important;
+}
+.app-status-tab.tab-ne_repond_pas.active {
+  background: linear-gradient(135deg, #ea580c, #c2410c) !important;
+  box-shadow: 0 6px 18px rgba(234, 88, 12, 0.4) !important;
+}
+.app-status-tab.tab-annulee.active {
+  background: var(--app-rose-gradient) !important;
+  box-shadow: 0 6px 18px rgba(244, 63, 94, 0.4) !important;
 }
 .app-tab-count {
   font-size: 11px;

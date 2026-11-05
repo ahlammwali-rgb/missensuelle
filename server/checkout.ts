@@ -1,4 +1,4 @@
-﻿import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { Express, Request, Response } from "express";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { products } from "../client/src/lib/store-data";
@@ -69,6 +69,9 @@ const loadStore = async () => {
     if (o.size === "L" && (o.product.includes("EXTENTION") || o.id.startsWith("MS-GS-") || o.id.startsWith("MS-TT-"))) {
       o.size = "";
     }
+    if (o.total === 7500 && (o.id.startsWith("MS-GS-") || o.id.startsWith("MS-TT-") || o.product.includes("EXTENTION"))) {
+      o.total = 0;
+    }
   }
 };
 const saveStore = () =>
@@ -131,6 +134,32 @@ export async function syncGoogleSheetOrders(sheetUrl?: string) {
     sheetUrl
   );
   return result;
+}
+
+let sheetAutoSyncTimer: NodeJS.Timeout | null = null;
+
+export function startGoogleSheetAutoSync(intervalMs = 45000) {
+  if (sheetAutoSyncTimer) return;
+  console.log(`[GoogleSheet] Background auto-sync started (every ${intervalMs / 1000}s)`);
+  setTimeout(() => {
+    syncGoogleSheetOrders()
+      .then(res => {
+        if (res.added > 0) {
+          console.log(`[GoogleSheet] Auto-sync imported ${res.added} orders`);
+        }
+      })
+      .catch(() => {});
+  }, 4000);
+
+  sheetAutoSyncTimer = setInterval(() => {
+    syncGoogleSheetOrders()
+      .then(res => {
+        if (res.added > 0) {
+          console.log(`[GoogleSheet] Auto-sync imported ${res.added} orders`);
+        }
+      })
+      .catch(() => {});
+  }, intervalMs);
 }
 
 export async function updateCheckoutOrderDetails(input: UpdateOrderDetailsInput) {
