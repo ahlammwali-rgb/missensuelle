@@ -30,7 +30,9 @@ import {
   updateAbandonedCheckout,
   updateCheckoutOrderDetails,
   updateMemoryOrderStatus,
+  syncGoogleSheetOrders,
 } from "./checkout";
+import { fetchSheetRows, getStoredSheetConfig, setStoredSheetConfig } from "./googleSheet";
 import { getDb, listStoreProducts, updateStoreOrderStatus } from "./db";
 import {
   clearEcomCredentials,
@@ -193,6 +195,47 @@ export const appRouter = router({
           return results;
         }),
       ),
+  }),
+  googleSheet: router({
+    getConfig: adminProcedure.query(async () => {
+      const config = getStoredSheetConfig();
+      try {
+        const rows = await fetchSheetRows(config.url);
+        return {
+          ...config,
+          connected: true,
+          rowCount: Math.max(0, rows.length - 1),
+          error: null,
+        };
+      } catch (err) {
+        return {
+          ...config,
+          connected: false,
+          rowCount: 0,
+          error: err instanceof Error ? err.message : "Impossible de lire le Google Sheet",
+        };
+      }
+    }),
+    saveConfig: adminProcedure
+      .input(
+        z.object({
+          url: z.string().min(10),
+          webhookUrl: z.string().optional(),
+          autoSync: z.boolean().optional(),
+        }),
+      )
+      .mutation(({ input }) => {
+        return setStoredSheetConfig({
+          url: input.url.trim(),
+          webhookUrl: input.webhookUrl?.trim() || "",
+          autoSync: input.autoSync ?? true,
+        });
+      }),
+    syncOrders: adminProcedure
+      .input(z.object({ url: z.string().optional() }).optional())
+      .mutation(async ({ input }) => {
+        return await syncGoogleSheetOrders(input?.url);
+      }),
   }),
 });
 

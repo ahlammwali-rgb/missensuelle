@@ -1,4 +1,4 @@
-/* ==========================================================================
+﻿/* ==========================================================================
    MISS SENSUELLE — MODERN 3D MOBILE APP DASHBOARD & CRM CONFIRMATION SUITE
    Ultra-fluid, tactile 3D cards, vivid status glow, zero-overlap layout.
    ========================================================================== */
@@ -914,7 +914,7 @@
     border: 1px solid var(--app-border) !important;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3) !important;
     display: grid !important;
-    grid-template-columns: repeat(5, 1fr) !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
     gap: 4px !important;
     padding: 6px !important;
     z-index: 45 !important;
@@ -976,7 +976,7 @@
 }
 
 /* ==========================================================================
-   ABANDONED ORDERS � MOBILE 3D CARD STREAM STYLING
+   ABANDONED ORDERS � MOBILE 3D CARD STREAM STYLING
    ========================================================================== */
 .abandoned-admin-section {
   display: flex;
@@ -1091,3 +1091,7 @@
   font-weight: 700;
   font-size: 13px;
 }
+
+
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.spin-icon { animation: spin 1s linear infinite; }

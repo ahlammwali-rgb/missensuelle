@@ -27,6 +27,7 @@ import {
 } from "../shared/checkout";
 import { getDb } from "./db";
 import { computeShippingFee } from "./ecomDelivery";
+import { importGoogleSheetToOrders, pushOrderToGoogleSheet } from "./googleSheet";
 import {
   ensurePersistentStoreLoaded,
   schedulePersistentStoreSave,
@@ -113,6 +114,17 @@ export async function restoreClientBackupOrders(orders: Array<Partial<CheckoutOr
     saveStore();
   }
   return { restored: added, total: memoryOrders.length };
+}
+
+export async function syncGoogleSheetOrders(sheetUrl?: string) {
+  await loadStore();
+  const result = await importGoogleSheetToOrders(
+    memoryOrders,
+    saveStore,
+    () => nextMemoryOrderId++,
+    sheetUrl
+  );
+  return result;
 }
 
 export async function updateCheckoutOrderDetails(input: UpdateOrderDetailsInput) {
