@@ -61,7 +61,17 @@ export default function CoatLanding({ product, quantity = 1 }: { product: Produc
     if (!result) return;
     setOrderNumber(result.orderNumber);
     // Horodatage réel de commande : { createdAt: new Date().toISOString() }
-    trackPixelEvent("Purchase", { content_ids: [product.id], value: result.total, currency: "DZD", order_id: result.orderNumber });
+    trackPixelEvent("Purchase", {
+      content_type: "product",
+      content_id: product.id,
+      content_ids: [product.id],
+      content_name: product.name,
+      value: result.total,
+      currency: "DZD",
+      order_id: result.orderNumber,
+      phone,
+      customer,
+    });
   }
 
   return (

@@ -126,6 +126,8 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
       value: result.total,
       currency: "DZD",
       order_id: result.orderNumber,
+      phone,
+      customer,
     });
   }
 

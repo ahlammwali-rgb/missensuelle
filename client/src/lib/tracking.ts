@@ -15,6 +15,7 @@ type TikTokQueue = unknown[] & {
   _o?: Record<string, unknown>;
   page?: () => void;
   track?: (name: string, data?: Record<string, unknown>) => void;
+  identify?: (data: Record<string, unknown>) => void;
   load?: (id: string, options?: Record<string, unknown>) => void;
   instance?: (id: string) => TikTokInstance;
   setAndDefer?: (target: unknown[], method: string) => void;
@@ -193,34 +194,65 @@ export function getMetaPixelDiagnostics() {
   };
 }
 
+export function identifyTikTokUser(phone: string, name?: string) {
+  if (typeof window === "undefined") return;
+  const config = getPixelConfig();
+  if (!config.tiktokPixelId && !config.tiktokCode) return;
+  const win = window as TrackingWindow;
+  const cleanPhone = phone.replace(/[\s\-\.]/g, "");
+  if (!cleanPhone) return;
+  const e164 = cleanPhone.startsWith("0")
+    ? `+213${cleanPhone.slice(1)}`
+    : cleanPhone.startsWith("+")
+    ? cleanPhone
+    : `+213${cleanPhone}`;
+  try {
+    win.ttq?.identify?.({
+      phone_number: e164,
+      name: name?.trim() || undefined,
+    });
+  } catch {}
+}
+
+function buildTikTokPayload(data: Record<string, unknown>) {
+  const contentIds = Array.isArray(data.content_ids) ? data.content_ids : [];
+  const firstId = String(data.content_id ?? contentIds[0] ?? "product");
+  const contentName = String(data.content_name ?? firstId);
+  const numericValue = typeof data.value === "number" ? data.value : Number(data.value) || 0;
+  const qty = typeof data.quantity === "number" ? data.quantity : 1;
+  return {
+    content_type: "product",
+    content_id: firstId,
+    content_name: contentName,
+    contents: [
+      {
+        content_id: firstId,
+        content_type: "product",
+        content_name: contentName,
+        quantity: qty,
+        price: numericValue,
+      },
+    ],
+    value: numericValue,
+    currency: String(data.currency ?? "DZD"),
+    ...data,
+  };
+}
+
 export function trackPixelEvent(name: PixelEvent, data: Record<string, unknown> = {}) {
   if (typeof window === "undefined") return;
   const config = getPixelConfig(); initializePixels(); const win = window as TrackingWindow;
+  
+  const rawPhone = String(data.phone ?? data.phone_number ?? "");
+  if (rawPhone) {
+    identifyTikTokUser(rawPhone, String(data.customer ?? data.name ?? ""));
+  }
+
   if (config.facebookPixelId) win.fbq?.("track", name, data);
   if (config.tiktokPixelId || config.tiktokCode) {
     win.ttq?.track?.(name, data);
     if (name === "Purchase") {
-      const contentIds = Array.isArray(data.content_ids) ? data.content_ids : [];
-      const firstId = String(data.content_id ?? contentIds[0] ?? "product");
-      const contentName = String(data.content_name ?? firstId);
-      const numericValue = typeof data.value === "number" ? data.value : Number(data.value) || 0;
-      const tiktokPayload: Record<string, unknown> = {
-        content_type: "product",
-        content_id: firstId,
-        content_name: contentName,
-        contents: [
-          {
-            content_id: firstId,
-            content_type: "product",
-            content_name: contentName,
-            quantity: 1,
-            price: numericValue,
-          },
-        ],
-        value: numericValue,
-        currency: String(data.currency ?? "DZD"),
-        ...data,
-      };
+      const tiktokPayload = buildTikTokPayload(data);
       win.ttq?.track?.("CompletePayment", tiktokPayload);
       win.ttq?.track?.("PlaceAnOrder", tiktokPayload);
       win.ttq?.track?.("SubmitForm", tiktokPayload);

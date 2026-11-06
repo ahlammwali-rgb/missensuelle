@@ -1,4 +1,4 @@
-﻿import type { CheckoutOrder } from "../shared/checkout";
+import type { CheckoutOrder } from "../shared/checkout";
 import { getDb } from "./db";
 import { getCloudToken } from "./persistentStore";
 
@@ -161,7 +161,7 @@ export async function importGoogleSheetToOrders(
     }
 
     const customer = (idxNom >= 0 ? row[idxNom] : row[0]) || "Cliente TikTok Lead";
-    const product = (idxProd >= 0 ? row[idxProd] : row[2]) || "Abaya Royal Emerald";
+    let product = (idxProd >= 0 ? row[idxProd] : row[2]) || "Abaya Royal Emerald";
     const variant = (idxVar >= 0 ? row[idxVar] : row[3]) || "";
     const qty = Math.max(1, parseInt(idxQty >= 0 ? row[idxQty] : "1", 10) || 1);
     const wilaya = (idxWil >= 0 ? row[idxWil] : row[5]) || "Alger";
@@ -169,13 +169,23 @@ export async function importGoogleSheetToOrders(
     const rawPriceStr = idxPrix >= 0 && row[idxPrix] ? row[idxPrix].replace(/\D/g, "") : "";
     const total = rawPriceStr ? (parseInt(rawPriceStr, 10) || 0) : 0;
 
+    const prodLower = `${product} ${variant}`.toLowerCase();
+    let productId = "p-007";
+    if (prodLower.includes("doudoune") || prodLower.includes("دواقون") || prodLower.includes("جاكيت") || prodLower.includes("hiver") || prodLower.includes("p-008")) {
+      productId = "p-008";
+      if (!idxProd || !row[idxProd]) product = "Doudoune Hiver de Luxe";
+    } else if (prodLower.includes("manteau") || prodLower.includes("blazer") || prodLower.includes("coat") || prodLower.includes("p-001")) {
+      productId = "p-001";
+      if (!idxProd || !row[idxProd]) product = "Manteau Icon";
+    }
+
     const newOrder: CheckoutOrder = {
       dbId: getNextOrderId(),
       id: orderId,
       createdAt: new Date().toISOString(),
       customer: customer.trim(),
       phone,
-      productId: "p-007",
+      productId,
       product: `${product} × ${qty}`,
       quantity: qty,
       total,

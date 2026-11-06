@@ -49,9 +49,12 @@ function useCatalogProducts() { const [catalog, setCatalog] = useState<Product[]
 
 function SearchIcon() { return <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>; }
 
-function ProductPage({ onAdd }: { onAdd: (product: typeof products[number]) => void }) {
+function ProductPage({ onAdd, slugOverride }: { onAdd: (product: typeof products[number]) => void; slugOverride?: string }) {
   const [, params] = useRoute("/produit/:slug");
-  const product = getProduct(params?.slug ?? "");
+  const [, paramsAlt] = useRoute("/produits/:slug");
+  const [, paramsEn] = useRoute("/product/:slug");
+  const slug = slugOverride ?? params?.slug ?? paramsAlt?.slug ?? paramsEn?.slug ?? "";
+  const product = getProduct(slug);
   const isVest = product?.id === "p-001";
   const isEmerald = product?.id === "p-007";
   const isDoudoune = product?.id === "p-008" || product?.slug === "doudoune-hiver-luxe";
@@ -196,9 +199,23 @@ export default function Storefront({ cart, onAdd, onUpdate, onClear }: { cart: C
 }
 
 function RouteContent({ onAdd, cart, onClear }: { onAdd: (product: typeof products[number]) => void; cart: CartLine[]; onClear: () => void }) {
-  const [home] = useRoute("/"); const [catalogue] = useRoute("/catalogue"); const [product] = useRoute("/produit/:slug"); const [checkout] = useRoute("/commande");
+  const [home] = useRoute("/");
+  const [catalogue] = useRoute("/catalogue");
+  const [product] = useRoute("/produit/:slug");
+  const [produits] = useRoute("/produits/:slug");
+  const [productEn] = useRoute("/product/:slug");
+  const [checkout] = useRoute("/commande");
+  const [doudoune] = useRoute("/doudoune");
+  const [doudouneAlt] = useRoute("/doudoune-hiver-luxe");
+  const [abaya] = useRoute("/abaya");
+  const [abayaAlt] = useRoute("/abaya-royal-emerald");
+  const [manteau] = useRoute("/manteau");
+
   if (catalogue) return <CataloguePage onAdd={onAdd} />;
-  if (product) return <ProductPage onAdd={onAdd} />;
+  if (product || produits || productEn) return <ProductPage onAdd={onAdd} />;
+  if (doudoune || doudouneAlt) return <ProductPage onAdd={onAdd} slugOverride="doudoune-hiver-luxe" />;
+  if (abaya || abayaAlt) return <ProductPage onAdd={onAdd} slugOverride="abaya-royal-emerald" />;
+  if (manteau) return <ProductPage onAdd={onAdd} slugOverride="blazer-lilac-dream" />;
   if (checkout) return <CheckoutPage cart={cart} onClear={onClear} />;
   if (home) return <HomePage onAdd={onAdd} />;
   return <div className="not-found-inline"><h1>Page introuvable.</h1><Link href="/" className="button button-dark">Retour à l'accueil</Link></div>;

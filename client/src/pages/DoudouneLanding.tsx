@@ -227,6 +227,8 @@ export default function DoudouneLanding({
       value: orderTotal,
       currency: "DZD",
       order_id: serverOrderNumber,
+      phone,
+      customer: name,
     });
 
     setOrderSubmitted(true);
