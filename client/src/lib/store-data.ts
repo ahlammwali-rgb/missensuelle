@@ -296,3 +296,30 @@ export function getCatalogProducts(): Product[] {
 export function saveCatalogProducts(next: Product[]) {
   if (typeof window !== "undefined") localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(next));
 }
+
+export function adjustProductStock(productIdentifier: string, delta: number): Product | null {
+  if (typeof window === "undefined" || !productIdentifier) return null;
+  const catalog = getCatalogProducts();
+  const raw = productIdentifier.trim().toLowerCase();
+
+  let targetIndex = catalog.findIndex(p => p.id.toLowerCase() === raw || p.slug.toLowerCase() === raw);
+  if (targetIndex === -1) {
+    targetIndex = catalog.findIndex(p => p.name.toLowerCase() === raw);
+  }
+  if (targetIndex === -1) {
+    targetIndex = catalog.findIndex(p => raw.includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(raw));
+  }
+  if (targetIndex === -1) {
+    if (raw.includes("abaya")) targetIndex = catalog.findIndex(p => p.id === "p-007" || p.slug.includes("abaya"));
+    else if (raw.includes("manteau") || raw.includes("blazer") || raw.includes("coat")) targetIndex = catalog.findIndex(p => p.id === "p-001" || p.slug.includes("blazer"));
+  }
+
+  if (targetIndex === -1) return null;
+  const current = catalog[targetIndex];
+  const newStock = Math.max(0, (current.stock || 0) + delta);
+  const updatedProduct = { ...current, stock: newStock };
+  const nextCatalog = [...catalog];
+  nextCatalog[targetIndex] = updatedProduct;
+  saveCatalogProducts(nextCatalog);
+  return updatedProduct;
+}

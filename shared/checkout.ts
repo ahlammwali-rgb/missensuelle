@@ -59,6 +59,8 @@ export type CheckoutOrder = {
   quantity: number; total: number; wilaya: string; commune: string; address: string; note: string;
   productId?: string; color?: string; size?: string; delivery?: "home" | "office";
   status: z.infer<typeof checkoutOrderStatusSchema>;
+  returnReceived?: boolean;
+  returnReceivedAt?: string;
 };
 export type AbandonedCheckout = {
   id: number; createdAt: string; updatedAt: string; customer: string; phone: string; product: string;

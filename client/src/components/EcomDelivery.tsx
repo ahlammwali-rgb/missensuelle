@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { PackageCheck, Truck, KeyRound, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
+import { PackageCheck, Truck, KeyRound, RefreshCw, CheckCircle2, AlertTriangle, Scan } from "lucide-react";
 import type { CheckoutOrder } from "@shared/checkout";
 import { wilayaIdFromName, type ShippingRate } from "@shared/shipping";
 import { trpc } from "@/lib/trpc";
-import { formatDZD } from "@/lib/store-data";
+import { adjustProductStock, formatDZD } from "@/lib/store-data";
+import { ParcelScannerModal } from "./ParcelScannerModal";
 
 type RowState = { selected: boolean; stopdesk: boolean; commune: string; codeStopdesk: string; refArticle: string };
 
@@ -17,7 +18,7 @@ export function EcomDeliveryPanel({ orders, notify, onShipped }: { orders: Check
   const [apiKey, setApiKey] = useState("");
   const [apiToken, setApiToken] = useState("");
   const [editing, setEditing] = useState(false);
-  const [confirmee, setConfirmee] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [lastErrors, setLastErrors] = useState<Record<string, string>>({});
 
@@ -46,7 +47,7 @@ export function EcomDeliveryPanel({ orders, notify, onShipped }: { orders: Check
   const shipSelected = () => {
     if (!selectedOrders.length) return;
     ship.mutate({
-      confirmee,
+      confirmee: true,
       items: selectedOrders.map(order => {
         const row = rowOf(order);
         return { orderId: order.id, stopdesk: row.stopdesk, commune: row.stopdesk ? undefined : row.commune, codeStopdesk: row.stopdesk ? row.codeStopdesk : undefined, refArticle: row.refArticle || undefined };
@@ -54,10 +55,20 @@ export function EcomDeliveryPanel({ orders, notify, onShipped }: { orders: Check
     }, {
       onSuccess: async results => {
         const errors: Record<string, string> = {};
-        for (const r of results) if (!r.ok) errors[r.orderId] = r.error ?? "Erreur";
+        for (const r of results) {
+          if (!r.ok) {
+            errors[r.orderId] = r.error ?? "Erreur";
+          } else {
+            const order = orders.find(o => o.id === r.orderId);
+            if (order) {
+              const qty = order.quantity || 1;
+              adjustProductStock(order.productId || order.product, -qty);
+            }
+          }
+        }
         setLastErrors(errors);
         const okCount = results.filter(r => r.ok).length;
-        notify(`${okCount} colis créé(s) chez E-com Delivery${results.length - okCount ? ` · ${results.length - okCount} échec(s)` : ""}`);
+        notify(`${okCount} colis expédié(s) à « Prêt à expédier » · Stock décompté${results.length - okCount ? ` · ${results.length - okCount} échec(s)` : ""}`);
         await utils.ecom.status.invalidate();
         onShipped();
       },
@@ -104,7 +115,14 @@ export function EcomDeliveryPanel({ orders, notify, onShipped }: { orders: Check
             <h2>Commandes confirmées à expédier <span className="count-bubble">{toShip.length}</span></h2>
           </div>
           <div className="ecom-ship-actions">
-            <label className="ecom-checkbox-label"><input type="checkbox" checked={confirmee} onChange={e => setConfirmee(e.target.checked)} /> Créer directement « Prêt à expédier »</label>
+            <button
+              type="button"
+              className="button button-scanner-action"
+              onClick={() => setIsScannerOpen(true)}
+              title="Scanner un colis pour l'expédier directement"
+            >
+              <Scan size={16} /> Scanner pour expédier
+            </button>
             <button className="button button-gradient" disabled={!connected || !selectedOrders.length || ship.isPending} onClick={shipSelected}>
               <Truck size={16} /> {ship.isPending ? "Envoi…" : `Expédier la sélection (${selectedOrders.length})`}
             </button>
@@ -138,6 +156,15 @@ export function EcomDeliveryPanel({ orders, notify, onShipped }: { orders: Check
           </div>
         ))}
       </div>
+
+      <ParcelScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        mode="ship"
+        orders={orders}
+        notify={notify}
+        onRefreshOrders={onShipped}
+      />
     </section>
   );
 }

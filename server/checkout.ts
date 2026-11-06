@@ -87,6 +87,16 @@ export function updateMemoryOrderStatus(id: number, status: CheckoutOrder["statu
   return found ? [found] : [];
 }
 
+export function markMemoryOrderReturn(id: number, returnReceived: boolean = true) {
+  const found = memoryOrders.find(order => order.dbId === id);
+  if (found) {
+    found.returnReceived = returnReceived;
+    found.returnReceivedAt = returnReceived ? new Date().toISOString() : undefined;
+    saveStore();
+  }
+  return found ? [found] : [];
+}
+
 export async function restoreClientBackupOrders(orders: Array<Partial<CheckoutOrder>>) {
   await loadStore();
   let added = 0;
