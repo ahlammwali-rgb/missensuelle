@@ -2900,3 +2900,395 @@ html.dark .more-item-text small {
   font-size: 11px;
   font-weight: 800;
 }
+
+/* ==========================================================================
+   E-COM DELIVERY & ABANDONED ORDERS DARK MODE ENHANCEMENTS (NEO LUXE)
+   ========================================================================== */
+
+.ecom-delivery-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 30px;
+}
+
+.ecom-delivery-card {
+  background: var(--app-surface, #ffffff);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+}
+
+html.dark .ecom-delivery-card {
+  background: rgba(15, 23, 42, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4) !important;
+  color: #f8fafc !important;
+}
+
+html.dark .ecom-delivery-card:hover {
+  border-color: rgba(168, 85, 247, 0.4) !important;
+}
+
+.ecom-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ecom-head-icon {
+  color: #a855f7;
+  flex-shrink: 0;
+}
+
+.ecom-card-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--app-text, #0f172a);
+}
+
+html.dark .ecom-card-head h2 {
+  color: #f8fafc !important;
+}
+
+.ecom-card-head-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.ecom-ship-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ecom-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--app-muted, #64748b);
+}
+
+html.dark .ecom-checkbox-label {
+  color: #cbd5e1 !important;
+}
+
+.ecom-connected-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--app-text, #1e293b);
+}
+
+html.dark .ecom-connected-badge {
+  color: #f1f5f9 !important;
+}
+
+.ecom-delivery-field {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: var(--app-bg, #f8fafc);
+  color: var(--app-text, #0f172a);
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.ecom-delivery-field:focus {
+  border-color: #a855f7;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.2);
+}
+
+html.dark .ecom-delivery-field {
+  background: rgba(2, 6, 23, 0.6) !important;
+  border-color: rgba(168, 85, 247, 0.3) !important;
+  color: #f8fafc !important;
+}
+
+html.dark .ecom-delivery-field option {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+.ecom-delivery-row {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--app-bg, #f8fafc);
+  transition: all 0.18s ease;
+}
+
+.ecom-delivery-row.has-error {
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+
+html.dark .ecom-delivery-row {
+  background: rgba(2, 6, 23, 0.45) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .ecom-delivery-row:hover {
+  border-color: rgba(168, 85, 247, 0.4) !important;
+}
+
+.ecom-row-customer {
+  color: var(--app-text, #0f172a);
+  font-size: 14px;
+}
+
+html.dark .ecom-row-customer {
+  color: #f8fafc !important;
+}
+
+.ecom-row-phone {
+  font-family: monospace;
+  color: #3b82f6;
+  font-weight: 700;
+}
+
+.ecom-row-product {
+  color: var(--app-muted, #64748b);
+}
+
+html.dark .ecom-row-product {
+  color: #cbd5e1 !important;
+}
+
+.ecom-row-sub {
+  color: var(--app-muted, #64748b);
+  font-size: 12px;
+  margin-top: 2px;
+  display: inline-block;
+}
+
+html.dark .ecom-row-sub {
+  color: #94a3b8 !important;
+}
+
+.ecom-row-total {
+  color: #10b981;
+  font-weight: 800;
+}
+
+.ecom-row-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ecom-shipped-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+html.dark .ecom-shipped-row {
+  border-top-color: rgba(255, 255, 255, 0.08) !important;
+  color: #e2e8f0 !important;
+}
+
+.ecom-trk-text {
+  font-family: monospace;
+  color: #a855f7;
+  font-weight: 800;
+}
+
+.ecom-note {
+  color: var(--app-muted, #64748b);
+  font-size: 13px;
+}
+
+html.dark .ecom-note {
+  color: #94a3b8 !important;
+}
+
+.ecom-help-text {
+  font-size: 11px;
+  color: var(--app-muted, #94a3b8);
+  line-height: 1.4;
+}
+
+html.dark .button.button-light {
+  background: rgba(30, 41, 59, 0.75) !important;
+  color: #f1f5f9 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+html.dark .button.button-light:hover {
+  background: rgba(51, 65, 85, 0.9) !important;
+  border-color: rgba(168, 85, 247, 0.4) !important;
+}
+
+/* ==========================================================================
+   COMMANDES ABANDONNÉES EN MODE SOMBRE NEO
+   ========================================================================== */
+
+html.dark .abandoned-admin-section {
+  color: #f8fafc !important;
+}
+
+html.dark .abandoned-admin-head h2 {
+  color: #f8fafc !important;
+}
+
+html.dark .abandoned-admin-head p {
+  color: #94a3b8 !important;
+}
+
+html.dark .abandoned-table {
+  background: rgba(15, 23, 42, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+html.dark .abandoned-table-head {
+  color: #94a3b8 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .abandoned-row {
+  border-top-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+@media (max-width: 720px) {
+  html.dark .abandoned-row {
+    background: rgba(15, 23, 42, 0.7) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+  }
+}
+
+html.dark .abandoned-row:hover {
+  background: rgba(30, 41, 59, 0.4) !important;
+}
+
+html.dark .abandoned-row strong {
+  color: #f8fafc !important;
+}
+
+html.dark .abandoned-row small {
+  color: #94a3b8 !important;
+}
+
+html.dark .abandoned-row > div::before {
+  color: #64748b !important;
+}
+
+html.dark .abandoned-row-actions {
+  border-top-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .abandoned-controls .admin-search,
+html.dark .abandoned-controls .period-select {
+  background: rgba(15, 23, 42, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+}
+
+html.dark .abandoned-controls .admin-search input,
+html.dark .abandoned-controls .period-select select {
+  background: transparent !important;
+  color: #f8fafc !important;
+}
+
+html.dark .abandoned-controls select option {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+html.dark .abandoned-empty {
+  color: #94a3b8 !important;
+}
+
+html.dark .abandoned-empty strong {
+  color: #f8fafc !important;
+}
+
+/* Badges néon d'abandon en mode sombre */
+html.dark .abandoned-activity-in_progress {
+  color: #34d399 !important;
+  background: rgba(16, 185, 129, 0.22) !important;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3) !important;
+}
+
+html.dark .abandoned-activity-abandoned {
+  color: #fb923c !important;
+  background: rgba(249, 115, 22, 0.22) !important;
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.3) !important;
+}
+
+html.dark .abandoned-status-new {
+  color: #c084fc !important;
+  background: rgba(168, 85, 247, 0.22) !important;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.3) !important;
+}
+
+html.dark .abandoned-status-called {
+  color: #34d399 !important;
+  background: rgba(16, 185, 129, 0.22) !important;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3) !important;
+}
+
+html.dark .abandoned-status-ignored {
+  color: #cbd5e1 !important;
+  background: rgba(148, 163, 184, 0.22) !important;
+}
+
+/* Modale de détail d'abandon en Dark Mode */
+html.dark .abandoned-modal {
+  background: #0d121f !important;
+  border: 1px solid rgba(168, 85, 247, 0.45) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 0 45px rgba(168, 85, 247, 0.35) !important;
+}
+
+html.dark .abandoned-modal .modal-head h2,
+html.dark .abandoned-modal .modal-customer strong {
+  color: #f8fafc !important;
+}
+
+html.dark .abandoned-modal .modal-customer span {
+  color: #94a3b8 !important;
+}
+
+html.dark .abandoned-modal .modal-details > div {
+  background: rgba(2, 6, 23, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark .abandoned-modal .modal-details strong {
+  color: #f8fafc !important;
+}
+
+html.dark .abandoned-modal .modal-details span {
+  color: #94a3b8 !important;
+}
+
+html.dark .abandoned-feedback {
+  background: rgba(245, 158, 11, 0.15) !important;
+  color: #fde68a !important;
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
