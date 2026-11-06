@@ -45,6 +45,9 @@ export default function DoudouneLanding({
   const [secondSize, setSecondSize] = useState<string>("L");
   const [remainingSeconds, setRemainingSeconds] = useState(18 * 3600 + 32 * 60);
   const [okMessage, setOkMessage] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [orderSubmitted, setOrderSubmitted] = useState<boolean>(false);
+  const isSubmittingRef = useRef<boolean>(false);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   const communes = selectedWilaya
@@ -116,6 +119,10 @@ export default function DoudouneLanding({
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isSubmittingRef.current || orderSubmitted) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+
     const formData = new FormData(e.currentTarget);
     const chosenColor = ((formData.get("color") as ColorKey) || color) as ColorKey;
     const size = String(formData.get("size") || "");
@@ -213,12 +220,18 @@ export default function DoudouneLanding({
     }
 
     trackPixelEvent("Purchase", {
+      content_type: "product",
+      content_id: product.id,
       content_ids: [product.id],
       content_name: product.name,
       value: orderTotal,
       currency: "DZD",
       order_id: serverOrderNumber,
     });
+
+    setOrderSubmitted(true);
+    setIsSubmitting(false);
+    isSubmittingRef.current = false;
   };
 
   const activatePack2Offer = () => {
@@ -348,7 +361,10 @@ export default function DoudouneLanding({
                 placeholder="رقم الهاتف (07...)"
                 onFocus={() =>
                   trackPixelEvent("InitiateCheckout", {
+                    content_type: "product",
+                    content_id: product.id,
                     content_ids: [product.id],
+                    content_name: product.name,
                     value: product.price,
                     currency: "DZD",
                   })
@@ -526,8 +542,12 @@ export default function DoudouneLanding({
                 strokeLinejoin="round"
               />
             </svg>
-            <button className="go" type="submit">
-              {offerMode === "pack2"
+            <button className="go" type="submit" disabled={isSubmitting || orderSubmitted}>
+              {isSubmitting
+                ? "جاري تأكيد طلبك... ⏳"
+                : orderSubmitted
+                ? "تم استلام طلبك بنجاح ✅"
+                : offerMode === "pack2"
                 ? "أؤكد طلبي للعرض (2 بـ 12,900 دج) 🛒"
                 : "أؤكد طلبي الآن 🛒"}
             </button>

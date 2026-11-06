@@ -444,6 +444,19 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
       const existing = memoryOrders.find(o => o.dbId === current.orderId);
       if (existing) return sessionOrderResult({ id: existing.dbId, orderNumber: existing.id, total: existing.total });
     }
+    // Deduplication guard: block rapid duplicate submissions for the same customer/phone within 60s
+    const cleanPhone = payload.phone.replace(/[\s\-\.]/g, "").replace(/^(\+213|00213)/, "0");
+    const recentCutoff = Date.now() - 60 * 1000;
+    const targetProductId = payload.items[0]?.productId;
+    const existingRecent = memoryOrders.find(o => {
+      const orderTime = new Date(o.createdAt).getTime();
+      if (orderTime < recentCutoff) return false;
+      const oPhone = o.phone.replace(/[\s\-\.]/g, "").replace(/^(\+213|00213)/, "0");
+      return oPhone === cleanPhone && (!targetProductId || o.productId === targetProductId);
+    });
+    if (existingRecent) {
+      return sessionOrderResult({ id: existingRecent.dbId, orderNumber: existingRecent.id, total: existingRecent.total });
+    }
     const resolved = payload.items.map(item => {
       const product = getCanonicalProduct(item.productId);
       if (!product) throw new CheckoutValidationError("Produit indisponible ou inconnu");

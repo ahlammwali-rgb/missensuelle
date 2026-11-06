@@ -335,6 +335,14 @@
   border-radius: 9cqw;
   padding: 3cqw 2cqw;
   box-shadow: 0 1cqw 2.2cqw #0007;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.doudoune-template .go:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  filter: grayscale(20%);
+  box-shadow: none;
 }
 
 .doudoune-template #ok {
