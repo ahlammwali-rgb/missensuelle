@@ -817,6 +817,45 @@ export async function updateAbandonedCheckout(id: number, recoveryStatus: Abando
   return { updated: true };
 }
 
+export async function deleteAbandonedCheckout(id: number) {
+  if (!Number.isInteger(id) || id <= 0) throw new CheckoutValidationError("ID d'abandon invalide");
+  const db = await getDb();
+  if (!db) {
+    await loadStore();
+    for (const [hash, session] of memorySessions.entries()) {
+      if (session.id === id) {
+        session.state = "discarded";
+        memorySessions.delete(hash);
+      }
+    }
+    saveStore();
+    return { deleted: true };
+  }
+  await db.update(storeCheckoutSessions).set({ state: "discarded", updatedAt: new Date() })
+    .where(and(eq(storeCheckoutSessions.id, id), eq(storeCheckoutSessions.state, "draft")));
+  return { deleted: true };
+}
+
+export async function deleteAllAbandonedCheckouts() {
+  const db = await getDb();
+  if (!db) {
+    await loadStore();
+    let count = 0;
+    for (const [hash, session] of memorySessions.entries()) {
+      if (session.state === "draft") {
+        session.state = "discarded";
+        memorySessions.delete(hash);
+        count++;
+      }
+    }
+    saveStore();
+    return { deleted: count };
+  }
+  await db.update(storeCheckoutSessions).set({ state: "discarded", updatedAt: new Date() })
+    .where(eq(storeCheckoutSessions.state, "draft"));
+  return { deleted: true };
+}
+
 function requestIp(req: Request) {
   return req.ip || req.socket.remoteAddress || "unknown";
 }

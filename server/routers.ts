@@ -21,6 +21,8 @@ import {
 import {
   discardCheckoutDraft,
   convertAbandonedToOrder,
+  deleteAbandonedCheckout,
+  deleteAllAbandonedCheckouts,
   listAbandonedCheckouts,
   purgeAbandonedWithoutPhone,
   listCheckoutOrders,
@@ -154,6 +156,10 @@ export const appRouter = router({
     updateAbandoned: adminProcedure
       .input(z.object({ id: z.number().int().positive(), status: recoveryStatusSchema }))
       .mutation(({ input }) => updateAbandonedCheckout(input.id, input.status)),
+    deleteAbandoned: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(({ input }) => deleteAbandonedCheckout(input.id)),
+    deleteAllAbandoned: adminProcedure.mutation(() => deleteAllAbandonedCheckouts()),
   }),
   ecom: router({
     status: adminProcedure.query(() => getEcomStatus()),
