@@ -21,12 +21,24 @@ type SerializedSession = Omit<PersistentMemorySession, "consentedAt" | "createdA
   updatedAt: string;
 };
 
+export type PushSubscriptionRecord = {
+  endpoint: string;
+  expirationTime?: number | null;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+  userAgent?: string;
+  savedAt?: string;
+};
+
 type PersistedState = {
   updatedAt: string;
   nextMemoryOrderId: number;
   nextMemorySessionId: number;
   orders: CheckoutOrder[];
   sessions: SerializedSession[];
+  pushSubscriptions?: PushSubscriptionRecord[];
 };
 
 const SHIFTED_CODES = [
@@ -47,6 +59,26 @@ const LOCAL_STORE_FILE = path.join(LOCAL_DATA_DIR, "store-state.json");
 
 function isTestEnv(): boolean {
   return Boolean(process.env.VITEST || process.env.NODE_ENV === "test");
+}
+
+const memoryPushSubscriptions = new Map<string, PushSubscriptionRecord>();
+
+export function getSavedPushSubscriptions(): PushSubscriptionRecord[] {
+  return Array.from(memoryPushSubscriptions.values());
+}
+
+export function savePushSubscriptionRecord(sub: PushSubscriptionRecord): void {
+  if (!sub || !sub.endpoint) return;
+  memoryPushSubscriptions.set(sub.endpoint, {
+    ...sub,
+    savedAt: new Date().toISOString(),
+  });
+}
+
+export function removeSavedPushSubscription(endpoint: string): void {
+  if (memoryPushSubscriptions.has(endpoint)) {
+    memoryPushSubscriptions.delete(endpoint);
+  }
 }
 
 function serializeSessions(
@@ -133,6 +165,15 @@ async function pushCloudState(state: PersistedState): Promise<void> {
       s => s && s.tokenHash && s.state !== "discarded" && s.state !== "purged",
     );
 
+    const mergedSubs = new Map<string, PushSubscriptionRecord>();
+    for (const sub of existing.state?.pushSubscriptions ?? []) {
+      if (sub && sub.endpoint) mergedSubs.set(sub.endpoint, sub);
+    }
+    for (const sub of state.pushSubscriptions ?? []) {
+      if (sub && sub.endpoint) mergedSubs.set(sub.endpoint, sub);
+    }
+    const finalPushSubscriptions = Array.from(mergedSubs.values());
+
     const finalState: PersistedState = {
       updatedAt: new Date().toISOString(),
       nextMemoryOrderId: Math.max(
@@ -147,6 +188,7 @@ async function pushCloudState(state: PersistedState): Promise<void> {
       ),
       orders: finalOrders,
       sessions: finalSessions,
+      pushSubscriptions: finalPushSubscriptions,
     };
 
     writeLocalState(finalState);
@@ -202,6 +244,12 @@ function mergeStateIntoMemory(
     }
   }
 
+  for (const sub of source.pushSubscriptions ?? []) {
+    if (sub && sub.endpoint) {
+      memoryPushSubscriptions.set(sub.endpoint, sub);
+    }
+  }
+
   const currentCounters = getCounters();
   const maxOrderId = memoryOrders.reduce(
     (max, o) => Math.max(max, (o.dbId ?? 0) + 1),
@@ -237,6 +285,7 @@ export async function ensurePersistentStoreLoaded(
           nextMemorySessionId: counters.nextSessionId,
           orders: [...memoryOrders],
           sessions: serializeSessions(memorySessions),
+          pushSubscriptions: Array.from(memoryPushSubscriptions.values()),
         });
       }
     })();
@@ -257,6 +306,7 @@ export function schedulePersistentStoreSave(
     nextMemorySessionId: counters.nextSessionId,
     orders: [...memoryOrders],
     sessions: serializeSessions(memorySessions),
+    pushSubscriptions: Array.from(memoryPushSubscriptions.values()),
   };
   writeLocalState(snapshot);
   saveQueue = saveQueue

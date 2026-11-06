@@ -91,6 +91,29 @@ function AdminPageContent() {
   const serverOrders = ordersQuery.data ?? [];
   const orderById = useMemo(() => new Map(serverOrders.map(order => [order.id, order])), [serverOrders]);
 
+  // Listen to background Web Push notifications received by the Service Worker
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === "PUSH_NOTIFICATION_RECEIVED") {
+        const payload = event.data.payload;
+        const soundUrgentEnabled = localStorage.getItem("ms_sound_urgent_enabled") !== "false";
+        const soundVictoryEnabled = localStorage.getItem("ms_sound_victory_enabled") !== "false";
+        const soundOrderEnabled = localStorage.getItem("ms_sound_order_enabled") !== "false";
+
+        if (payload?.type === "urgent_alert" && soundUrgentEnabled) {
+          playUrgentAlertSound();
+        } else if (payload?.type === "victory" && soundVictoryEnabled) {
+          playVictoryDeliveredSound();
+        } else if (payload?.type === "new_order" && soundOrderEnabled) {
+          playChaChingSound();
+        }
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", handleSwMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", handleSwMessage);
+  }, []);
+
   // Real-time Shopify "Cha-Ching" sound & Push Notifications watcher for new orders
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
   const initialOrdersLoadedRef = useRef(false);

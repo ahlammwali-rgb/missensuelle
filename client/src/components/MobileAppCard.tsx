@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Smartphone,
   Bell,
@@ -10,16 +10,40 @@ import {
   ShieldCheck,
   AlertTriangle,
   Trophy,
-  PhoneCall
+  Radio,
+  Clock,
+  Check,
 } from "lucide-react";
 import {
   playChaChingSound,
   playUrgentAlertSound,
   playVictoryDeliveredSound,
-  playAbandonedAlertSound
+  playAbandonedAlertSound,
 } from "@/lib/sound";
+import { trpc } from "@/lib/trpc";
 
 export type NotificationType = "order" | "urgent_issue" | "delivered" | "abandoned";
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer | null): string {
+  if (!buffer) return "";
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+}
 
 export function showPushNotification(
   title: string,
@@ -44,46 +68,56 @@ export function showPushNotification(
     }
 
     if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.ready.then(reg => {
-        reg.showNotification(title, {
-          body,
-          icon: "/admin-pwa-icon.png",
-          badge: "/admin-pwa-icon.png",
-          vibrate: vibratePattern,
-          tag,
-          renotify: true,
-          requireInteraction,
-          data: { url: "/admin" },
-        } as NotificationOptions & { vibrate?: number[]; requireInteraction?: boolean });
-      }).catch(() => {
-        try {
-          new Notification(title, {
+      navigator.serviceWorker.ready
+        .then((reg) => {
+          reg.showNotification(title, {
             body,
-            icon: "/admin-pwa-icon.png",
+            icon: "/icons/icon-192x192.png",
+            badge: "/icons/icon-192x192.png",
+            vibrate: vibratePattern,
             tag,
-          });
-        } catch {
-          // Fallback ignored
-        }
-      });
+            renotify: true,
+            requireInteraction,
+            data: { url: "/admin" },
+          } as NotificationOptions & { vibrate?: number[]; requireInteraction?: boolean });
+        })
+        .catch(() => {
+          try {
+            new Notification(title, {
+              body,
+              icon: "/icons/icon-192x192.png",
+              tag,
+            });
+          } catch {}
+        });
     } else {
       new Notification(title, {
         body,
-        icon: "/admin-pwa-icon.png",
+        icon: "/icons/icon-192x192.png",
         tag,
       });
     }
-  } catch {
-    // Notification error ignored
-  }
+  } catch {}
 }
 
-export function MobileAppCard({ notify }: { notify: (message: string, type?: "normal" | "urgent" | "victory") => void }) {
+export function MobileAppCard({
+  notify,
+}: {
+  notify: (message: string, type?: "normal" | "urgent" | "victory") => void;
+}) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isStandalone, setIsStandalone] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>("default");
+  const [isPushSubscribed, setIsPushSubscribed] = useState(false);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [testCountdown, setTestCountdown] = useState<number | null>(null);
+
+  // Cash Register Sound Type: "shopify" | "vintage"
+  const [cashSoundType, setCashSoundType] = useState<"shopify" | "vintage">(() => {
+    return (localStorage.getItem("ms_cash_sound_type") as "shopify" | "vintage") || "shopify";
+  });
 
   // Notification sound & push toggles
   const [soundOrder, setSoundOrder] = useState<boolean>(() => {
@@ -102,6 +136,27 @@ export function MobileAppCard({ notify }: { notify: (message: string, type?: "no
     return localStorage.getItem("ms_push_order_enabled") !== "false";
   });
 
+  // TRPC queries & mutations for Web Push VAPID
+  const vapidQuery = trpc.admin.getVapidPublicKey.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const savePushMutation = trpc.admin.savePushSubscription.useMutation();
+  const testPushMutation = trpc.admin.testPushNotification.useMutation();
+
+  // Check existing push subscription on load
+  const checkSubscription = useCallback(async () => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      return;
+    }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      setIsPushSubscribed(Boolean(sub));
+    } catch {
+      setIsPushSubscribed(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -119,6 +174,9 @@ export function MobileAppCard({ notify }: { notify: (message: string, type?: "no
     // Check notification permission
     if ("Notification" in window) {
       setNotifPermission(Notification.permission);
+      if (Notification.permission === "granted") {
+        void checkSubscription();
+      }
     }
 
     // Capture beforeinstallprompt event (Android / Chromium)
@@ -137,7 +195,7 @@ export function MobileAppCard({ notify }: { notify: (message: string, type?: "no
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
     };
-  }, []);
+  }, [checkSubscription, notify]);
 
   const handleInstallClick = async () => {
     if (isStandalone) {
@@ -160,49 +218,123 @@ export function MobileAppCard({ notify }: { notify: (message: string, type?: "no
     }
 
     if (isIOS) {
-      setShowIOSGuide(prev => !prev);
+      setShowIOSGuide((prev) => !prev);
       return;
     }
 
-    notify("Pour installer : cliquez sur l'icône de téléchargement dans la barre d'adresse de votre navigateur ou dans le menu ⋮");
+    notify(
+      "Pour installer : cliquez sur l'icône de téléchargement dans la barre d'adresse de votre navigateur ou dans le menu ⋮"
+    );
   };
 
+  // Subscribe to Native Background Web Push via VAPID
   const handleRequestNotifications = async () => {
     if (typeof window === "undefined" || !("Notification" in window)) {
       notify("Les notifications ne sont pas supportées par ce navigateur");
       return;
     }
 
+    setIsSubscribing(true);
     try {
       const res = await Notification.requestPermission();
       setNotifPermission(res);
+
       if (res === "granted") {
-        playChaChingSound();
-        showPushNotification(
-          "🛍️ Notifications Activées ! 💰",
-          "Vous recevrez désormais les alertes sonores de commande, problèmes de colis et livraisons.",
-          "welcome-notif",
-          "order"
+        if ("serviceWorker" in navigator && "PushManager" in window) {
+          const reg = await navigator.serviceWorker.ready;
+          const vapidRes = await vapidQuery.refetch();
+          const publicKey = vapidRes.data?.publicKey;
+
+          if (publicKey) {
+            const applicationServerKey = urlBase64ToUint8Array(publicKey);
+            let sub = await reg.pushManager.getSubscription();
+            if (!sub) {
+              sub = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: applicationServerKey as unknown as BufferSource,
+              });
+            }
+
+            if (sub) {
+              const p256dh = arrayBufferToBase64(sub.getKey ? sub.getKey("p256dh") : null);
+              const auth = arrayBufferToBase64(sub.getKey ? sub.getKey("auth") : null);
+
+              await savePushMutation.mutateAsync({
+                endpoint: sub.endpoint,
+                expirationTime: sub.expirationTime,
+                keys: { p256dh, auth },
+                userAgent: navigator.userAgent,
+              });
+
+              setIsPushSubscribed(true);
+            }
+          }
+        }
+
+        playChaChingSound(cashSoundType);
+        notify(
+          "Notifications push arrière-plan activées avec succès ! Le serveur réveillera votre téléphone à chaque nouvelle commande.",
+          "victory"
         );
-        notify("Notifications push autorisées ! Test sonore Cha-Ching envoyé 💰", "victory");
       } else if (res === "denied") {
-        notify("Notifications refusées. Autorisez-les dans les paramètres du navigateur.");
+        notify("Notifications refusées. Autorisez-les dans les paramètres du navigateur ou du téléphone.");
       }
-    } catch {
-      notify("Impossible de demander l'autorisation des notifications");
+    } catch (err: any) {
+      console.error("Subscription error:", err);
+      notify("Impossible d'activer les notifications push : " + (err?.message || "Erreur inconnue"));
+    } finally {
+      setIsSubscribing(false);
     }
   };
 
-  // Test 1: Authentic Shopify Cha-Ching
-  const handleTestChaChing = () => {
-    playChaChingSound();
+  // Background Push Test with 5-Second Delay
+  const handleTestBackgroundPush = async () => {
+    try {
+      if (notifPermission !== "granted") {
+        await handleRequestNotifications();
+        return;
+      }
+
+      setTestCountdown(5);
+      notify(
+        "⏳ Test programmé dans 5s ! Verrouillez votre écran ou quittez l'app maintenant pour tester la réception en arrière-plan.",
+        "normal"
+      );
+
+      // Trigger delayed push on server
+      await testPushMutation.mutateAsync({
+        type: "new_order",
+        delaySeconds: 5,
+      });
+
+      // Local countdown timer for UI feedback
+      let count = 5;
+      const interval = setInterval(() => {
+        count--;
+        if (count <= 0) {
+          clearInterval(interval);
+          setTestCountdown(null);
+        } else {
+          setTestCountdown(count);
+        }
+      }, 1000);
+    } catch (err: any) {
+      setTestCountdown(null);
+      notify("Erreur lors de l'envoi du test : " + (err?.message || "Erreur"));
+    }
+  };
+
+  // Test 1: Authentic Real Cash Register
+  const handleTestCashRegister = (type: "shopify" | "vintage") => {
+    playChaChingSound(type);
+    const label = type === "shopify" ? "Caisse Shopify (Cha-Ching 💰)" : "Caisse Vintage Mécanique (Tiroir + Clochette 🛎️)";
     showPushNotification(
-      "🛍️ COMMANDE TEST SHOPIFY : Cha-Ching ! 💰 (+9 800 DZD)",
+      `🛍️ ${label} : (+9 800 DZD)`,
       "Amina B. (0550 12 34 56) · Doudoune Hiver Luxe · Alger",
-      "test-order-sample",
+      `test-order-${type}`,
       "order"
     );
-    notify("Sonnerie 100% Shopify 'Cha-Ching' 💰 jouée avec succès !", "normal");
+    notify(`Son réel ${label} joué avec succès !`, "normal");
   };
 
   // Test 2: Urgent Red Alert Siren (Ne Répond Pas / Annulé / Reporté)
@@ -210,11 +342,11 @@ export function MobileAppCard({ notify }: { notify: (message: string, type?: "no
     playUrgentAlertSound();
     showPushNotification(
       "🚨 INTERVENTION REQUISE : Client Ne Répond Pas !",
-      "Amina K. (0555 12 34 56) · Colis CMD-1049 · Oran · Rappeler immédiatement !",
+      "Karim M. (0555 12 34 56) · Colis CMD-1049 · Oran · Rappeler immédiatement !",
       "test-urgent-sample",
       "urgent_issue"
     );
-    notify("🚨 Alerte d'intervention rouge simulée avec sirène d'urgence !", "urgent");
+    notify("🚨 Alerte rouge d'intervention d'urgence jouée !", "urgent");
   };
 
   // Test 3: Victory Fanfare (Colis Livré en Vert)
@@ -226,7 +358,19 @@ export function MobileAppCard({ notify }: { notify: (message: string, type?: "no
       "test-victory-sample",
       "delivered"
     );
-    notify("🎉 Colis livré vert simulé avec fanfare de victoire !", "victory");
+    notify("🎉 Sonnerie de victoire colis livré jouée avec succès !", "victory");
+  };
+
+  const handleSelectCashSound = (type: "shopify" | "vintage") => {
+    setCashSoundType(type);
+    localStorage.setItem("ms_cash_sound_type", type);
+    playChaChingSound(type);
+    notify(
+      type === "shopify"
+        ? "Son configuré sur : Caisse Shopify (Cha-Ching authentique) 💰"
+        : "Son configuré sur : Caisse Vintage Mécanique (Tiroir métallique + Clochette) 🛎️",
+      "normal"
+    );
   };
 
   const toggleOption = (key: string, value: boolean, setter: (v: boolean) => void) => {
@@ -243,131 +387,240 @@ export function MobileAppCard({ notify }: { notify: (message: string, type?: "no
           </div>
           <div>
             <h3>
-              Application Mobile & Système d'Alertes Audio Supérieur
+              Application Mobile & Notifications en Temps Réel
               <Sparkles size={16} style={{ color: "#f59e0b" }} />
             </h3>
             <p>
-              Notifications pour chaque événement de colis (<strong>Rouge & Alerte</strong> pour Ne répond pas / Annulé / Reporté, <strong>Vert & Victoire</strong> pour Colis Livré, et <strong>Shopify Cha-Ching 100%</strong> pour Commandes).
+              Notifications push <strong>en temps réel même écran verrouillé ou app fermée</strong>, avec vrais sons
+              de caisse enregistreuse mécanique, sirène d'alerte rouge et fanfare de livraison.
             </p>
           </div>
         </div>
 
-        {isStandalone ? (
-          <span className="mobile-status-badge installed">
-            <CheckCircle2 size={14} /> App Installée
-          </span>
-        ) : deferredPrompt ? (
-          <span className="mobile-status-badge ready">
-            <Download size={14} /> Prêt à installer
-          </span>
-        ) : isIOS ? (
-          <span className="mobile-status-badge ios">
-            <Share2 size={14} /> Guide iPhone
-          </span>
-        ) : (
-          <span className="mobile-status-badge ready">
-            <Download size={14} /> WebAPK / PWA
-          </span>
-        )}
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+          {isPushSubscribed ? (
+            <span className="mobile-status-badge installed" style={{ background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" }}>
+              <Radio size={14} /> Push Arrière-Plan Actif ✅
+            </span>
+          ) : (
+            <span className="mobile-status-badge ready" style={{ background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a" }}>
+              <Bell size={14} /> Push à synchroniser
+            </span>
+          )}
+
+          {isStandalone ? (
+            <span className="mobile-status-badge installed">
+              <CheckCircle2 size={14} /> App Installée
+            </span>
+          ) : deferredPrompt ? (
+            <span className="mobile-status-badge ready">
+              <Download size={14} /> Prêt à installer
+            </span>
+          ) : isIOS ? (
+            <span className="mobile-status-badge ios">
+              <Share2 size={14} /> Guide iPhone
+            </span>
+          ) : (
+            <span className="mobile-status-badge ready">
+              <Download size={14} /> WebAPK / PWA
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="mobile-app-grid">
-        {/* Panel 1: Installation */}
+        {/* Panel 1: Native Background Web Push */}
         <div className="mobile-sub-panel">
           <div>
             <h4>
-              <Download size={17} style={{ color: "#8b5cf6" }} />
-              1. Installer l'application sur smartphone
+              <Radio size={17} style={{ color: "#10b981" }} />
+              1. Réception en Arrière-Plan & Écran Éteint
             </h4>
             <p>
-              Installez l'icône Miss Sensuelle sur votre écran d'accueil sans passer par le store. L'application tourne en plein écran et continue de surveiller les colis en arrière-plan.
+              Grâce au protocole <strong>Web Push VAPID</strong>, le serveur réveille votre téléphone instantanément
+              dès qu'un client passe commande ou qu'un livreur signale un problème, même si votre téléphone dort dans
+              votre poche.
             </p>
           </div>
 
           <div>
-            <button
-              type="button"
-              className="mobile-btn-primary"
-              onClick={handleInstallClick}
-            >
-              <Download size={17} />
-              {isStandalone
-                ? "Application déjà installée ✓"
-                : "Installer l'application sur ce téléphone"}
-            </button>
-
-            {isIOS && showIOSGuide && (
-              <div className="ios-guidance-box">
-                <strong>Pour installer sur iPhone / iPad :</strong>
-                <ol style={{ margin: "6px 0 0 16px", padding: 0 }}>
-                  <li>Appuyez sur le bouton <strong>Partager [⎋]</strong> en bas de Safari.</li>
-                  <li>Faites défiler vers le bas et touchez <strong>« Sur l'écran d'accueil »</strong>.</li>
-                  <li>Touchez <strong>« Ajouter »</strong> en haut à droite.</li>
-                </ol>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Panel 2: Push Notifications & 3 Specialized Audio Suites */}
-        <div className="mobile-sub-panel">
-          <div>
-            <h4>
-              <Bell size={17} style={{ color: "#10b981" }} />
-              2. Système d'Alertes Audio Supérieur
-            </h4>
-            <p>
-              {notifPermission === "granted"
-                ? "🟢 Notifications push actives. Vos 3 sons distincts retentiront selon chaque situation de colis."
-                : notifPermission === "denied"
-                ? "🔴 Notifications bloquées. Veuillez les autoriser dans les paramètres du navigateur."
-                : "Activez les alertes push pour recevoir les sonneries même écran éteint."}
-            </p>
-          </div>
-
-          <div>
-            {notifPermission !== "granted" ? (
+            {notifPermission !== "granted" || !isPushSubscribed ? (
               <button
                 type="button"
                 className="mobile-btn-success"
                 onClick={handleRequestNotifications}
+                disabled={isSubscribing}
+                style={{ width: "100%", justifyContent: "center", marginBottom: "8px" }}
               >
                 <Bell size={17} />
-                Activer les notifications push
+                {isSubscribing
+                  ? "Connexion au serveur..."
+                  : "Activer les notifications push (Même écran verrouillé)"}
               </button>
             ) : (
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#10b981", fontSize: "0.86rem", fontWeight: 600, marginBottom: "8px" }}>
-                <ShieldCheck size={16} />
-                Notifications en direct actives sur cet appareil
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  background: "#f0fdf4",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  border: "1px solid #bbf7d0",
+                  color: "#15803d",
+                  fontSize: "0.88rem",
+                  fontWeight: 600,
+                  marginBottom: "8px",
+                }}
+              >
+                <ShieldCheck size={18} />
+                Téléphone connecté aux alertes serveur en arrière-plan ✓
               </div>
             )}
 
-            <div className="mobile-actions-row">
+            {/* Background 5s Delay Test Button */}
+            <button
+              type="button"
+              className="mobile-btn-primary"
+              onClick={handleTestBackgroundPush}
+              disabled={Boolean(testCountdown)}
+              style={{
+                width: "100%",
+                justifyContent: "center",
+                background: testCountdown ? "#e2e8f0" : "#6366f1",
+                color: testCountdown ? "#475569" : "#ffffff",
+              }}
+            >
+              <Clock size={16} />
+              {testCountdown !== null
+                ? `⏳ Verrouillez votre écran ! Arrivée dans ${testCountdown}s...`
+                : "📲 Tester la notification en arrière-plan (Délai 5s)"}
+            </button>
+            <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "6px 0 0 2px" }}>
+              Appuyez, puis verrouillez immédiatement votre écran pour voir le téléphone sonner en veille !
+            </p>
+          </div>
+        </div>
+
+        {/* Panel 2: Authentic Sound Suite Selection */}
+        <div className="mobile-sub-panel">
+          <div>
+            <h4>
+              <Volume2 size={17} style={{ color: "#f59e0b" }} />
+              2. Vrais Sons de Caisse Enregistreuse (100% Mécanique)
+            </h4>
+            <p>
+              Fini les bips électroniques : de vrais enregistrements audio de tiroir-caisse métallique et de sonnette.
+              Choisissez votre son préféré pour les nouvelles commandes :
+            </p>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "8px",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => handleSelectCashSound("shopify")}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: "4px",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  border:
+                    cashSoundType === "shopify"
+                      ? "2px solid #10b981"
+                      : "1px solid #cbd5e1",
+                  background: cashSoundType === "shopify" ? "#f0fdf4" : "#ffffff",
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                  <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#0f172a" }}>
+                    💰 Shopify Cha-Ching
+                  </span>
+                  {cashSoundType === "shopify" && <Check size={16} style={{ color: "#10b981" }} />}
+                </div>
+                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>
+                  Clochette nette et rapide identique à Shopify
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectCashSound("vintage")}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: "4px",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  border:
+                    cashSoundType === "vintage"
+                      ? "2px solid #10b981"
+                      : "1px solid #cbd5e1",
+                  background: cashSoundType === "vintage" ? "#f0fdf4" : "#ffffff",
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                  <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#0f172a" }}>
+                    🛎️ Caisse Vintage
+                  </span>
+                  {cashSoundType === "vintage" && <Check size={16} style={{ color: "#10b981" }} />}
+                </div>
+                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>
+                  Tiroir métallique coulissant + ding lourd
+                </span>
+              </button>
+            </div>
+
+            {/* Audio action test buttons */}
+            <div className="mobile-actions-row" style={{ marginTop: "6px" }}>
               <button
                 type="button"
                 className="mobile-btn-sound"
-                onClick={handleTestChaChing}
-                title="Tester la sonnerie authentique Shopify 100%"
+                onClick={() => handleTestCashRegister("shopify")}
+                title="Écouter le Cha-Ching Shopify"
               >
                 <Volume2 size={15} />
-                Shopify Cha-Ching 💰
+                Écouter Cha-Ching 💰
+              </button>
+
+              <button
+                type="button"
+                className="mobile-btn-sound"
+                onClick={() => handleTestCashRegister("vintage")}
+                title="Écouter la Caisse Vintage"
+              >
+                <Volume2 size={15} />
+                Écouter Caisse Vintage 🛎️
               </button>
 
               <button
                 type="button"
                 className="mobile-btn-urgent"
                 onClick={handleTestUrgent}
-                title="Tester l'alerte d'urgence rouge pour colis avec problème"
+                title="Alerte d'intervention rouge pour colis avec problème"
               >
                 <AlertTriangle size={15} />
-                Alerte Colis (Rouge) 🚨
+                Alerte Rouge (Ne répond pas) 🚨
               </button>
 
               <button
                 type="button"
                 className="mobile-btn-victory"
                 onClick={handleTestVictory}
-                title="Tester la sonnerie de victoire pour colis livré"
+                title="Fanfare victoire pour colis livré"
               >
                 <Trophy size={15} />
                 Colis Livré (Vert) 🎉
@@ -377,43 +630,77 @@ export function MobileAppCard({ notify }: { notify: (message: string, type?: "no
         </div>
       </div>
 
-      {/* Preferences Toggles */}
-      <div className="mobile-toggles-bar">
-        <label className="mobile-toggle-item">
-          <input
-            type="checkbox"
-            checked={soundOrder}
-            onChange={e => toggleOption("ms_sound_order_enabled", e.target.checked, setSoundOrder)}
-          />
-          <span>💰 Cha-Ching Shopify (Nouvelle commande)</span>
-        </label>
+      {/* Panel 3: Installation & Preferences Bar */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "12px",
+          marginTop: "16px",
+          paddingTop: "14px",
+          borderTop: "1px solid #e2e8f0",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <button
+            type="button"
+            className="mobile-btn-primary"
+            onClick={handleInstallClick}
+            style={{ fontSize: "0.84rem", padding: "7px 12px" }}
+          >
+            <Download size={15} />
+            {isStandalone
+              ? "Application installée sur l'écran d'accueil ✓"
+              : "Installer l'icône sur ce téléphone"}
+          </button>
 
-        <label className="mobile-toggle-item">
-          <input
-            type="checkbox"
-            checked={soundUrgent}
-            onChange={e => toggleOption("ms_sound_urgent_enabled", e.target.checked, setSoundUrgent)}
-          />
-          <span>🚨 Alerte d'intervention (Ne répond pas / Annulé / Reporté)</span>
-        </label>
+          {isIOS && showIOSGuide && (
+            <div className="ios-guidance-box" style={{ marginTop: "6px" }}>
+              <strong>Pour installer sur iPhone :</strong> Partager [⎋] → Sur l'écran d'accueil → Ajouter
+            </div>
+          )}
+        </div>
 
-        <label className="mobile-toggle-item">
-          <input
-            type="checkbox"
-            checked={soundVictory}
-            onChange={e => toggleOption("ms_sound_victory_enabled", e.target.checked, setSoundVictory)}
-          />
-          <span>🎉 Fanfare Victoire (Colis Livré en Vert)</span>
-        </label>
+        {/* Preferences Toggles */}
+        <div className="mobile-toggles-bar" style={{ margin: 0, padding: 0 }}>
+          <label className="mobile-toggle-item">
+            <input
+              type="checkbox"
+              checked={soundOrder}
+              onChange={(e) => toggleOption("ms_sound_order_enabled", e.target.checked, setSoundOrder)}
+            />
+            <span>💰 Caisse (Commandes)</span>
+          </label>
 
-        <label className="mobile-toggle-item">
-          <input
-            type="checkbox"
-            checked={pushOrder}
-            onChange={e => toggleOption("ms_push_order_enabled", e.target.checked, setPushOrder)}
-          />
-          <span>📲 Notifications Push en arrière-plan</span>
-        </label>
+          <label className="mobile-toggle-item">
+            <input
+              type="checkbox"
+              checked={soundUrgent}
+              onChange={(e) => toggleOption("ms_sound_urgent_enabled", e.target.checked, setSoundUrgent)}
+            />
+            <span>🚨 Alerte Rouge (Problèmes)</span>
+          </label>
+
+          <label className="mobile-toggle-item">
+            <input
+              type="checkbox"
+              checked={soundVictory}
+              onChange={(e) => toggleOption("ms_sound_victory_enabled", e.target.checked, setSoundVictory)}
+            />
+            <span>🎉 Victoire (Livré)</span>
+          </label>
+
+          <label className="mobile-toggle-item">
+            <input
+              type="checkbox"
+              checked={pushOrder}
+              onChange={(e) => toggleOption("ms_push_order_enabled", e.target.checked, setPushOrder)}
+            />
+            <span>📲 Push Arrière-Plan</span>
+          </label>
+        </div>
       </div>
     </div>
   );

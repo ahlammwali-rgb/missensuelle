@@ -50,6 +50,9 @@ import {
   saveEcomCredentials,
   shipOrders,
 } from "./ecomDelivery";
+import { VAPID_PUBLIC_KEY, sendAdminPushNotification } from "./webPush";
+import { savePushSubscriptionRecord } from "./persistentStore";
+import { triggerStoreSave } from "./checkout";
 import { z } from "zod";
 
 async function ecomGuard<T>(fn: () => Promise<T>): Promise<T> {
@@ -174,6 +177,81 @@ export const appRouter = router({
       .input(z.object({ id: z.number().int().positive() }))
       .mutation(({ input }) => deleteAbandonedCheckout(input.id)),
     deleteAllAbandoned: adminProcedure.mutation(() => deleteAllAbandonedCheckouts()),
+    getVapidPublicKey: adminProcedure.query(() => ({
+      publicKey: VAPID_PUBLIC_KEY,
+    })),
+    savePushSubscription: adminProcedure
+      .input(
+        z.object({
+          endpoint: z.string().url(),
+          expirationTime: z.number().nullable().optional(),
+          keys: z.object({
+            p256dh: z.string().min(1),
+            auth: z.string().min(1),
+          }),
+          userAgent: z.string().optional(),
+        })
+      )
+      .mutation(({ input }) => {
+        savePushSubscriptionRecord({
+          endpoint: input.endpoint,
+          expirationTime: input.expirationTime ?? null,
+          keys: input.keys,
+          userAgent: input.userAgent,
+        });
+        triggerStoreSave();
+        return { success: true };
+      }),
+    testPushNotification: adminProcedure
+      .input(
+        z.object({
+          type: z.enum(["new_order", "urgent_alert", "victory"]),
+          delaySeconds: z.number().int().min(0).max(60).default(0),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const runTest = async () => {
+          if (input.type === "new_order") {
+            await sendAdminPushNotification({
+              title: "🛍️ Test Commande : Cha-Ching ! 💰",
+              body: "Amina B. (0550 12 34 56) · Doudoune Hiver Luxe · 9 800 DZD · Alger",
+              icon: "/icons/icon-192x192.png",
+              badge: "/icons/icon-192x192.png",
+              tag: `test-order-${Date.now()}`,
+              type: "new_order",
+              data: { url: "/admin", sound: "/sounds/shopify-chaching.mp3", type: "new_order" },
+            });
+          } else if (input.type === "urgent_alert") {
+            await sendAdminPushNotification({
+              title: "🚨 Test Intervention : Client Ne Répond Pas !",
+              body: "Karim M. (0661 98 76 54) · Colis CMD-1049 · Oran · Rappel urgent !",
+              icon: "/icons/icon-192x192.png",
+              badge: "/icons/icon-192x192.png",
+              tag: `test-urgent-${Date.now()}`,
+              type: "urgent_alert",
+              data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert" },
+            });
+          } else if (input.type === "victory") {
+            await sendAdminPushNotification({
+              title: "🎉 Test Livraison : Colis Livré !",
+              body: "Sarah D. (0770 11 22 33) · Colis CMD-1052 · Blida · 11 500 DZD encaissés !",
+              icon: "/icons/icon-192x192.png",
+              badge: "/icons/icon-192x192.png",
+              tag: `test-victory-${Date.now()}`,
+              type: "victory",
+              data: { url: "/admin", sound: "/sounds/victory-delivered.wav", type: "victory" },
+            });
+          }
+        };
+
+        if (input.delaySeconds > 0) {
+          setTimeout(runTest, input.delaySeconds * 1000);
+          return { scheduled: true, delaySeconds: input.delaySeconds };
+        } else {
+          await runTest();
+          return { scheduled: false, sent: true };
+        }
+      }),
   }),
   ecom: router({
     status: adminProcedure.query(() => getEcomStatus()),

@@ -91,76 +91,36 @@ export function playScanSound(success = true) {
 }
 
 /**
- * 1. 100% Authentic Shopify-Style "Cha-Ching" 💰 Sound Effect
- * Used when a new order arrives.
+ * 1. 100% Authentic Real Cash Register Sound Effect (Recorded Mechanical Audio, NO Synth)
+ * Uses high-fidelity real recordings:
+ *  - "shopify": Authentic Shopify mobile Cha-Ching bell
+ *  - "vintage": Mechanical heavy register lever, sliding coin drawer & physical bell
  */
-export function playChaChingSound() {
+export function playChaChingSound(variant?: "shopify" | "vintage") {
   if (typeof navigator !== "undefined" && navigator.vibrate) {
     navigator.vibrate([120, 50, 220, 40, 180]);
   }
 
-  playAudioWithFallback("/sounds/shopify-chaching.wav", () => {
+  const selected =
+    variant ||
+    (typeof localStorage !== "undefined" ? localStorage.getItem("ms_cash_sound_type") : null) ||
+    "shopify";
+
+  const primaryUrl =
+    selected === "vintage"
+      ? "/sounds/cash-register-vintage.mp3"
+      : "/sounds/shopify-chaching.mp3";
+
+  const fallbackUrl =
+    selected === "vintage"
+      ? "/sounds/shopify-chaching.mp3"
+      : "/sounds/cash-register-vintage.mp3";
+
+  playAudioWithFallback(primaryUrl, () => {
     try {
-      const ctx = getAudioContext();
-      if (!ctx) return;
-      const now = ctx.currentTime;
-
-      // Mechanical drawer slide
-      const bufferSize = Math.floor(ctx.sampleRate * 0.08);
-      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-      const output = noiseBuffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        output[i] = Math.random() * 2 - 1;
-      }
-      const whiteNoise = ctx.createBufferSource();
-      whiteNoise.buffer = noiseBuffer;
-      const filter = ctx.createBiquadFilter();
-      filter.type = "bandpass";
-      filter.frequency.setValueAtTime(1350, now);
-      const noiseGain = ctx.createGain();
-      noiseGain.gain.setValueAtTime(0.25, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
-      whiteNoise.connect(filter);
-      filter.connect(noiseGain);
-      noiseGain.connect(ctx.destination);
-      whiteNoise.start(now);
-      whiteNoise.stop(now + 0.08);
-
-      // Primary crystal bell C6 (1046.5 Hz)
-      const bell1 = ctx.createOscillator();
-      const bellGain1 = ctx.createGain();
-      bell1.type = "sine";
-      bell1.frequency.setValueAtTime(1046.5, now + 0.05);
-      bellGain1.gain.setValueAtTime(0.42, now + 0.05);
-      bellGain1.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
-      bell1.connect(bellGain1);
-      bellGain1.connect(ctx.destination);
-      bell1.start(now + 0.05);
-      bell1.stop(now + 0.9);
-
-      // Harmonic C7 (2093 Hz)
-      const bell2 = ctx.createOscillator();
-      const bellGain2 = ctx.createGain();
-      bell2.type = "sine";
-      bell2.frequency.setValueAtTime(2093, now + 0.05);
-      bellGain2.gain.setValueAtTime(0.28, now + 0.05);
-      bellGain2.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
-      bell2.connect(bellGain2);
-      bellGain2.connect(ctx.destination);
-      bell2.start(now + 0.05);
-      bell2.stop(now + 0.75);
-
-      // Shimmer G7 (3136 Hz)
-      const bell3 = ctx.createOscillator();
-      const bellGain3 = ctx.createGain();
-      bell3.type = "sine";
-      bell3.frequency.setValueAtTime(3136, now + 0.06);
-      bellGain3.gain.setValueAtTime(0.18, now + 0.06);
-      bellGain3.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-      bell3.connect(bellGain3);
-      bellGain3.connect(ctx.destination);
-      bell3.start(now + 0.06);
-      bell3.stop(now + 0.5);
+      const alt = new Audio(fallbackUrl);
+      alt.volume = 1.0;
+      void alt.play();
     } catch {}
   });
 }
