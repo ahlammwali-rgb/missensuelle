@@ -19,7 +19,7 @@ import { GoogleSheetPanel } from "@/components/GoogleSheetPanel";
 import { TransferredOrdersPanel } from "@/components/TransferredOrdersPanel";
 import { ReturnsPanel } from "@/components/ReturnsPanel";
 import { MobileAppCard, showPushNotification } from "@/components/MobileAppCard";
-import { playChaChingSound, playAbandonedAlertSound } from "@/lib/sound";
+import { playChaChingSound, playUrgentAlertSound, playVictoryDeliveredSound, playAbandonedAlertSound } from "@/lib/sound";
 import { loadRealOrders, orderMatchesPeriod } from "@/lib/admin-orders";
 
 const actionLabels: { status: OrderStatus; label: string }[] = [{ status: "confirmee", label: "Confirmer" }, { status: "annulee", label: "Annuler" }, { status: "reportee", label: "Reporter" }, { status: "ne_repond_pas", label: "Ne répond pas" }, { status: "transferee", label: "Transférer" }];
@@ -60,7 +60,12 @@ function AdminPageContent() {
   const [query, setQuery] = useState("");
   const [period, setPeriod] = useState("Toutes les dates");
   const [selected, setSelected] = useState<CheckoutOrder | null>(null);
-  const [toast, setToast] = useState("");
+  type ToastType = "normal" | "urgent" | "victory" | "order";
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const notify = (message: string, type: ToastType = "normal") => {
+    setToast({ message, type });
+    window.setTimeout(() => setToast(null), 3800);
+  };
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [searchPopupQuery, setSearchPopupQuery] = useState("");
@@ -84,6 +89,7 @@ function AdminPageContent() {
     syncSheetMutation.mutate();
   }, []);
   const serverOrders = ordersQuery.data ?? [];
+  const orderById = useMemo(() => new Map(serverOrders.map(order => [order.id, order])), [serverOrders]);
 
   // Real-time Shopify "Cha-Ching" sound & Push Notifications watcher for new orders
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
@@ -121,10 +127,10 @@ function AdminPageContent() {
         if (pushEnabled) {
           const title = `🛍️ COMMANDE REÇUE ! (+${formatDZD(order.total)})`;
           const body = `${order.customer || "Cliente"} (${order.phone}) · ${order.product} · ${order.wilaya}`;
-          showPushNotification(title, body, `order-${order.id}`);
+          showPushNotification(title, body, `order-${order.id}`, "order");
         }
 
-        notify(`💰 Nouvelle commande : ${order.customer || "Cliente"} (+${formatDZD(order.total)}) !`);
+        notify(`💰 Nouvelle commande : ${order.customer || "Cliente"} (+${formatDZD(order.total)}) !`, "order");
       }
     }
 
@@ -169,7 +175,7 @@ function AdminPageContent() {
         if (pushEnabled) {
           const title = `🛒 Nouveau Panier Abandonné !`;
           const body = `${item.customer || "Visiteur"} (${item.phone}) · ${item.product}`;
-          showPushNotification(title, body, `abandoned-${item.id}`);
+          showPushNotification(title, body, `abandoned-${item.id}`, "abandoned");
         }
 
         notify(`🛒 Nouveau panier abandonné détecté (${item.phone})`);
@@ -180,6 +186,197 @@ function AdminPageContent() {
       localStorage.setItem("ms_known_abandoned_set", JSON.stringify(Array.from(knownAbandonedIdsRef.current).slice(-200)));
     } catch {}
   }, [abandonedQuery.data, abandonedQuery.isLoading]);
+
+  // Real-time watcher for order status changes (ne_repond_pas, annulee, reportee)
+  const orderStatusHistoryRef = useRef<Map<string, OrderStatus>>(new Map());
+  const initialOrderStatusLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (ordersQuery.isLoading || !ordersQuery.data) return;
+    const currentOrders = ordersQuery.data;
+
+    if (!initialOrderStatusLoadedRef.current) {
+      initialOrderStatusLoadedRef.current = true;
+      for (const o of currentOrders) {
+        orderStatusHistoryRef.current.set(o.id, o.status);
+      }
+      return;
+    }
+
+    const soundUrgentEnabled = localStorage.getItem("ms_sound_urgent_enabled") !== "false";
+    const pushEnabled = localStorage.getItem("ms_push_order_enabled") !== "false";
+
+    for (const o of currentOrders) {
+      const prevStatus = orderStatusHistoryRef.current.get(o.id);
+      if (prevStatus && prevStatus !== o.status) {
+        orderStatusHistoryRef.current.set(o.id, o.status);
+
+        if (o.status === "ne_repond_pas") {
+          if (soundUrgentEnabled) playUrgentAlertSound();
+          if (pushEnabled) {
+            showPushNotification(
+              `🚨 INTERVENTION REQUISE : Client Ne Répond Pas !`,
+              `${o.customer || "Cliente"} (${o.phone}) · Commande ${o.id} · Wilaya: ${o.wilaya} · Rappel urgent requis !`,
+              `ord-nrp-${o.id}`,
+              "urgent_issue"
+            );
+          }
+          notify(`🚨 INTERVENTION : ${o.customer || "Cliente"} (${o.phone}) ne répond pas !`, "urgent");
+        } else if (o.status === "annulee") {
+          if (soundUrgentEnabled) playUrgentAlertSound();
+          if (pushEnabled) {
+            showPushNotification(
+              `🚨 COMMANDE ANNULÉE / REFUSÉE`,
+              `${o.customer || "Cliente"} (${o.phone}) · Commande ${o.id} · Total: ${formatDZD(o.total)}`,
+              `ord-cancel-${o.id}`,
+              "urgent_issue"
+            );
+          }
+          notify(`🚨 ALERTE : Commande ${o.id} annulée / refusée (${o.customer})`, "urgent");
+        } else if (o.status === "reportee") {
+          if (soundUrgentEnabled) playUrgentAlertSound();
+          if (pushEnabled) {
+            showPushNotification(
+              `⚠️ LIVRAISON REPORTÉE PAR LE CLIENT`,
+              `${o.customer || "Cliente"} (${o.phone}) · Commande ${o.id} · Wilaya: ${o.wilaya}`,
+              `ord-delay-${o.id}`,
+              "urgent_issue"
+            );
+          }
+          notify(`⚠️ REPORT : Commande ${o.id} reportée (${o.customer})`, "urgent");
+        }
+      } else if (!prevStatus) {
+        orderStatusHistoryRef.current.set(o.id, o.status);
+      }
+    }
+  }, [ordersQuery.data, ordersQuery.isLoading]);
+
+  // E-com status & carrier batch tracking query for live parcel events
+  const ecomStatusQuery = trpc.ecom.status.useQuery(undefined, {
+    refetchInterval: 30000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    retry: false,
+  });
+  const shipments = useMemo(() => ecomStatusQuery.data?.shipments || {}, [ecomStatusQuery.data]);
+
+  const activeTrackingNumbers = useMemo(() => {
+    const list: string[] = [];
+    for (const sh of Object.values(shipments)) {
+      if (sh?.tracking) list.push(sh.tracking);
+    }
+    return list.slice(0, 100);
+  }, [shipments]);
+
+  const trackingBatchQuery = trpc.ecom.trackBatch.useQuery(
+    { trackings: activeTrackingNumbers },
+    {
+      enabled: activeTrackingNumbers.length > 0,
+      refetchInterval: 30000,
+      refetchIntervalInBackground: true,
+      refetchOnWindowFocus: true,
+      retry: false,
+    }
+  );
+
+  const trackingMap = (trackingBatchQuery.data || {}) as Record<string, { situation?: string }>;
+  const knownSituationsRef = useRef<Map<string, string>>(new Map());
+  const initialSituationsLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (!trackingBatchQuery.data || Object.keys(trackingMap).length === 0) return;
+
+    if (!initialSituationsLoadedRef.current) {
+      initialSituationsLoadedRef.current = true;
+      for (const [tracking, data] of Object.entries(trackingMap)) {
+        if (data?.situation) {
+          knownSituationsRef.current.set(tracking, data.situation.toLowerCase());
+        }
+      }
+      return;
+    }
+
+    const soundUrgentEnabled = localStorage.getItem("ms_sound_urgent_enabled") !== "false";
+    const soundVictoryEnabled = localStorage.getItem("ms_sound_victory_enabled") !== "false";
+    const pushEnabled = localStorage.getItem("ms_push_order_enabled") !== "false";
+
+    const orderIdByTracking = new Map<string, string>();
+    for (const [orderId, sh] of Object.entries(shipments)) {
+      if (sh?.tracking) orderIdByTracking.set(sh.tracking, orderId);
+    }
+
+    for (const [tracking, data] of Object.entries(trackingMap)) {
+      if (!data?.situation) continue;
+      const currentSit = data.situation.toLowerCase();
+      const prevSit = knownSituationsRef.current.get(tracking);
+
+      if (prevSit && prevSit !== currentSit) {
+        knownSituationsRef.current.set(tracking, currentSit);
+        const orderId = orderIdByTracking.get(tracking);
+        const order = orderId ? orderById.get(orderId) : null;
+        const customerName = order?.customer || "Cliente";
+        const phone = order?.phone || "";
+        const wilaya = order?.wilaya || "";
+        const total = order?.total || 0;
+
+        // 1. Colis LIVRÉ -> GREEN VICTORY
+        if (currentSit.includes("livr") && !prevSit.includes("livr")) {
+          if (soundVictoryEnabled) playVictoryDeliveredSound();
+          if (pushEnabled) {
+            showPushNotification(
+              `🎉 COLIS LIVRÉ AVEC SUCCÈS ! (+${formatDZD(total)})`,
+              `Encaissement validé pour ${customerName} (${wilaya}) · Commande ${orderId || tracking}`,
+              `delivered-${tracking}`,
+              "delivered"
+            );
+          }
+          notify(`🎉 VICTOIRE : Colis ${orderId || tracking} livré à ${customerName} (+${formatDZD(total)}) !`, "victory");
+        }
+        // 2. Client NE RÉPOND PAS -> RED ALERT
+        else if (currentSit.includes("repond") && !prevSit.includes("repond")) {
+          if (soundUrgentEnabled) playUrgentAlertSound();
+          if (pushEnabled) {
+            showPushNotification(
+              `🚨 INTERVENTION LIVREUR : Client Ne Répond Pas !`,
+              `${customerName} (${phone}) ne répond pas au livreur · Wilaya: ${wilaya} · Appel requis immédiatement !`,
+              `nrp-${tracking}`,
+              "urgent_issue"
+            );
+          }
+          notify(`🚨 INTERVENTION : ${customerName} (${phone}) ne répond pas au livreur !`, "urgent");
+        }
+        // 3. Colis REPORTÉ -> RED / ORANGE ALERT
+        else if (currentSit.includes("report") && !prevSit.includes("report")) {
+          if (soundUrgentEnabled) playUrgentAlertSound();
+          if (pushEnabled) {
+            showPushNotification(
+              `⚠️ COLIS REPORTÉ PAR LE CLIENT`,
+              `${customerName} (${phone}) a reporté la livraison · Wilaya: ${wilaya} · Commande ${orderId || tracking}`,
+              `delay-${tracking}`,
+              "urgent_issue"
+            );
+          }
+          notify(`⚠️ LIVRAISON REPORTÉE : ${customerName} (${wilaya})`, "urgent");
+        }
+        // 4. Colis ANNULÉ / RETOUR / REFUSÉ -> RED ALERT
+        else if ((currentSit.includes("retour") || currentSit.includes("annul") || currentSit.includes("refus")) &&
+                 (!prevSit.includes("retour") && !prevSit.includes("annul") && !prevSit.includes("refus"))) {
+          if (soundUrgentEnabled) playUrgentAlertSound();
+          if (pushEnabled) {
+            showPushNotification(
+              `🚨 ALERTE RETOUR / COLIS REFUSÉ !`,
+              `Colis ${orderId || tracking} en échec / refusé par ${customerName} (${phone}) · Action requise !`,
+              `returned-${tracking}`,
+              "urgent_issue"
+            );
+          }
+          notify(`🚨 ALERTE RETOUR : Colis ${orderId || tracking} en retour (${customerName}) !`, "urgent");
+        }
+      } else if (!prevSit) {
+        knownSituationsRef.current.set(tracking, currentSit);
+      }
+    }
+  }, [trackingBatchQuery.data, shipments, orderById]);
 
   useEffect(() => {
     if (ordersQuery.isLoading || ordersQuery.error) return;
@@ -219,7 +416,6 @@ function AdminPageContent() {
       // Ignore storage error
     }
   }, [ordersQuery.isLoading, ordersQuery.error, serverOrders]);
-  const orderById = useMemo(() => new Map(serverOrders.map(order => [order.id, order])), [serverOrders]);
   const orders = useMemo(() => serverOrders.map(toDashboardOrder), [serverOrders]);
   const periodOrders = useMemo(() => orders.filter(order => order.status !== "transferee" && orderMatchesPeriod(order, period)), [orders, period]);
   const filtered = useMemo(() => periodOrders.filter(order => order.status !== "transferee" && (activeStatus === "all" || order.status === activeStatus) && `${order.id} ${order.phone} ${order.customer}`.toLowerCase().includes(query.toLowerCase())), [periodOrders, activeStatus, query]);
@@ -231,11 +427,30 @@ function AdminPageContent() {
       .filter(o => `${o.id} ${o.customer} ${o.phone} ${o.wilaya} ${o.commune} ${o.product}`.toLowerCase().includes(q))
       .slice(0, 30);
   }, [serverOrders, searchPopupQuery]);
-  const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 2800); };
   const updateStatus = (id: string, status: OrderStatus) => {
     const source = orderById.get(id);
     if (!source) { notify("Commande introuvable dans les données serveur"); return; }
-    updateOrderStatus.mutate({ id: source.dbId, status }, { onSuccess: async () => { await utils.admin.orders.invalidate(); notify(status === "transferee" ? `Commande ${id} transférée vers la section dédiée ✦` : `Commande ${id} · ${status === "confirmee" ? "confirmée" : "statut mis à jour"}`); setSelected(null); }, onError: error => notify(error.message || "Mise à jour impossible") });
+    updateOrderStatus.mutate({ id: source.dbId, status }, {
+      onSuccess: async () => {
+        await utils.admin.orders.invalidate();
+        if (status === "ne_repond_pas") {
+          playUrgentAlertSound();
+          notify(`🚨 Commande ${id} : NE RÉPOND PAS (Intervention requise)`, "urgent");
+        } else if (status === "annulee") {
+          playUrgentAlertSound();
+          notify(`🚨 Commande ${id} : ANNULÉE / REFUSÉE`, "urgent");
+        } else if (status === "reportee") {
+          playUrgentAlertSound();
+          notify(`⚠️ Commande ${id} : REPORTÉE`, "urgent");
+        } else if (status === "confirmee") {
+          notify(`Commande ${id} · confirmée ✦`, "normal");
+        } else {
+          notify(status === "transferee" ? `Commande ${id} transférée vers la section dédiée ✦` : `Commande ${id} · statut mis à jour`);
+        }
+        setSelected(null);
+      },
+      onError: error => notify(error.message || "Mise à jour impossible")
+    });
   };
   const saveOrderDetails = (dbId: number, updates: Omit<Parameters<typeof updateOrderDetails.mutate>[0], "id">) => {
     updateOrderDetails.mutate(
@@ -491,7 +706,12 @@ function AdminPageContent() {
       </div>
     </div>
   </div>
-)}{selected && <OrderModal order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={callCustomer} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onDelete={handleDeleteOrder} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{toast && <div className="toast-admin"><span>✦</span>{toast}</div>}</div>;
+)}{selected && <OrderModal order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={callCustomer} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onDelete={handleDeleteOrder} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{toast && (
+  <div className={`toast-admin toast-${toast.type}`}>
+    <span>{toast.type === "urgent" ? "🚨" : toast.type === "victory" ? "🎉" : toast.type === "order" ? "💰" : "✦"}</span>
+    {toast.message}
+  </div>
+)}</div>;
 }
 
 async function copyOrderDetails(order: CheckoutOrder, notify: (message: string) => void) { const value = `${order.id} · ${order.customer} · ${order.phone}`; try { if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(value); notify("Détails copiés"); return; } } catch {} try { const area = document.createElement("textarea"); area.value = value; area.style.position = "fixed"; area.style.opacity = "0"; document.body.appendChild(area); area.select(); document.execCommand("copy"); area.remove(); notify("Détails copiés"); } catch { notify("Copie indisponible dans ce navigateur"); } }

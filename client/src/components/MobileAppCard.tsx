@@ -8,14 +8,40 @@ import {
   Share2,
   Sparkles,
   ShieldCheck,
-  AlertCircle
+  AlertTriangle,
+  Trophy,
+  PhoneCall
 } from "lucide-react";
-import { playChaChingSound, playAbandonedAlertSound } from "@/lib/sound";
+import {
+  playChaChingSound,
+  playUrgentAlertSound,
+  playVictoryDeliveredSound,
+  playAbandonedAlertSound
+} from "@/lib/sound";
 
-export function showPushNotification(title: string, body: string, tag: string) {
+export type NotificationType = "order" | "urgent_issue" | "delivered" | "abandoned";
+
+export function showPushNotification(
+  title: string,
+  body: string,
+  tag: string,
+  type: NotificationType = "order"
+) {
   try {
     if (typeof window === "undefined" || !("Notification" in window)) return;
     if (Notification.permission !== "granted") return;
+
+    let vibratePattern = [120, 50, 220, 40, 180];
+    let requireInteraction = false;
+
+    if (type === "urgent_issue") {
+      vibratePattern = [280, 90, 280, 90, 450];
+      requireInteraction = true;
+    } else if (type === "delivered") {
+      vibratePattern = [90, 50, 140, 50, 180, 50, 320];
+    } else if (type === "abandoned") {
+      vibratePattern = [80, 50, 120];
+    }
 
     if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.ready.then(reg => {
@@ -23,11 +49,12 @@ export function showPushNotification(title: string, body: string, tag: string) {
           body,
           icon: "/admin-pwa-icon.png",
           badge: "/admin-pwa-icon.png",
-          vibrate: [200, 100, 200, 100, 400],
+          vibrate: vibratePattern,
           tag,
           renotify: true,
+          requireInteraction,
           data: { url: "/admin" },
-        } as NotificationOptions & { vibrate?: number[] });
+        } as NotificationOptions & { vibrate?: number[]; requireInteraction?: boolean });
       }).catch(() => {
         try {
           new Notification(title, {
@@ -51,7 +78,7 @@ export function showPushNotification(title: string, body: string, tag: string) {
   }
 }
 
-export function MobileAppCard({ notify }: { notify: (message: string) => void }) {
+export function MobileAppCard({ notify }: { notify: (message: string, type?: "normal" | "urgent" | "victory") => void }) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isStandalone, setIsStandalone] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
@@ -61,6 +88,12 @@ export function MobileAppCard({ notify }: { notify: (message: string) => void })
   // Notification sound & push toggles
   const [soundOrder, setSoundOrder] = useState<boolean>(() => {
     return localStorage.getItem("ms_sound_order_enabled") !== "false";
+  });
+  const [soundUrgent, setSoundUrgent] = useState<boolean>(() => {
+    return localStorage.getItem("ms_sound_urgent_enabled") !== "false";
+  });
+  const [soundVictory, setSoundVictory] = useState<boolean>(() => {
+    return localStorage.getItem("ms_sound_victory_enabled") !== "false";
   });
   const [soundAbandoned, setSoundAbandoned] = useState<boolean>(() => {
     return localStorage.getItem("ms_sound_abandoned_enabled") !== "false";
@@ -98,7 +131,7 @@ export function MobileAppCard({ notify }: { notify: (message: string) => void })
     window.addEventListener("appinstalled", () => {
       setIsStandalone(true);
       setDeferredPrompt(null);
-      notify("Application Miss Sensuelle installée avec succès !");
+      notify("Application Miss Sensuelle installée avec succès !", "victory");
     });
 
     return () => {
@@ -117,7 +150,7 @@ export function MobileAppCard({ notify }: { notify: (message: string) => void })
         await deferredPrompt.prompt();
         const choice = await deferredPrompt.userChoice;
         if (choice.outcome === "accepted") {
-          notify("Installation confirmée !");
+          notify("Installation confirmée !", "victory");
         }
         setDeferredPrompt(null);
       } catch {
@@ -131,7 +164,6 @@ export function MobileAppCard({ notify }: { notify: (message: string) => void })
       return;
     }
 
-    // Generic guidance for Chrome on desktop or Android if prompt isn't fired yet
     notify("Pour installer : cliquez sur l'icône de téléchargement dans la barre d'adresse de votre navigateur ou dans le menu ⋮");
   };
 
@@ -148,35 +180,53 @@ export function MobileAppCard({ notify }: { notify: (message: string) => void })
         playChaChingSound();
         showPushNotification(
           "🛍️ Notifications Activées ! 💰",
-          "Vous recevrez une alerte sonore 'Cha-Ching' à chaque nouvelle commande.",
-          "welcome-notif"
+          "Vous recevrez désormais les alertes sonores de commande, problèmes de colis et livraisons.",
+          "welcome-notif",
+          "order"
         );
-        notify("Notifications push autorisées ! Test sonore envoyé 💰");
+        notify("Notifications push autorisées ! Test sonore Cha-Ching envoyé 💰", "victory");
       } else if (res === "denied") {
         notify("Notifications refusées. Autorisez-les dans les paramètres du navigateur.");
       }
-    } catch (err) {
+    } catch {
       notify("Impossible de demander l'autorisation des notifications");
     }
   };
 
+  // Test 1: Authentic Shopify Cha-Ching
   const handleTestChaChing = () => {
     playChaChingSound();
-    notify("Sonnerie Shopify 'Cha-Ching' 💰 jouée avec succès !");
+    showPushNotification(
+      "🛍️ COMMANDE TEST SHOPIFY : Cha-Ching ! 💰 (+9 800 DZD)",
+      "Amina B. (0550 12 34 56) · Doudoune Hiver Luxe · Alger",
+      "test-order-sample",
+      "order"
+    );
+    notify("Sonnerie 100% Shopify 'Cha-Ching' 💰 jouée avec succès !", "normal");
   };
 
-  const handleTestPush = () => {
-    if (notifPermission !== "granted") {
-      void handleRequestNotifications();
-      return;
-    }
-    playChaChingSound();
+  // Test 2: Urgent Red Alert Siren (Ne Répond Pas / Annulé / Reporté)
+  const handleTestUrgent = () => {
+    playUrgentAlertSound();
     showPushNotification(
-      "🛍️ COMMANDE TEST : Cha-Ching ! 💰 (+9 800 DZD)",
-      "Amina B. (0550 12 34 56) · Doudoune Hiver Luxe · Alger",
-      "test-order-sample"
+      "🚨 INTERVENTION REQUISE : Client Ne Répond Pas !",
+      "Amina K. (0555 12 34 56) · Colis CMD-1049 · Oran · Rappeler immédiatement !",
+      "test-urgent-sample",
+      "urgent_issue"
     );
-    notify("Notification push test envoyée sur votre écran !");
+    notify("🚨 Alerte d'intervention rouge simulée avec sirène d'urgence !", "urgent");
+  };
+
+  // Test 3: Victory Fanfare (Colis Livré en Vert)
+  const handleTestVictory = () => {
+    playVictoryDeliveredSound();
+    showPushNotification(
+      "🎉 COLIS LIVRÉ AVEC SUCCÈS ! (+9 800 DZD)",
+      "Encaissement validé pour Khadidja M. · Commande CMD-1038 · Sétif",
+      "test-victory-sample",
+      "delivered"
+    );
+    notify("🎉 Colis livré vert simulé avec fanfare de victoire !", "victory");
   };
 
   const toggleOption = (key: string, value: boolean, setter: (v: boolean) => void) => {
@@ -193,11 +243,11 @@ export function MobileAppCard({ notify }: { notify: (message: string) => void })
           </div>
           <div>
             <h3>
-              Application Mobile & Alertes Directes
+              Application Mobile & Système d'Alertes Audio Supérieur
               <Sparkles size={16} style={{ color: "#f59e0b" }} />
             </h3>
             <p>
-              Installez l'application sur votre smartphone et recevez la sonnerie <strong>Cha-Ching</strong> (Shopify) 💰 en temps réel à chaque commande.
+              Notifications pour chaque événement de colis (<strong>Rouge & Alerte</strong> pour Ne répond pas / Annulé / Reporté, <strong>Vert & Victoire</strong> pour Colis Livré, et <strong>Shopify Cha-Ching 100%</strong> pour Commandes).
             </p>
           </div>
         </div>
@@ -227,10 +277,10 @@ export function MobileAppCard({ notify }: { notify: (message: string) => void })
           <div>
             <h4>
               <Download size={17} style={{ color: "#8b5cf6" }} />
-              1. Installer l'application sur ce téléphone
+              1. Installer l'application sur smartphone
             </h4>
             <p>
-              Ajoutez l'icône Miss Sensuelle sur votre écran d'accueil sans passer par le Play Store. Elle s'ouvre en plein écran comme une véritable application native.
+              Installez l'icône Miss Sensuelle sur votre écran d'accueil sans passer par le store. L'application tourne en plein écran et continue de surveiller les colis en arrière-plan.
             </p>
           </div>
 
@@ -259,19 +309,19 @@ export function MobileAppCard({ notify }: { notify: (message: string) => void })
           </div>
         </div>
 
-        {/* Panel 2: Push Notifications & Audio */}
+        {/* Panel 2: Push Notifications & 3 Specialized Audio Suites */}
         <div className="mobile-sub-panel">
           <div>
             <h4>
               <Bell size={17} style={{ color: "#10b981" }} />
-              2. Notifications Push & Sonnerie Cha-Ching
+              2. Système d'Alertes Audio Supérieur
             </h4>
             <p>
               {notifPermission === "granted"
-                ? "🟢 Notifications autorisées sur cet appareil. Votre téléphone vibrera et sonnera à chaque nouvelle commande."
+                ? "🟢 Notifications push actives. Vos 3 sons distincts retentiront selon chaque situation de colis."
                 : notifPermission === "denied"
-                ? "🔴 Notifications bloquées. Veuillez les réactiver dans les paramètres de votre navigateur."
-                : "Activez les alertes push pour être immédiatement notifié même lorsque votre écran est éteint."}
+                ? "🔴 Notifications bloquées. Veuillez les autoriser dans les paramètres du navigateur."
+                : "Activez les alertes push pour recevoir les sonneries même écran éteint."}
             </p>
           </div>
 
@@ -288,7 +338,7 @@ export function MobileAppCard({ notify }: { notify: (message: string) => void })
             ) : (
               <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#10b981", fontSize: "0.86rem", fontWeight: 600, marginBottom: "8px" }}>
                 <ShieldCheck size={16} />
-                Notifications en direct actives sur ce téléphone
+                Notifications en direct actives sur cet appareil
               </div>
             )}
 
@@ -297,20 +347,30 @@ export function MobileAppCard({ notify }: { notify: (message: string) => void })
                 type="button"
                 className="mobile-btn-sound"
                 onClick={handleTestChaChing}
-                title="Tester la sonnerie de caisse enregistreuse Shopify"
+                title="Tester la sonnerie authentique Shopify 100%"
               >
                 <Volume2 size={15} />
-                Tester Cha-Ching 💰
+                Shopify Cha-Ching 💰
               </button>
 
               <button
                 type="button"
-                className="mobile-btn-test-push"
-                onClick={handleTestPush}
-                title="Simuler une notification de nouvelle commande"
+                className="mobile-btn-urgent"
+                onClick={handleTestUrgent}
+                title="Tester l'alerte d'urgence rouge pour colis avec problème"
               >
-                <Bell size={15} />
-                Tester la notification push
+                <AlertTriangle size={15} />
+                Alerte Colis (Rouge) 🚨
+              </button>
+
+              <button
+                type="button"
+                className="mobile-btn-victory"
+                onClick={handleTestVictory}
+                title="Tester la sonnerie de victoire pour colis livré"
+              >
+                <Trophy size={15} />
+                Colis Livré (Vert) 🎉
               </button>
             </div>
           </div>
@@ -325,7 +385,25 @@ export function MobileAppCard({ notify }: { notify: (message: string) => void })
             checked={soundOrder}
             onChange={e => toggleOption("ms_sound_order_enabled", e.target.checked, setSoundOrder)}
           />
-          <span>Sonnerie Cha-Ching 💰 à chaque nouvelle commande</span>
+          <span>💰 Cha-Ching Shopify (Nouvelle commande)</span>
+        </label>
+
+        <label className="mobile-toggle-item">
+          <input
+            type="checkbox"
+            checked={soundUrgent}
+            onChange={e => toggleOption("ms_sound_urgent_enabled", e.target.checked, setSoundUrgent)}
+          />
+          <span>🚨 Alerte d'intervention (Ne répond pas / Annulé / Reporté)</span>
+        </label>
+
+        <label className="mobile-toggle-item">
+          <input
+            type="checkbox"
+            checked={soundVictory}
+            onChange={e => toggleOption("ms_sound_victory_enabled", e.target.checked, setSoundVictory)}
+          />
+          <span>🎉 Fanfare Victoire (Colis Livré en Vert)</span>
         </label>
 
         <label className="mobile-toggle-item">
@@ -334,16 +412,7 @@ export function MobileAppCard({ notify }: { notify: (message: string) => void })
             checked={pushOrder}
             onChange={e => toggleOption("ms_push_order_enabled", e.target.checked, setPushOrder)}
           />
-          <span>Notifications push en arrière-plan</span>
-        </label>
-
-        <label className="mobile-toggle-item">
-          <input
-            type="checkbox"
-            checked={soundAbandoned}
-            onChange={e => toggleOption("ms_sound_abandoned_enabled", e.target.checked, setSoundAbandoned)}
-          />
-          <span>Alerte sonore pour paniers abandonnés</span>
+          <span>📲 Notifications Push en arrière-plan</span>
         </label>
       </div>
     </div>

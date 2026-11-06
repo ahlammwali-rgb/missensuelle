@@ -1,11 +1,14 @@
 // Miss Sensuelle Admin Service Worker
-const CACHE_NAME = "ms-admin-v1";
+const CACHE_NAME = "ms-admin-v2";
 const PRECACHE_URLS = [
   "/admin",
   "/manifest.json",
   "/admin-pwa-icon.png",
   "/icons/icon-192x192.png",
-  "/icons/icon-512x512.png"
+  "/icons/icon-512x512.png",
+  "/sounds/shopify-chaching.wav",
+  "/sounds/alert-urgent.wav",
+  "/sounds/victory-delivered.wav"
 ];
 
 self.addEventListener("install", (event) => {
