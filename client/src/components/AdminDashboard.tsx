@@ -37,6 +37,8 @@ type Props = {
   stockPanel: ReactNode;
 };
 
+const activeDashboardStatuses: OrderStatus[] = ["nouvelle", "confirmee", "reportee", "ne_repond_pas", "annulee"];
+
 const labels: Record<OrderStatus, { label: string; icon: string }> = {
   nouvelle: { label: "Nouvelles", icon: "🟡" },
   confirmee: { label: "Confirmées", icon: "🟢" },
@@ -235,7 +237,7 @@ export function AdminDashboard({
               <span>Toutes</span>
               <b className="app-tab-count">{orders.length}</b>
             </button>
-            {(Object.keys(labels) as OrderStatus[]).map(status => {
+            {activeDashboardStatuses.map(status => {
               const count = orders.filter(order => order.status === status).length;
               const meta = labels[status];
               return (

@@ -300,3 +300,53 @@ export async function shipOrders(orders: CheckoutOrder[], inputs: ShipInput[], c
   if (Array.from(results.values()).some(r => r.ok)) await saveState();
   return inputs.map(input => results.get(input.orderId) ?? { orderId: input.orderId, ok: false, error: "Aucun résultat" });
 }
+
+export type EcomTrackingHistory = {
+  date: string;
+  ville: number | string;
+  situation: string;
+  commentaire?: string | null;
+};
+
+export type EcomTrackingInfo = {
+  tracking: string;
+  date_creation?: string;
+  situation?: string;
+  id_situation?: number;
+  etat_logistique?: string;
+  id_etat_logistique?: number;
+  nom_complet?: string;
+  mobile?: string;
+  commune?: string;
+  id_wilaya?: number;
+  article?: string;
+  quantite?: number;
+  total?: number;
+  encaisser?: boolean;
+  recouvert?: boolean;
+  historique?: EcomTrackingHistory[];
+};
+
+export async function getEcomTracking(tracking: string): Promise<EcomTrackingInfo | null> {
+  if (!tracking) return null;
+  try {
+    const creds = await credentials();
+    if (!creds) return null;
+    return await ecomRequest<EcomTrackingInfo>(`/colis/${encodeURIComponent(tracking.trim())}`, { creds });
+  } catch {
+    return null;
+  }
+}
+
+export async function getEcomTrackingBatch(trackings: string[]): Promise<Record<string, EcomTrackingInfo>> {
+  const result: Record<string, EcomTrackingInfo> = {};
+  const unique = Array.from(new Set(trackings.filter(Boolean)));
+  await Promise.all(
+    unique.map(async trk => {
+      const data = await getEcomTracking(trk);
+      if (data) result[trk] = data;
+    })
+  );
+  return result;
+}
+

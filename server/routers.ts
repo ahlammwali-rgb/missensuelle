@@ -39,6 +39,8 @@ import {
   EcomError,
   getEcomLocations,
   getEcomStatus,
+  getEcomTracking,
+  getEcomTrackingBatch,
   getShippingRates,
   saveEcomCredentials,
   shipOrders,
@@ -195,6 +197,12 @@ export const appRouter = router({
           return results;
         }),
       ),
+      track: adminProcedure
+        .input(z.object({ tracking: z.string().min(1) }))
+        .query(({ input }) => ecomGuard(() => getEcomTracking(input.tracking))),
+      trackBatch: adminProcedure
+        .input(z.object({ trackings: z.array(z.string()).max(100) }))
+        .query(({ input }) => ecomGuard(() => getEcomTrackingBatch(input.trackings))),
   }),
   googleSheet: router({
     getConfig: adminProcedure.query(async () => {
