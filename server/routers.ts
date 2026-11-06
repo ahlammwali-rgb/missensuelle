@@ -33,6 +33,8 @@ import {
   updateCheckoutOrderDetails,
   updateMemoryOrderStatus,
   markMemoryOrderReturn,
+  deleteMemoryOrder,
+  autoDeduplicateOrders,
   syncGoogleSheetOrders,
 } from "./checkout";
 import { fetchSheetRows, getStoredSheetConfig, setStoredSheetConfig } from "./googleSheet";
@@ -120,6 +122,14 @@ export const appRouter = router({
     updateOrderDetails: adminProcedure
       .input(updateOrderDetailsSchema)
       .mutation(({ input }) => updateCheckoutOrderDetails(input)),
+    deleteOrder: adminProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .mutation(({ input }) => ({ deleted: deleteMemoryOrder(input.id) })),
+    deduplicateOrders: adminProcedure
+      .mutation(async () => {
+        const orders = await listCheckoutOrders();
+        return { total: orders.length };
+      }),
     restoreOrders: adminProcedure
       .input(
         z.object({

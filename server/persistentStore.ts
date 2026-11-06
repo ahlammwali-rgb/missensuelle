@@ -122,15 +122,8 @@ async function pushCloudState(state: PersistedState): Promise<void> {
   if (isTestEnv()) return;
   try {
     const existing = await fetchCloudState();
-    const mergedOrdersMap = new Map<string, CheckoutOrder>();
-    // Put remote orders first, then overwrite with current in-memory orders so edits/statuses win
-    for (const o of existing.state?.orders ?? []) {
-      if (o && o.id) mergedOrdersMap.set(o.id, o);
-    }
-    for (const o of state.orders) {
-      if (o && o.id) mergedOrdersMap.set(o.id, o);
-    }
-    const mergedOrders = Array.from(mergedOrdersMap.values()).sort(
+    // In-memory state is authoritative for orders; do not resurrect orders that were deleted
+    const finalOrders = [...state.orders].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
 
@@ -152,14 +145,14 @@ async function pushCloudState(state: PersistedState): Promise<void> {
       nextMemoryOrderId: Math.max(
         state.nextMemoryOrderId,
         existing.state?.nextMemoryOrderId ?? 1,
-        mergedOrders.reduce((max, o) => Math.max(max, (o.dbId ?? 0) + 1), 1),
+        finalOrders.reduce((max, o) => Math.max(max, (o.dbId ?? 0) + 1), 1),
       ),
       nextMemorySessionId: Math.max(
         state.nextMemorySessionId,
         existing.state?.nextMemorySessionId ?? 1,
         Array.from(mergedSessionsMap.values()).reduce((max, s) => Math.max(max, (s.id ?? 0) + 1), 1),
       ),
-      orders: mergedOrders,
+      orders: finalOrders,
       sessions: Array.from(mergedSessionsMap.values()),
     };
 

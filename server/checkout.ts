@@ -63,6 +63,69 @@ const setCounters = (nextOrderId: number, nextSessionId: number) => {
   nextMemoryOrderId = nextOrderId;
   nextMemorySessionId = nextSessionId;
 };
+export function autoDeduplicateOrders(orders: CheckoutOrder[]): { removed: number } {
+  const toRemoveIds = new Set<string>();
+  const phoneGroups = new Map<string, CheckoutOrder[]>();
+
+  for (const o of orders) {
+    const clean = (o.phone || "").replace(/[\s\-\.]/g, "").replace(/^(\+213|00213)/, "0");
+    if (!clean || clean.length < 8) continue;
+    const list = phoneGroups.get(clean) ?? [];
+    list.push(o);
+    phoneGroups.set(clean, list);
+  }
+
+  for (const [, list] of phoneGroups) {
+    if (list.length <= 1) continue;
+    // Sort oldest first
+    list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+    for (let i = 0; i < list.length; i++) {
+      const primary = list[i];
+      if (toRemoveIds.has(primary.id)) continue;
+
+      for (let j = i + 1; j < list.length; j++) {
+        const candidate = list[j];
+        if (toRemoveIds.has(candidate.id)) continue;
+
+        const diffMs = Math.abs(new Date(candidate.createdAt).getTime() - new Date(primary.createdAt).getTime());
+        // Same product & submitted within 5 minutes (rapid duplicate click or repeated form submit)
+        if (diffMs <= 5 * 60 * 1000 && candidate.productId === primary.productId) {
+          // If candidate was marked with a status like "confirmee" or "ne_repond_pas", inherit it on primary
+          if (primary.status === "nouvelle" && candidate.status !== "nouvelle") {
+            primary.status = candidate.status;
+          }
+          if (!primary.note && candidate.note) {
+            primary.note = candidate.note;
+          }
+          toRemoveIds.add(candidate.id);
+        }
+      }
+    }
+  }
+
+  if (toRemoveIds.size > 0) {
+    const before = orders.length;
+    for (let i = orders.length - 1; i >= 0; i--) {
+      if (toRemoveIds.has(orders[i].id)) {
+        orders.splice(i, 1);
+      }
+    }
+    return { removed: before - orders.length };
+  }
+  return { removed: 0 };
+}
+
+export function deleteMemoryOrder(id: number): boolean {
+  const idx = memoryOrders.findIndex(o => o.dbId === id);
+  if (idx !== -1) {
+    memoryOrders.splice(idx, 1);
+    saveStore();
+    return true;
+  }
+  return false;
+}
+
 const loadStore = async () => {
   await ensurePersistentStoreLoaded(memoryOrders, memorySessions, getCounters, setCounters);
   for (const o of memoryOrders) {
@@ -72,6 +135,10 @@ const loadStore = async () => {
     if (o.total === 7500 && (o.id.startsWith("MS-GS-") || o.id.startsWith("MS-TT-") || o.product.includes("EXTENTION"))) {
       o.total = 0;
     }
+  }
+  const dedup = autoDeduplicateOrders(memoryOrders);
+  if (dedup.removed > 0) {
+    saveStore();
   }
 };
 const saveStore = () =>
@@ -597,6 +664,8 @@ export async function listCheckoutOrders(): Promise<CheckoutOrder[]> {
   const db = await getDb();
   if (!db) {
     await loadStore();
+    const dedup = autoDeduplicateOrders(memoryOrders);
+    if (dedup.removed > 0) saveStore();
     return [...memoryOrders];
   }
   const orders = await db.select().from(storeOrders).orderBy(desc(storeOrders.createdAt));

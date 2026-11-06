@@ -67,6 +67,7 @@ function AdminPageContent() {
   const utils = trpc.useUtils();
   const updateOrderStatus = trpc.admin.updateOrderStatus.useMutation();
   const updateOrderDetails = trpc.admin.updateOrderDetails.useMutation();
+  const deleteOrderMutation = trpc.admin.deleteOrder.useMutation();
   const restoreOrders = trpc.admin.restoreOrders.useMutation();
   const restoredOnceRef = useRef(false);
   const syncSheetMutation = trpc.googleSheet.syncOrders.useMutation({
@@ -148,6 +149,19 @@ function AdminPageContent() {
           notify("Modifications de la commande enregistrées ✦");
         },
         onError: error => notify(error.message || "Impossible d'enregistrer les modifications"),
+      }
+    );
+  };
+  const handleDeleteOrder = (dbId: number) => {
+    deleteOrderMutation.mutate(
+      { id: dbId },
+      {
+        onSuccess: async () => {
+          await utils.admin.orders.invalidate();
+          setSelected(null);
+          notify("Commande supprimée du tableau de bord");
+        },
+        onError: error => notify(error.message || "Suppression impossible"),
       }
     );
   };
@@ -368,7 +382,7 @@ function AdminPageContent() {
       </div>
     </div>
   </div>
-)}{selected && <OrderModal order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={callCustomer} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{toast && <div className="toast-admin"><span>✦</span>{toast}</div>}</div>;
+)}{selected && <OrderModal order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={callCustomer} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onDelete={handleDeleteOrder} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{toast && <div className="toast-admin"><span>✦</span>{toast}</div>}</div>;
 }
 
 async function copyOrderDetails(order: CheckoutOrder, notify: (message: string) => void) { const value = `${order.id} · ${order.customer} · ${order.phone}`; try { if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(value); notify("Détails copiés"); return; } } catch {} try { const area = document.createElement("textarea"); area.value = value; area.style.position = "fixed"; area.style.opacity = "0"; document.body.appendChild(area); area.select(); document.execCommand("copy"); area.remove(); notify("Détails copiés"); } catch { notify("Copie indisponible dans ce navigateur"); } }
@@ -443,6 +457,7 @@ function OrderModal({
   onCall,
   onUpdate,
   onSaveDetails,
+  onDelete,
   onCopy,
 }: {
   order: CheckoutOrder;
@@ -451,6 +466,7 @@ function OrderModal({
   onCall: (phone: string) => void;
   onUpdate: (id: string, status: OrderStatus) => void;
   onSaveDetails: (dbId: number, updates: OrderDetailsPayload) => void;
+  onDelete: (dbId: number) => void;
   onCopy: () => void;
 }) {
   const catalog = useMemo(() => getCatalogProducts(), []);
@@ -662,6 +678,33 @@ function OrderModal({
         </div>
         <button type="button" className="copy-order" onClick={onCopy}>
           <Copy size={15} />Copier les détails de la commande
+        </button>
+        <button
+          type="button"
+          style={{
+            marginTop: "10px",
+            width: "100%",
+            height: "44px",
+            borderRadius: "14px",
+            border: "1px solid rgba(239, 68, 68, 0.3)",
+            background: "rgba(239, 68, 68, 0.08)",
+            color: "#ef4444",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            fontWeight: 700,
+            fontSize: "14px",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+          onClick={() => {
+            if (window.confirm(`Êtes-vous sûr de vouloir supprimer définitivement la commande ${order.id} ?`)) {
+              onDelete(order.dbId);
+            }
+          }}
+        >
+          <Trash2 size={16} /> Supprimer cette commande
         </button>
       </div>
     </div>
