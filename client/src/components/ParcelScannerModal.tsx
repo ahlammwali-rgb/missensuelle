@@ -59,10 +59,11 @@ export function ParcelScannerModal({
   const [lastScanned, setLastScanned] = useState<ScanResult | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const html5QrCodeRef = useRef<unknown>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const isScanningRef = useRef(false);
+  const isThrottledRef = useRef(false);
+  const animationFrameRef = useRef<number | null>(null);
 
   const utils = trpc.useUtils();
   const ecomStatusQuery = trpc.ecom.status.useQuery(undefined, { refetchOnWindowFocus: false });
@@ -71,35 +72,48 @@ export function ParcelScannerModal({
   const shipMutation = trpc.ecom.ship.useMutation();
   const markReturnMutation = trpc.admin.markReturnReceived.useMutation();
 
+  // Keep references to latest props/state to avoid restarting camera on re-renders
+  const ordersRef = useRef(orders);
+  ordersRef.current = orders;
+  const shipmentsRef = useRef(shipments);
+  shipmentsRef.current = shipments;
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const isProcessingRef = useRef(isProcessing);
+  isProcessingRef.current = isProcessing;
+
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
 
-  // Clean stop of camera
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+  // Load jsQR script fallback for browsers without native BarcodeDetector
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasNative = "BarcodeDetector" in window;
+    const hasJsQR = "jsQR" in window;
+    if (!hasNative && !hasJsQR) {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js";
+      script.async = true;
+      document.body.appendChild(script);
     }
-    const html5Qr = html5QrCodeRef.current as { isScanning?: boolean; stop?: () => Promise<void> } | null;
-    if (html5Qr && html5Qr.isScanning && html5Qr.stop) {
-      html5Qr.stop().catch(() => {});
-    }
-    setCameraActive(false);
   }, []);
 
-  // Process a scanned or typed code
+  // Process code handler
   const handleProcessCode = useCallback(
     async (rawCode: string) => {
       const code = rawCode.trim();
-      if (!code || isProcessing) return;
+      if (!code || isProcessingRef.current) return;
       setIsProcessing(true);
 
+      const currentOrders = ordersRef.current;
+      const currentShipments = shipmentsRef.current;
+      const currentMode = modeRef.current;
       const normalizedCode = code.toUpperCase().replace(/\s+/g, "");
 
       // Match order by tracking, id, or phone
-      let matchedOrder = orders.find(o => {
-        const trk = (shipments[o.id]?.tracking || "").toUpperCase();
+      const matchedOrder = currentOrders.find(o => {
+        const trk = (currentShipments[o.id]?.tracking || "").toUpperCase();
         if (trk && (normalizedCode === trk || normalizedCode.includes(trk))) return true;
         if (o.id.toUpperCase() === normalizedCode || o.id.toUpperCase().replace(/^MS-/, "") === normalizedCode) return true;
         const cleanPhone = o.phone.replace(/[\s\-\.]/g, "");
@@ -123,12 +137,12 @@ export function ParcelScannerModal({
       const qty = matchedOrder.quantity || 1;
       const productIdentifier = matchedOrder.productId || matchedOrder.product;
 
-      if (mode === "ship") {
+      if (currentMode === "ship") {
         // MODE EXPÉDITION ("Prêt à expédier")
-        const alreadyShipped = Boolean(shipments[matchedOrder.id]) || matchedOrder.status === "transferee";
+        const alreadyShipped = Boolean(currentShipments[matchedOrder.id]) || matchedOrder.status === "transferee";
         if (alreadyShipped) {
           playScanSound(false);
-          const trk = shipments[matchedOrder.id]?.tracking || "Déjà expédié";
+          const trk = currentShipments[matchedOrder.id]?.tracking || "Déjà expédié";
           setLastScanned({
             success: false,
             order: matchedOrder,
@@ -142,7 +156,6 @@ export function ParcelScannerModal({
         }
 
         try {
-          // Call E-com ship directly with confirmee: true (Prêt à expédier)
           const results = await shipMutation.mutateAsync({
             confirmee: true,
             items: [
@@ -197,7 +210,7 @@ export function ParcelScannerModal({
           setLastScanned({
             success: false,
             order: matchedOrder,
-            tracking: shipments[matchedOrder.id]?.tracking,
+            tracking: currentShipments[matchedOrder.id]?.tracking,
             message: `Colis déjà réceptionné le ${new Date(matchedOrder.returnReceivedAt || "").toLocaleString("fr-DZ")}.`,
             at: new Date().toLocaleTimeString("fr-DZ"),
           });
@@ -219,7 +232,7 @@ export function ParcelScannerModal({
           setLastScanned({
             success: true,
             order: matchedOrder,
-            tracking: shipments[matchedOrder.id]?.tracking,
+            tracking: currentShipments[matchedOrder.id]?.tracking,
             newStock: updatedProduct?.stock,
             productName: updatedProduct?.name || matchedOrder.product,
             qty,
@@ -246,127 +259,181 @@ export function ParcelScannerModal({
       setManualInput("");
       if (inputRef.current) inputRef.current.focus();
     },
-    [orders, shipments, isProcessing, mode, shipMutation, markReturnMutation, notify, utils, onRefreshOrders]
+    [shipMutation, markReturnMutation, notify, utils, onRefreshOrders]
   );
 
-  // Initialize camera
-  const startCamera = useCallback(async () => {
+  const handleProcessCodeRef = useRef(handleProcessCode);
+  handleProcessCodeRef.current = handleProcessCode;
+
+  // Single clean stop function
+  const stopCamera = useCallback(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        try {
+          track.stop();
+        } catch {}
+      });
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraActive(false);
+    setIsTorchOn(false);
+  }, []);
+
+  // Stable Camera starter that ONLY runs on isOpen / facingMode change
+  useEffect(() => {
+    if (!isOpen) {
+      stopCamera();
+      return;
+    }
+
+    let isMounted = true;
     setCameraError(null);
-    stopCamera();
 
-    try {
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: { ideal: facingMode },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      };
+    const initStream = async () => {
+      try {
+        // Stop any previous stream first
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(t => t.stop());
+          streamRef.current = null;
+        }
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
+        const constraints: MediaStreamConstraints = {
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        };
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (!isMounted) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
 
-      setCameraActive(true);
+        streamRef.current = stream;
 
-      // Check flashlight support
-      const track = stream.getVideoTracks()[0];
-      const capabilities = track.getCapabilities?.() as { torch?: boolean } | undefined;
-      setHasTorch(Boolean(capabilities?.torch));
+        const video = videoRef.current;
+        if (video) {
+          video.muted = true;
+          video.defaultMuted = true;
+          video.playsInline = true;
+          video.setAttribute("playsinline", "true");
+          video.setAttribute("webkit-playsinline", "true");
+          video.srcObject = stream;
 
-      // BarcodeDetector API detection loop
-      const detectorClass = (window as unknown as { BarcodeDetector?: new (options: { formats: string[] }) => { detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue: string }>> } }).BarcodeDetector;
+          // Crucial for iOS Safari & Android Chrome: wait for metadata before playing
+          await new Promise<void>(resolve => {
+            if (video.readyState >= 2) {
+              resolve();
+            } else {
+              video.onloadedmetadata = () => resolve();
+            }
+          });
 
-      if (detectorClass) {
-        const detector = new detectorClass({
-          formats: ["qr_code", "code_128", "code_39", "ean_13", "data_matrix"],
-        });
+          if (!isMounted) return;
+          try {
+            await video.play();
+          } catch (e) {
+            console.warn("Video auto-play interrupted:", e);
+          }
+        }
 
-        const scanFrame = async () => {
-          if (!streamRef.current || !videoRef.current || !isOpen) return;
-          if (videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA && !isScanningRef.current) {
+        setCameraActive(true);
+
+        // Torch support check
+        const track = stream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities?.() as { torch?: boolean } | undefined;
+        setHasTorch(Boolean(capabilities?.torch));
+
+        // Start Scanner Loop
+        type BarcodeDetectorType = new (options: { formats: string[] }) => {
+          detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue: string }>>;
+        };
+        const NativeDetector = (window as unknown as { BarcodeDetector?: BarcodeDetectorType }).BarcodeDetector;
+        const nativeDetector = NativeDetector
+          ? new NativeDetector({ formats: ["qr_code", "code_128", "code_39", "ean_13", "data_matrix"] })
+          : null;
+
+        let lastScanTime = 0;
+
+        const scanLoop = async (now: number) => {
+          if (!isMounted || !streamRef.current) return;
+
+          // Run scan frame every 200ms to keep CPU & battery optimal on smartphones
+          if (now - lastScanTime >= 200 && videoRef.current && videoRef.current.readyState >= 2 && !isThrottledRef.current) {
+            lastScanTime = now;
+
             try {
-              const barcodes = await detector.detect(videoRef.current);
-              if (barcodes.length > 0 && barcodes[0].rawValue) {
-                isScanningRef.current = true;
-                await handleProcessCode(barcodes[0].rawValue);
-                await new Promise(r => setTimeout(r, 1200));
-                isScanningRef.current = false;
+              if (nativeDetector) {
+                const barcodes = await nativeDetector.detect(videoRef.current);
+                if (barcodes.length > 0 && barcodes[0].rawValue) {
+                  isThrottledRef.current = true;
+                  await handleProcessCodeRef.current(barcodes[0].rawValue);
+                  setTimeout(() => {
+                    isThrottledRef.current = false;
+                  }, 1500);
+                }
+              } else {
+                // Fallback using in-memory canvas and jsQR
+                const jsQR = (window as unknown as { jsQR?: (data: Uint8ClampedArray, w: number, h: number, opts?: unknown) => { data: string } | null }).jsQR;
+                if (jsQR && canvasRef.current && videoRef.current) {
+                  const canvas = canvasRef.current;
+                  const v = videoRef.current;
+                  if (v.videoWidth > 0 && v.videoHeight > 0) {
+                    canvas.width = Math.min(v.videoWidth, 640);
+                    canvas.height = Math.min(v.videoHeight, 480);
+                    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+                    if (ctx) {
+                      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+                      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                      const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: "dontInvert" });
+                      if (code?.data) {
+                        isThrottledRef.current = true;
+                        await handleProcessCodeRef.current(code.data);
+                        setTimeout(() => {
+                          isThrottledRef.current = false;
+                        }, 1500);
+                      }
+                    }
+                  }
+                }
               }
             } catch {
-              // Frame dropped or detection error
+              // Frame dropped, continue loop
             }
           }
-          if (streamRef.current && isOpen) {
-            requestAnimationFrame(scanFrame);
+
+          if (isMounted && streamRef.current) {
+            animationFrameRef.current = requestAnimationFrame(scanLoop);
           }
         };
 
-        requestAnimationFrame(scanFrame);
-      } else {
-        // Fallback: Html5Qrcode dynamic loader
-        loadHtml5QrcodeFallback();
+        animationFrameRef.current = requestAnimationFrame(scanLoop);
+      } catch (err) {
+        if (!isMounted) return;
+        console.error("Camera access error:", err);
+        setCameraError("Impossible d'accéder à la caméra. Vérifiez les autorisations de votre navigateur.");
+        setCameraActive(false);
       }
-    } catch (err) {
-      setCameraError("Impossible d'accéder à la caméra. Vérifiez les autorisations.");
-      setCameraActive(false);
-    }
-  }, [facingMode, stopCamera, handleProcessCode, isOpen]);
-
-  // Fallback loader for browsers without native BarcodeDetector
-  const loadHtml5QrcodeFallback = () => {
-    const existing = (window as unknown as { Html5Qrcode?: unknown }).Html5Qrcode;
-    if (existing) {
-      initHtml5Qrcode();
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
-    script.async = true;
-    script.onload = () => initHtml5Qrcode();
-    document.body.appendChild(script);
-  };
-
-  const initHtml5Qrcode = () => {
-    type Html5QrcodeConstructor = new (elementId: string) => {
-      start: (
-        camera: { facingMode: string },
-        config: { fps: number; qrbox: { width: number; height: number } },
-        onSuccess: (decodedText: string) => void
-      ) => Promise<void>;
-      stop: () => Promise<void>;
-      isScanning: boolean;
     };
 
-    const Html5QrcodeClass = (window as unknown as { Html5Qrcode: Html5QrcodeConstructor }).Html5Qrcode;
-    if (!Html5QrcodeClass) return;
+    initStream();
+    setTimeout(() => inputRef.current?.focus(), 300);
 
-    try {
-      const qrScanner = new Html5QrcodeClass("scanner-video-box");
-      html5QrCodeRef.current = qrScanner;
-      qrScanner
-        .start(
-          { facingMode: facingMode },
-          { fps: 15, qrbox: { width: 260, height: 260 } },
-          async (decodedText: string) => {
-            if (!isScanningRef.current) {
-              isScanningRef.current = true;
-              await handleProcessCode(decodedText);
-              await new Promise(r => setTimeout(r, 1200));
-              isScanningRef.current = false;
-            }
-          }
-        )
-        .then(() => setCameraActive(true))
-        .catch(() => setCameraError("Erreur d'initialisation du lecteur"));
-    } catch {
-      // Ignored
-    }
-  };
+    return () => {
+      isMounted = false;
+      stopCamera();
+    };
+  }, [isOpen, facingMode, stopCamera]);
 
   const toggleTorch = async () => {
     if (!streamRef.current) return;
@@ -378,26 +445,18 @@ export function ParcelScannerModal({
       });
       setIsTorchOn(nextTorch);
     } catch {
-      // Not supported
+      // Torch not supported on front camera or specific devices
     }
   };
-
-  // Toggle camera on/off or change camera
-  useEffect(() => {
-    if (isOpen) {
-      startCamera();
-      setTimeout(() => inputRef.current?.focus(), 300);
-    } else {
-      stopCamera();
-    }
-    return () => stopCamera();
-  }, [isOpen, startCamera, stopCamera]);
 
   if (!isOpen) return null;
 
   return (
     <div className="scanner-modal-overlay" onClick={onClose}>
       <div className="scanner-modal" onClick={e => e.stopPropagation()}>
+        {/* Hidden offscreen canvas for fallback scanner */}
+        <canvas ref={canvasRef} style={{ display: "none" }} />
+
         {/* Head */}
         <div className="scanner-modal-head">
           <div className="scanner-title-wrap">
@@ -435,8 +494,14 @@ export function ParcelScannerModal({
         </div>
 
         {/* Video / Camera Viewport */}
-        <div className="scanner-viewport-wrap" id="scanner-video-box">
-          <video ref={videoRef} className="scanner-video-element" playsInline autoPlay muted />
+        <div className="scanner-viewport-wrap">
+          <video
+            ref={videoRef}
+            className="scanner-video-element"
+            playsInline
+            autoPlay
+            muted
+          />
 
           {/* Holographic Aiming Reticle with laser beam */}
           <div className="scanner-target-reticle">
@@ -467,7 +532,6 @@ export function ParcelScannerModal({
               className="cam-ctrl-btn"
               onClick={() => {
                 setFacingMode(prev => (prev === "environment" ? "user" : "environment"));
-                startCamera();
               }}
               title="Changer de caméra"
             >
@@ -479,8 +543,11 @@ export function ParcelScannerModal({
             <div className="scanner-cam-error">
               <Camera size={24} />
               <p>{cameraError}</p>
-              <button className="button button-light" onClick={startCamera}>
-                Réessayer la caméra
+              <button
+                className="button button-light"
+                onClick={() => setFacingMode(prev => (prev === "environment" ? "user" : "environment"))}
+              >
+                Changer de caméra ou réessayer
               </button>
             </div>
           )}
