@@ -127,18 +127,11 @@ async function pushCloudState(state: PersistedState): Promise<void> {
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
 
-    const mergedSessionsMap = new Map<string, SerializedSession>();
-    for (const s of existing.state?.sessions ?? []) {
-      if (s && s.tokenHash) mergedSessionsMap.set(s.tokenHash, s);
-    }
-    for (const s of state.sessions) {
-      if (s && s.tokenHash) {
-        const prev = mergedSessionsMap.get(s.tokenHash);
-        if (!prev || s.revision >= prev.revision || s.state === "submitted" || s.state === "discarded" || s.state === "purged") {
-          mergedSessionsMap.set(s.tokenHash, s);
-        }
-      }
-    }
+    // In-memory state is authoritative for sessions; do not resurrect sessions that were deleted or discarded
+    // Omit purged or discarded sessions to keep storage clean and lightweight
+    const finalSessions = state.sessions.filter(
+      s => s && s.tokenHash && s.state !== "discarded" && s.state !== "purged",
+    );
 
     const finalState: PersistedState = {
       updatedAt: new Date().toISOString(),
@@ -150,10 +143,10 @@ async function pushCloudState(state: PersistedState): Promise<void> {
       nextMemorySessionId: Math.max(
         state.nextMemorySessionId,
         existing.state?.nextMemorySessionId ?? 1,
-        Array.from(mergedSessionsMap.values()).reduce((max, s) => Math.max(max, (s.id ?? 0) + 1), 1),
+        finalSessions.reduce((max, s) => Math.max(max, (s.id ?? 0) + 1), 1),
       ),
       orders: finalOrders,
-      sessions: Array.from(mergedSessionsMap.values()),
+      sessions: finalSessions,
     };
 
     writeLocalState(finalState);
@@ -202,7 +195,7 @@ function mergeStateIntoMemory(
   );
 
   for (const rawSession of source.sessions ?? []) {
-    if (!rawSession || !rawSession.tokenHash) continue;
+    if (!rawSession || !rawSession.tokenHash || rawSession.state === "discarded" || rawSession.state === "purged") continue;
     const current = memorySessions.get(rawSession.tokenHash);
     if (!current || rawSession.revision > current.revision) {
       memorySessions.set(rawSession.tokenHash, deserializeSession(rawSession));

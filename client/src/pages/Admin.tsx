@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Bell, ChevronDown, ClipboardList, Copy, ExternalLink, Facebook, FileSpreadsheet, Filter, ImagePlus, LayoutDashboard, Moon, MoreHorizontal, Package, PackageCheck, Pencil, Phone, Plus, RefreshCw, RotateCcw, Save, Search, Settings2, Sun, Trash2, Truck, TrendingUp, Upload, Users, X } from "lucide-react";
+import { BarChart3, Bell, ChevronDown, ClipboardList, Copy, Download, ExternalLink, Facebook, FileSpreadsheet, Filter, ImagePlus, LayoutDashboard, Moon, MoreHorizontal, Package, PackageCheck, Pencil, Phone, Plus, RefreshCw, RotateCcw, Save, Search, Settings2, Smartphone, Sun, Trash2, Truck, TrendingUp, Upload, Users, X } from "lucide-react";
 import { Link } from "wouter";
 import { AdminAuthGate } from "@/components/AdminAuthGate";
 import { AbandonedOrders } from "@/components/AbandonedOrders";
@@ -18,6 +18,8 @@ import { EcomDeliveryPanel } from "@/components/EcomDelivery";
 import { GoogleSheetPanel } from "@/components/GoogleSheetPanel";
 import { TransferredOrdersPanel } from "@/components/TransferredOrdersPanel";
 import { ReturnsPanel } from "@/components/ReturnsPanel";
+import { MobileAppCard, showPushNotification } from "@/components/MobileAppCard";
+import { playChaChingSound, playAbandonedAlertSound } from "@/lib/sound";
 import { loadRealOrders, orderMatchesPeriod } from "@/lib/admin-orders";
 
 const actionLabels: { status: OrderStatus; label: string }[] = [{ status: "confirmee", label: "Confirmer" }, { status: "annulee", label: "Annuler" }, { status: "reportee", label: "Reporter" }, { status: "ne_repond_pas", label: "Ne répond pas" }, { status: "transferee", label: "Transférer" }];
@@ -62,8 +64,8 @@ function AdminPageContent() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [searchPopupQuery, setSearchPopupQuery] = useState("");
-  const ordersQuery = trpc.admin.orders.useQuery(undefined, { refetchInterval: 10000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false });
-  const abandonedQuery = trpc.admin.abandonedOrders.useQuery(undefined, { refetchInterval: 10000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false });
+  const ordersQuery = trpc.admin.orders.useQuery(undefined, { refetchInterval: 10000, refetchIntervalInBackground: true, refetchOnWindowFocus: true, retry: false });
+  const abandonedQuery = trpc.admin.abandonedOrders.useQuery(undefined, { refetchInterval: 10000, refetchIntervalInBackground: true, refetchOnWindowFocus: true, retry: false });
   const utils = trpc.useUtils();
   const updateOrderStatus = trpc.admin.updateOrderStatus.useMutation();
   const updateOrderDetails = trpc.admin.updateOrderDetails.useMutation();
@@ -82,6 +84,102 @@ function AdminPageContent() {
     syncSheetMutation.mutate();
   }, []);
   const serverOrders = ordersQuery.data ?? [];
+
+  // Real-time Shopify "Cha-Ching" sound & Push Notifications watcher for new orders
+  const knownOrderIdsRef = useRef<Set<string>>(new Set());
+  const initialOrdersLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (ordersQuery.isLoading || !ordersQuery.data) return;
+    const currentOrders = ordersQuery.data;
+
+    if (!initialOrdersLoadedRef.current) {
+      initialOrdersLoadedRef.current = true;
+      let savedKnown: string[] = [];
+      try {
+        savedKnown = JSON.parse(localStorage.getItem("ms_known_orders_set") || "[]");
+      } catch {}
+      const initialSet = new Set<string>([...savedKnown, ...currentOrders.map(o => o.id)]);
+      knownOrderIdsRef.current = initialSet;
+      try {
+        localStorage.setItem("ms_known_orders_set", JSON.stringify(Array.from(initialSet).slice(-200)));
+      } catch {}
+      return;
+    }
+
+    const soundEnabled = localStorage.getItem("ms_sound_order_enabled") !== "false";
+    const pushEnabled = localStorage.getItem("ms_push_order_enabled") !== "false";
+
+    for (const order of currentOrders) {
+      if (!knownOrderIdsRef.current.has(order.id)) {
+        knownOrderIdsRef.current.add(order.id);
+
+        if (soundEnabled) {
+          playChaChingSound();
+        }
+
+        if (pushEnabled) {
+          const title = `🛍️ COMMANDE REÇUE ! (+${formatDZD(order.total)})`;
+          const body = `${order.customer || "Cliente"} (${order.phone}) · ${order.product} · ${order.wilaya}`;
+          showPushNotification(title, body, `order-${order.id}`);
+        }
+
+        notify(`💰 Nouvelle commande : ${order.customer || "Cliente"} (+${formatDZD(order.total)}) !`);
+      }
+    }
+
+    try {
+      localStorage.setItem("ms_known_orders_set", JSON.stringify(Array.from(knownOrderIdsRef.current).slice(-200)));
+    } catch {}
+  }, [ordersQuery.data, ordersQuery.isLoading]);
+
+  // Real-time watcher for abandoned carts
+  const knownAbandonedIdsRef = useRef<Set<number>>(new Set());
+  const initialAbandonedLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (abandonedQuery.isLoading || !abandonedQuery.data) return;
+    const currentAbandoned = abandonedQuery.data;
+
+    if (!initialAbandonedLoadedRef.current) {
+      initialAbandonedLoadedRef.current = true;
+      let savedKnown: number[] = [];
+      try {
+        savedKnown = JSON.parse(localStorage.getItem("ms_known_abandoned_set") || "[]");
+      } catch {}
+      const initialSet = new Set<number>([...savedKnown, ...currentAbandoned.map(a => a.id)]);
+      knownAbandonedIdsRef.current = initialSet;
+      try {
+        localStorage.setItem("ms_known_abandoned_set", JSON.stringify(Array.from(initialSet).slice(-200)));
+      } catch {}
+      return;
+    }
+
+    const soundEnabled = localStorage.getItem("ms_sound_abandoned_enabled") !== "false";
+    const pushEnabled = localStorage.getItem("ms_push_order_enabled") !== "false";
+
+    for (const item of currentAbandoned) {
+      if (!knownAbandonedIdsRef.current.has(item.id)) {
+        knownAbandonedIdsRef.current.add(item.id);
+
+        if (soundEnabled) {
+          playAbandonedAlertSound();
+        }
+
+        if (pushEnabled) {
+          const title = `🛒 Nouveau Panier Abandonné !`;
+          const body = `${item.customer || "Visiteur"} (${item.phone}) · ${item.product}`;
+          showPushNotification(title, body, `abandoned-${item.id}`);
+        }
+
+        notify(`🛒 Nouveau panier abandonné détecté (${item.phone})`);
+      }
+    }
+
+    try {
+      localStorage.setItem("ms_known_abandoned_set", JSON.stringify(Array.from(knownAbandonedIdsRef.current).slice(-200)));
+    } catch {}
+  }, [abandonedQuery.data, abandonedQuery.isLoading]);
 
   useEffect(() => {
     if (ordersQuery.isLoading || ordersQuery.error) return;
@@ -170,7 +268,18 @@ function AdminPageContent() {
   const abandonedCount = abandonedQuery.data?.length;
   const go = (next: AdminSection) => setSection(next);
 
-  return <div className="admin-shell"><aside className="admin-sidebar"><Link href="/" className="wordmark admin-wordmark"><span className="wordmark-star">✦</span><span>miss</span><em>sensuelle</em></Link><nav className="admin-mobile-nav" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={17} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={17} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge">{transferredCount}</span>}</button><button type="button" className={section === "ecom" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "ecom" ? "page" : undefined} onClick={() => { go("ecom"); setIsMoreMenuOpen(false); }}><PackageCheck size={17} /><span>Livraison</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={17} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><MoreHorizontal size={17} /><span>Menu</span></button></nav><div className="admin-user"><div className="admin-avatar">MS</div><div><strong>Miss Sensuelle</strong><span>Administratrice</span></div></div><nav className="admin-nav"><span className="admin-nav-label">Workspace</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{orders.filter(order => order.status !== "transferee" && order.status === "nouvelle").length}</b></button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com Delivery <b>{orders.filter(order => order.status === "confirmee").length}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue <b>{getCatalogProducts().length}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button><BarChart3 size={18} />Rapports</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Catalogue produits" : section === "ecom" ? "E-com Delivery" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : "Bonjour, Miss"} <span>✦</span></h1></div><div className="admin-top-actions"><button type="button" className="neo-darkmode-btn" onClick={toggleTheme} title={theme === "dark" ? "Mode Clair" : "Mode Sombre Neo Waw"} aria-label="Basculer Mode Sombre Neo">
+  return <div className="admin-shell"><aside className="admin-sidebar"><Link href="/" className="wordmark admin-wordmark"><span className="wordmark-star">✦</span><span>miss</span><em>sensuelle</em></Link><nav className="admin-mobile-nav" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={17} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={17} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge">{transferredCount}</span>}</button><button type="button" className={section === "ecom" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "ecom" ? "page" : undefined} onClick={() => { go("ecom"); setIsMoreMenuOpen(false); }}><PackageCheck size={17} /><span>Livraison</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={17} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><MoreHorizontal size={17} /><span>Menu</span></button></nav><div className="admin-user"><div className="admin-avatar">MS</div><div><strong>Miss Sensuelle</strong><span>Administratrice</span></div></div><nav className="admin-nav"><span className="admin-nav-label">Workspace</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{orders.filter(order => order.status !== "transferee" && order.status === "nouvelle").length}</b></button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com Delivery <b>{orders.filter(order => order.status === "confirmee").length}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue <b>{getCatalogProducts().length}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button><BarChart3 size={18} />Rapports</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Catalogue produits" : section === "ecom" ? "E-com Delivery" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : "Bonjour, Miss"} <span>✦</span></h1></div><div className="admin-top-actions">
+  <button
+    type="button"
+    className="neo-darkmode-btn"
+    onClick={() => go("settings")}
+    title="Installer l'application mobile & alertes sonores"
+    style={{ background: "rgba(139, 92, 246, 0.15)", border: "1px solid rgba(139, 92, 246, 0.35)", cursor: "pointer" }}
+  >
+    <Smartphone size={14} style={{ color: "#a855f7" }} />
+    <span className="neo-btn-label" style={{ color: "#a855f7", fontWeight: 600 }}>App Mobile</span>
+  </button>
+  <button type="button" className="neo-darkmode-btn" onClick={toggleTheme} title={theme === "dark" ? "Mode Clair" : "Mode Sombre Neo Waw"} aria-label="Basculer Mode Sombre Neo">
   {theme === "dark" ? (
     <>
       <Sun size={15} className="neo-sun-glow" />
@@ -358,11 +467,11 @@ function AdminPageContent() {
           onClick={() => { go("settings"); setIsMoreMenuOpen(false); }}
         >
           <div className="more-item-icon icon-purple">
-            <Settings2 size={20} />
+            <Smartphone size={20} />
           </div>
           <div className="more-item-text">
-            <strong>Pixels & Paramètres</strong>
-            <small>TikTok, Meta & Réglages boutique</small>
+            <strong>App Mobile & Paramètres</strong>
+            <small>Installer sur smartphone & alertes Cha-Ching</small>
           </div>
         </button>
 
@@ -432,7 +541,99 @@ function ProductForm({ initial, onCancel, onSave }: { initial: Product; onCancel
   return <form className="product-admin-form" onSubmit={submit}><div className="form-panel-head"><div><span className="eyebrow">{initial.id ? "Modifier" : "Nouveau produit"}</span><h3>{initial.id ? initial.name : "Créer une fiche complète"}</h3></div><button type="button" className="icon-button" onClick={onCancel} aria-label="Fermer le formulaire"><X size={18} /></button></div><div className="product-admin-grid"><label>Nom du produit<input required value={form.name} onChange={e => set("name", e.target.value)} /></label><label>Slug URL<input value={form.slug} onChange={e => set("slug", e.target.value)} placeholder="auto-generé si vide" /></label><label>Catégorie<select value={form.category} onChange={e => { const category = categories.find(item => item.id === e.target.value); set("category", e.target.value as Product["category"]); set("categoryLabel", category?.label ?? "Mode femme"); }}>{categories.map(category => <option key={category.id} value={category.id}>{category.label}</option>)}</select></label><label>Badge<input value={form.badge ?? ""} onChange={e => set("badge", e.target.value)} placeholder="Nouveau, Best-seller…" /></label><label>Prix DA<input required type="number" min="0" value={form.price} onChange={e => set("price", Number(e.target.value))} /></label><label>Ancien prix DA<input type="number" min="0" value={form.oldPrice ?? ""} onChange={e => set("oldPrice", e.target.value ? Number(e.target.value) : undefined)} /></label><label>Stock<input required type="number" min="0" value={form.stock} onChange={e => set("stock", Number(e.target.value))} /></label><label>Couleur accent<input type="color" value={form.accent} onChange={e => set("accent", e.target.value)} /></label><label className="wide-field">Description<textarea required value={form.description} onChange={e => set("description", e.target.value)} /></label><label>Détails (une ligne par détail)<textarea value={Array.isArray(form.details) ? form.details.join("\n") : String(form.details)} onChange={e => set("details", e.target.value as never)} /></label><label>Couleurs séparées par virgule<textarea value={Array.isArray(form.colors) ? form.colors.join(", ") : String(form.colors)} onChange={e => set("colors", e.target.value as never)} /></label><label>Photo principale (URL)<input required value={form.image} onChange={e => set("image", e.target.value)} /><button type="button" className="upload-inline" onClick={() => imageRef.current?.click()}><ImagePlus size={14} />Importer une photo</button><input ref={imageRef} className="visually-hidden" type="file" accept="image/*" onChange={e => readImages(e.target.files, false)} /></label><label>Galerie (une URL par ligne)<textarea value={galleryText} onChange={e => setGalleryText(e.target.value)} /><button type="button" className="upload-inline" onClick={() => galleryRef.current?.click()}><Upload size={14} />Ajouter des photos</button><input ref={galleryRef} className="visually-hidden" type="file" accept="image/*" multiple onChange={e => readImages(e.target.files, true)} /></label><label>Nom arabe<input value={form.arName ?? ""} onChange={e => set("arName", e.target.value)} /></label><label>Catégorie arabe<input value={form.arCategoryLabel ?? ""} onChange={e => set("arCategoryLabel", e.target.value)} /></label><label className="wide-field">Description arabe<textarea value={form.arDescription ?? ""} onChange={e => set("arDescription", e.target.value)} /></label></div><div className="form-panel-actions"><button type="button" className="button button-light" onClick={onCancel}>Annuler</button><button type="submit" className="button button-gradient"><Save size={16} />Enregistrer le produit</button></div></form>;
 }
 
-function TrackingSettings({ notify }: { notify: (message: string) => void }) { const globalTikTok = hasGlobalTikTokPixel(); const globalFacebook = hasGlobalFacebookPixel(); const [config, setConfig] = useState<PixelConfig>(() => getPixelConfig()); const update = (key: keyof PixelConfig, value: string) => setConfig(current => ({ ...current, [key]: value })); const save = () => { try { savePixelConfig(config); notify("Pixels globaux du site · préférences enregistrées"); } catch (error) { notify(error instanceof Error ? error.message : "Impossible d’enregistrer les préférences pixels"); } }; return <section className="tracking-settings"><div className="settings-hero"><span className="eyebrow">Mesure & acquisition</span><h2>Connecte tes pixels<br /><em>sans perdre le signal.</em></h2><p>Les événements ViewContent, InitiateCheckout et Purchase sont envoyés sur les pages produit et après validation COD.</p></div><p className="tracking-config-notice">Meta et TikTok sont installés dans l’en-tête pour tous les visiteurs avec les identifiants du site. Ces identifiants globaux ne sont pas remplacés par le stockage local. Vérifie la réception dans le Gestionnaire d’événements de chaque plateforme.</p><PixelDiagnostics /><div className="tracking-grid"><div className="tracking-card"><div className="tracking-card-head"><Facebook size={22} /><div><h3>Meta Pixel</h3><p>Facebook / Instagram</p></div><span>{globalFacebook ? "Global" : "Optionnel"}</span></div><label>ID du pixel Facebook<input readOnly={globalFacebook} value={config.facebookPixelId} onChange={e => update("facebookPixelId", e.target.value)} placeholder="Ex. 123456789012345" /></label><small>Le pixel Meta global est configuré pour tous les visiteurs. Pour modifier cet identifiant global, il faut mettre à jour la configuration du site.</small></div><div className="tracking-card"><div className="tracking-card-head"><span className="tiktok-mark">♪</span><div><h3>TikTok Pixel</h3><p>ID ou code complet</p></div><span>Optionnel</span></div><label>ID TikTok<input readOnly={globalTikTok} value={config.tiktokPixelId} onChange={e => update("tiktokPixelId", e.target.value)} placeholder="Ex. CDEFGHIJKL123456" /></label><label>Code TikTok fourni<textarea disabled={globalTikTok} value={config.tiktokCode} onChange={e => update("tiktokCode", e.target.value)} placeholder="Colle ici le code que TikTok te donne…" /></label><small>Le pixel global du site est déjà configuré par ID : aucun code supplémentaire n’est nécessaire. Pour changer cet ID global, il faut mettre à jour la configuration du site.</small></div></div><div className="event-map"><div><span className="eyebrow">Événements COD actifs</span><h3>Le tunnel est déjà préparé</h3></div><div className="event-pills"><span>ViewContent <b>Fiche produit</b></span><span>InitiateCheckout <b>Commencer maintenant</b></span><span>Purchase <b>Commande COD reçue</b></span></div></div><div className="settings-actions"><button className="button button-light" onClick={() => { if (!config.facebookPixelId && !config.tiktokPixelId && !config.tiktokCode) { notify("Renseigne et enregistre un pixel avant le test"); return; } trackPixelEvent("ViewContent", { content_name: "Vérification du pixel", currency: "DZD" }); notify("Vérifie la réception dans Test Events — aucune commande créée"); }}><Facebook size={16} />Tester l’événement</button><button className="button button-gradient" onClick={save}><Save size={16} />Enregistrer les pixels</button></div></section>; }
+function TrackingSettings({ notify }: { notify: (message: string) => void }) {
+  const globalTikTok = hasGlobalTikTokPixel();
+  const globalFacebook = hasGlobalFacebookPixel();
+  const [config, setConfig] = useState<PixelConfig>(() => getPixelConfig());
+  const update = (key: keyof PixelConfig, value: string) => setConfig(current => ({ ...current, [key]: value }));
+  const save = () => {
+    try {
+      savePixelConfig(config);
+      notify("Pixels globaux du site · préférences enregistrées");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Impossible d’enregistrer les préférences pixels");
+    }
+  };
+
+  return (
+    <section className="tracking-settings">
+      <MobileAppCard notify={notify} />
+
+      <div className="settings-hero">
+        <span className="eyebrow">Mesure & acquisition</span>
+        <h2>Connecte tes pixels<br /><em>sans perdre le signal.</em></h2>
+        <p>Les événements ViewContent, InitiateCheckout et Purchase sont envoyés sur les pages produit et après validation COD.</p>
+      </div>
+      <p className="tracking-config-notice">Meta et TikTok sont installés dans l’en-tête pour tous les visiteurs avec les identifiants du site. Ces identifiants globaux ne sont pas remplacés par le stockage local. Vérifie la réception dans le Gestionnaire d’événements de chaque plateforme.</p>
+      <PixelDiagnostics />
+      <div className="tracking-grid">
+        <div className="tracking-card">
+          <div className="tracking-card-head">
+            <Facebook size={22} />
+            <div>
+              <h3>Meta Pixel</h3>
+              <p>Facebook / Instagram</p>
+            </div>
+            <span>{globalFacebook ? "Global" : "Optionnel"}</span>
+          </div>
+          <label>
+            ID du pixel Facebook
+            <input readOnly={globalFacebook} value={config.facebookPixelId} onChange={e => update("facebookPixelId", e.target.value)} placeholder="Ex. 123456789012345" />
+          </label>
+          <small>Le pixel Meta global est configuré pour tous les visiteurs. Pour modifier cet identifiant global, il faut mettre à jour la configuration du site.</small>
+        </div>
+        <div className="tracking-card">
+          <div className="tracking-card-head">
+            <span className="tiktok-mark">♪</span>
+            <div>
+              <h3>TikTok Pixel</h3>
+              <p>ID ou code complet</p>
+            </div>
+            <span>Optionnel</span>
+          </div>
+          <label>
+            ID TikTok
+            <input readOnly={globalTikTok} value={config.tiktokPixelId} onChange={e => update("tiktokPixelId", e.target.value)} placeholder="Ex. CDEFGHIJKL123456" />
+          </label>
+          <label>
+            Code TikTok fourni
+            <textarea disabled={globalTikTok} value={config.tiktokCode} onChange={e => update("tiktokCode", e.target.value)} placeholder="Colle ici le code que TikTok te donne…" />
+          </label>
+          <small>Le pixel global du site est déjà configuré par ID : aucun code supplémentaire n’est nécessaire. Pour changer cet ID global, il faut mettre à jour la configuration du site.</small>
+        </div>
+      </div>
+      <div className="event-map">
+        <div>
+          <span className="eyebrow">Événements COD actifs</span>
+          <h3>Le tunnel est déjà préparé</h3>
+        </div>
+        <div className="event-pills">
+          <span>ViewContent <b>Fiche produit</b></span>
+          <span>InitiateCheckout <b>Commencer maintenant</b></span>
+          <span>Purchase <b>Commande COD reçue</b></span>
+        </div>
+      </div>
+      <div className="settings-actions">
+        <button
+          className="button button-light"
+          onClick={() => {
+            if (!config.facebookPixelId && !config.tiktokPixelId && !config.tiktokCode) {
+              notify("Renseigne et enregistre un pixel avant le test");
+              return;
+            }
+            trackPixelEvent("ViewContent", { content_name: "Vérification du pixel", currency: "DZD" });
+            notify("Vérifie la réception dans Test Events — aucune commande créée");
+          }}
+        >
+          <Facebook size={16} />Tester l’événement
+        </button>
+        <button className="button button-gradient" onClick={save}>
+          <Save size={16} />Enregistrer les pixels
+        </button>
+      </div>
+    </section>
+  );
+}
 
 type OrderDetailsPayload = {
   customer: string;
