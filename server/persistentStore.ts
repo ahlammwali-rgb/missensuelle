@@ -105,11 +105,33 @@ export function findStaffMemberByCode(code: string): StaffMember | undefined {
   return undefined;
 }
 
+function getDefaultSalaryDates(createdAtIso?: string): { start: string; end: string } {
+  const baseDate = createdAtIso ? new Date(createdAtIso) : new Date();
+  const safeBase = Number.isNaN(baseDate.getTime()) ? new Date() : baseDate;
+  const start = safeBase.toISOString().slice(0, 10);
+  const endDate = new Date(safeBase);
+  endDate.setMonth(endDate.getMonth() + 1);
+  const end = endDate.toISOString().slice(0, 10);
+  return { start, end };
+}
+
 export function upsertStaffMember(input: StaffMemberInput): StaffMember {
   const id = input.id && memoryStaffMembers.has(input.id)
     ? input.id
     : input.id || `staff-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   const existing = memoryStaffMembers.get(id);
+  const createdAt = existing?.createdAt || new Date().toISOString();
+  const defaults = getDefaultSalaryDates(createdAt);
+
+  const rawProductCommissions = input.productCommissions ?? existing?.productCommissions ?? {};
+  const cleanProductCommissions: Record<string, number> = {};
+  for (const [prodId, amount] of Object.entries(rawProductCommissions)) {
+    const num = Number(amount);
+    if (prodId && Number.isFinite(num) && num >= 0) {
+      cleanProductCommissions[prodId] = Math.round(num);
+    }
+  }
+
   const member: StaffMember = {
     id,
     name: input.name.trim(),
@@ -119,8 +141,12 @@ export function upsertStaffMember(input: StaffMemberInput): StaffMember {
     baseSalary: Math.max(0, Math.round(input.baseSalary || 0)),
     commissionPerDelivered: Math.max(0, Math.round(input.commissionPerDelivered ?? 150)),
     upsellBonusPerDelivered: Math.max(0, Math.round(input.upsellBonusPerDelivered ?? 50)),
+    productCommissions: cleanProductCommissions,
+    salaryStartDate: (input.salaryStartDate || existing?.salaryStartDate || defaults.start).trim(),
+    salaryEndDate: (input.salaryEndDate || existing?.salaryEndDate || defaults.end).trim(),
+    payrollHistory: input.payrollHistory ?? existing?.payrollHistory ?? [],
     active: input.active ?? true,
-    createdAt: existing?.createdAt || new Date().toISOString(),
+    createdAt,
     lastSeenAt: existing?.lastSeenAt,
   };
   memoryStaffMembers.set(id, member);

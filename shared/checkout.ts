@@ -68,6 +68,38 @@ export const recordOrderInteractionSchema = z.object({
   actorName: z.string().trim().max(120).optional(),
 });
 
+export const staffPayrollProductBreakdownSchema = z.object({
+  productId: z.string().trim().max(80),
+  productName: z.string().trim().max(200),
+  deliveredCount: z.number().int().min(0),
+  unitCommission: z.number().int().min(0),
+  totalCommission: z.number().int().min(0),
+});
+
+export const staffPayrollRecordSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  closedAt: z.string().trim().max(80),
+  startDate: z.string().trim().max(40),
+  endDate: z.string().trim().max(40),
+  baseSalary: z.number().int().min(0),
+  commissionTotal: z.number().int().min(0),
+  upsellBonusTotal: z.number().int().min(0),
+  totalPay: z.number().int().min(0),
+  callsCount: z.number().int().min(0),
+  whatsappCount: z.number().int().min(0).default(0),
+  handledCount: z.number().int().min(0).default(0),
+  confirmedCount: z.number().int().min(0),
+  deliveredCount: z.number().int().min(0),
+  nrpCount: z.number().int().min(0),
+  postponedCount: z.number().int().min(0),
+  cancelledCount: z.number().int().min(0),
+  upsellCount: z.number().int().min(0).default(0),
+  productBreakdown: z.array(staffPayrollProductBreakdownSchema).default([]),
+});
+
+export type StaffPayrollProductBreakdown = z.infer<typeof staffPayrollProductBreakdownSchema>;
+export type StaffPayrollRecord = z.infer<typeof staffPayrollRecordSchema>;
+
 export const staffMemberSchema = z.object({
   id: z.string().trim().min(1).max(80).optional(),
   name: z.string().trim().min(1).max(120),
@@ -77,6 +109,10 @@ export const staffMemberSchema = z.object({
   baseSalary: z.number().int().min(0).max(10000000).default(0),
   commissionPerDelivered: z.number().int().min(0).max(1000000).default(150),
   upsellBonusPerDelivered: z.number().int().min(0).max(1000000).default(50),
+  productCommissions: z.record(z.string(), z.number().int().min(0).max(1000000)).optional(),
+  salaryStartDate: z.string().trim().max(40).optional(),
+  salaryEndDate: z.string().trim().max(40).optional(),
+  payrollHistory: z.array(staffPayrollRecordSchema).optional(),
   active: z.boolean().default(true),
 });
 
@@ -131,6 +167,10 @@ export type StaffMember = {
   baseSalary: number;
   commissionPerDelivered: number;
   upsellBonusPerDelivered: number;
+  productCommissions?: Record<string, number>;
+  salaryStartDate?: string;
+  salaryEndDate?: string;
+  payrollHistory?: StaffPayrollRecord[];
   active: boolean;
   createdAt: string;
   lastSeenAt?: string;
