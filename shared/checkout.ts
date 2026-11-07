@@ -3,8 +3,8 @@ import { z } from "zod";
 export const checkoutItemSchema = z.object({
   productId: z.string().min(1).max(80),
   quantity: z.number().int().min(1).max(20),
-  color: z.string().trim().max(80).default(""),
-  size: z.string().trim().max(40).default(""),
+  color: z.string().trim().max(300).default(""),
+  size: z.string().trim().max(150).default(""),
 });
 
 export const checkoutPayloadSchema = z.object({
@@ -38,8 +38,8 @@ export const updateOrderDetailsSchema = z.object({
   product: z.string().trim().min(1).max(300),
   quantity: z.number().int().min(1).max(100),
   total: z.number().int().min(0).max(10000000),
-  color: z.string().trim().max(80).default(""),
-  size: z.string().trim().max(40).default(""),
+  color: z.string().trim().max(300).default(""),
+  size: z.string().trim().max(150).default(""),
   delivery: z.enum(["home", "office"]).default("home"),
   wilaya: z.string().trim().min(1).max(120),
   commune: z.string().trim().min(1).max(120),

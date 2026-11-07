@@ -910,6 +910,88 @@ type OrderDetailsPayload = {
   note: string;
 };
 
+function findMatchingCatalogProduct(catalog: Product[], orderProductId?: string, orderProductName?: string): Product {
+  if (orderProductId) {
+    const byId = catalog.find(p => p.id === orderProductId || p.slug === orderProductId);
+    if (byId) return byId;
+  }
+  const raw = (orderProductName || "").trim().toLowerCase();
+  if (raw) {
+    const exact = catalog.find(p => raw.includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(raw));
+    if (exact) return exact;
+    if (raw.includes("doudoune") || raw.includes("دواقون")) {
+      const d = catalog.find(p => p.id === "p-008" || p.slug.includes("doudoune"));
+      if (d) return d;
+    }
+    if (raw.includes("abaya") || raw.includes("عباية")) {
+      const a = catalog.find(p => p.id === "p-007" || p.slug.includes("abaya"));
+      if (a) return a;
+    }
+    if (raw.includes("manteau") || raw.includes("icon") || raw.includes("blazer") || raw.includes("معطف")) {
+      const m = catalog.find(p => p.id === "p-001" || p.slug.includes("blazer"));
+      if (m) return m;
+    }
+    for (const p of catalog) {
+      if (raw.includes(p.slug.toLowerCase())) return p;
+    }
+  }
+  return catalog[0] ?? {
+    id: "p-008",
+    slug: "doudoune-hiver-luxe",
+    name: "Doudoune Hiver de Luxe",
+    category: "vestes",
+    categoryLabel: "Vestes & Manteaux",
+    price: 7600,
+    oldPrice: 9000,
+    description: "",
+    details: [],
+    colors: ["أزرق سماوي", "أبيض", "أسود"],
+    image: "",
+    accent: "#17307e",
+    stock: 25,
+  };
+}
+
+function computeProductGoodsPrice(product: Product | undefined, qty: number): number {
+  if (!product) return 0;
+  const isDoudoune = product.id === "p-008" || product.slug.includes("doudoune") || product.name.toLowerCase().includes("doudoune");
+  if (isDoudoune) {
+    const pairs = Math.floor(qty / 2);
+    const singles = qty % 2;
+    return (pairs * 12900) + (singles * 7600);
+  }
+  return product.price * qty;
+}
+
+type PieceVariant = { color: string; size: string };
+
+function parseVariants(rawColor: string | undefined, rawSize: string | undefined, count: number, availableColors: string[]): PieceVariant[] {
+  const result: PieceVariant[] = [];
+  const defaultColor = availableColors[0] || "Noir";
+  const defaultSize = "M";
+
+  for (let i = 1; i <= count; i++) {
+    const cMatch = rawColor ? rawColor.match(new RegExp(`(?:^|\\|\\s*)${i}\\s*:\\s*([^|]+)`, "i")) : null;
+    const sMatch = rawSize ? rawSize.match(new RegExp(`(?:^|\\|\\s*)${i}\\s*:\\s*([^|]+)`, "i")) : null;
+
+    let cVal = cMatch ? cMatch[1].trim() : "";
+    let sVal = sMatch ? sMatch[1].trim() : "";
+
+    if (!cVal && i === 1 && rawColor && !rawColor.includes(":")) {
+      cVal = rawColor.split("|")[0]?.trim() || "";
+    }
+    if (!sVal && i === 1 && rawSize && !rawSize.includes(":")) {
+      sVal = rawSize.split("|")[0]?.trim() || "";
+    }
+
+    result.push({
+      color: cVal || defaultColor,
+      size: sVal || defaultSize,
+    });
+  }
+  return result;
+}
+
 function OrderModal({
   order,
   isSaving,
@@ -931,26 +1013,44 @@ function OrderModal({
 }) {
   const catalog = useMemo(() => getCatalogProducts(), []);
   const initialBaseProduct = useMemo(() => {
-    const cleanName = order.product.replace(/\s*×\s*\d+$/, "").trim();
-    return catalog.find(p => p.id === order.productId || p.name === cleanName) ?? catalog[0];
+    return findMatchingCatalogProduct(catalog, order.productId, order.product);
   }, [catalog, order.product, order.productId]);
 
   const [customer, setCustomer] = useState(order.customer);
   const [phone, setPhone] = useState(order.phone);
-  const [productId, setProductId] = useState(order.productId || initialBaseProduct?.id || "p-007");
-  const [productName, setProductName] = useState(() => order.product.replace(/\s*×\s*\d+$/, "").trim() || initialBaseProduct?.name || "");
-  const [quantity, setQuantity] = useState(order.quantity || 1);
+  const [productId, setProductId] = useState(order.productId || initialBaseProduct?.id || "p-008");
+  const [productName, setProductName] = useState(() => initialBaseProduct?.name || order.product.replace(/\s*×\s*\d+$/, "").trim());
+  const [quantity, setQuantity] = useState(Math.max(1, order.quantity || 1));
   const [total, setTotal] = useState(order.total);
-  const [color, setColor] = useState(order.color || "Emerald");
-  const [size, setSize] = useState(order.size || "M");
   const [delivery, setDelivery] = useState<"home" | "office">(order.delivery || "home");
   const [wilaya, setWilaya] = useState(order.wilaya);
   const [commune, setCommune] = useState(order.commune);
   const [address, setAddress] = useState(order.address || "");
   const [note, setNote] = useState(order.note || "");
 
-  const selectedCatalogProduct = catalog.find(p => p.id === productId);
-  const availableColors = selectedCatalogProduct?.colors?.length ? selectedCatalogProduct.colors : ["Emerald", "Noir"];
+  const selectedCatalogProduct = catalog.find(p => p.id === productId) || initialBaseProduct;
+  const isDoudoune = selectedCatalogProduct?.id === "p-008" || selectedCatalogProduct?.slug.includes("doudoune") || selectedCatalogProduct?.name.toLowerCase().includes("doudoune");
+
+  const availableColors = useMemo(() => {
+    if (isDoudoune) {
+      return ["أزرق سماوي", "أبيض", "أسود"];
+    }
+    return selectedCatalogProduct?.colors?.length ? selectedCatalogProduct.colors : ["Emerald", "Noir"];
+  }, [selectedCatalogProduct, isDoudoune]);
+
+  // Conserve le frais de livraison d'origine de la commande
+  const initialShippingFee = useMemo(() => {
+    const initialGoods = computeProductGoodsPrice(initialBaseProduct, order.quantity || 1);
+    const diff = order.total - initialGoods;
+    return diff > 0 ? diff : 0;
+  }, [initialBaseProduct, order.quantity, order.total]);
+
+  const [shippingFee, setShippingFee] = useState<number>(initialShippingFee);
+
+  const [variants, setVariants] = useState<PieceVariant[]>(() =>
+    parseVariants(order.color, order.size, Math.max(1, order.quantity || 1), availableColors)
+  );
+
   const allWilayas = useMemo(() => Array.from(new Set([order.wilaya, ...abayaWilayas, ...wilayas].filter(Boolean))), [order.wilaya]);
   const arabicCommunes = abayaCommunesByWilaya[wilaya] ?? [];
 
@@ -959,24 +1059,65 @@ function OrderModal({
     const found = catalog.find(p => p.id === nextId);
     if (found) {
       setProductName(found.name);
-      setTotal(found.price * quantity);
-      if (found.colors.length && !found.colors.includes(color)) {
-        setColor(found.colors[0]);
-      }
+      const isFree = found.id === "p-007" || found.slug.includes("abaya");
+      const currentShip = isFree ? 0 : shippingFee;
+      if (isFree) setShippingFee(0);
+      const nextGoods = computeProductGoodsPrice(found, quantity);
+      setTotal(nextGoods + currentShip);
     }
   };
 
   const handleQuantityChange = (nextQty: number) => {
-    const safeQty = Math.max(1, Math.min(100, nextQty || 1));
+    const safeQty = Math.max(1, Math.min(10, nextQty || 1));
     setQuantity(safeQty);
-    if (selectedCatalogProduct) {
-      setTotal(selectedCatalogProduct.price * safeQty);
-    }
+
+    // Ajuste dynamiquement la liste des variantes
+    setVariants(prev => {
+      const next = [...prev];
+      while (next.length < safeQty) {
+        const last = next[next.length - 1] || { color: availableColors[0] || "Noir", size: "M" };
+        next.push({ ...last });
+      }
+      return next.slice(0, safeQty);
+    });
+
+    // Recalcule automatiquement le Total : Prix des articles (avec promo duo) + Livraison
+    const nextGoods = computeProductGoodsPrice(selectedCatalogProduct, safeQty);
+    setTotal(nextGoods + shippingFee);
   };
+
+  const updatePieceVariant = (index: number, field: "color" | "size", val: string) => {
+    setVariants(prev => {
+      const next = [...prev];
+      if (next[index]) {
+        next[index] = { ...next[index], [field]: val };
+      }
+      return next;
+    });
+  };
+
+  const currentGoods = computeProductGoodsPrice(selectedCatalogProduct, quantity);
 
   const handleSubmitEdit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const formattedProduct = `${productName} × ${quantity}`;
+    const activeVariants = variants.slice(0, quantity);
+    const finalColor = quantity === 1
+      ? (activeVariants[0]?.color || availableColors[0] || "")
+      : activeVariants.map((v, i) => `${i + 1}: ${v.color}`).join(" | ");
+
+    const finalSize = quantity === 1
+      ? (activeVariants[0]?.size || "M")
+      : activeVariants.map((v, i) => `${i + 1}: ${v.size}`).join(" | ");
+
+    let formattedProduct = "";
+    if (isDoudoune && quantity === 2) {
+      formattedProduct = `${productName} (عرض 2 دواقون بـ 12900 دج)`;
+    } else if (quantity > 1) {
+      formattedProduct = `${productName} × ${quantity}`;
+    } else {
+      formattedProduct = productName;
+    }
+
     onSaveDetails(order.dbId, {
       customer: customer.trim() || order.customer,
       phone: phone.trim() || order.phone,
@@ -984,8 +1125,8 @@ function OrderModal({
       product: formattedProduct,
       quantity,
       total: Number(total) || 0,
-      color: color.trim(),
-      size: size.trim(),
+      color: finalColor.trim(),
+      size: finalSize.trim(),
       delivery,
       wilaya: wilaya.trim(),
       commune: commune.trim(),
@@ -1043,29 +1184,146 @@ function OrderModal({
               </select>
             </label>
             <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
-              Quantité
-              <input type="number" min={1} max={100} value={quantity} onChange={e => handleQuantityChange(Number(e.target.value))} required />
+              Quantité (Liste déroulante)
+              <select
+                value={quantity}
+                onChange={e => handleQuantityChange(Number(e.target.value))}
+                style={{
+                  height: "44px",
+                  borderRadius: "10px",
+                  border: "1px solid #cbd5e1",
+                  padding: "0 12px",
+                  fontWeight: 700,
+                  fontSize: "14px",
+                  backgroundColor: "var(--input-bg, #fff)",
+                  cursor: "pointer",
+                }}
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(qty => {
+                  const goods = computeProductGoodsPrice(selectedCatalogProduct, qty);
+                  let label = `${qty} pièce${qty > 1 ? "s" : ""} — ${formatDZD(goods)}`;
+                  if (isDoudoune && qty === 2) {
+                    label = `2 pièces (Pack Duo 12 900 DA - Promo 🔥)`;
+                  } else if (isDoudoune && qty === 4) {
+                    label = `4 pièces (2x Pack Duo 25 800 DA - Promo 🔥)`;
+                  }
+                  return (
+                    <option key={qty} value={qty}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
             </label>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
-              Variante · Couleur
-              <select value={color} onChange={e => setColor(e.target.value)}>
-                {Array.from(new Set([color, ...availableColors, "Emerald (أخضر)", "Noir (أسود)"].filter(Boolean))).map(c => (
-                  <option key={c} value={c}>{c === "Emerald" ? "Emerald (أخضر)" : c === "Noir" ? "Noir (أسود)" : c}</option>
+          {quantity === 1 ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+              <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+                Variante · Couleur
+                <select
+                  value={variants[0]?.color || availableColors[0]}
+                  onChange={e => updatePieceVariant(0, "color", e.target.value)}
+                >
+                  {Array.from(new Set([variants[0]?.color, ...availableColors].filter(Boolean))).map(c => (
+                    <option key={c} value={c}>{c === "Emerald" ? "Emerald (أخضر)" : c === "Noir" ? "Noir (أسود)" : c}</option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+                Variante · Taille
+                <select
+                  value={variants[0]?.size || "M"}
+                  onChange={e => updatePieceVariant(0, "size", e.target.value)}
+                >
+                  {["S", "M", "L", "XL", "XXL", "Standard"].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          ) : (
+            <div style={{
+              padding: "12px 14px",
+              borderRadius: "14px",
+              background: isDoudoune && quantity === 2
+                ? "linear-gradient(135deg, rgba(235, 75, 122, 0.08), rgba(244, 63, 94, 0.04))"
+                : "rgba(99, 102, 241, 0.06)",
+              border: isDoudoune && quantity === 2
+                ? "1px solid rgba(235, 75, 122, 0.3)"
+                : "1px solid rgba(99, 102, 241, 0.2)",
+              display: "grid",
+              gap: "10px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "6px" }}>
+                <span style={{
+                  fontSize: "13px",
+                  fontWeight: 800,
+                  color: isDoudoune && quantity === 2 ? "#eb4b7a" : "#4f46e5",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}>
+                  <span>{isDoudoune && quantity === 2 ? "🔥" : "📦"}</span>
+                  Variantes par pièce ({quantity} pièces)
+                  {isDoudoune && quantity === 2 && (
+                    <span style={{
+                      background: "#eb4b7a",
+                      color: "#fff",
+                      fontSize: "11px",
+                      padding: "2px 8px",
+                      borderRadius: "999px",
+                      fontWeight: 700,
+                    }}>
+                      Pack Duo 12 900 DA
+                    </span>
+                  )}
+                </span>
+                <small style={{ color: "var(--muted, #64748b)", fontSize: "11px" }}>
+                  Sélectionne la couleur et taille de chaque article
+                </small>
+              </div>
+              <div style={{ display: "grid", gap: "8px" }}>
+                {variants.slice(0, quantity).map((v, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "auto 1fr 1fr",
+                      gap: "8px",
+                      alignItems: "center",
+                      background: "rgba(255, 255, 255, 0.9)",
+                      padding: "8px 10px",
+                      borderRadius: "10px",
+                      border: "1px solid rgba(0,0,0,0.08)",
+                    }}
+                  >
+                    <span style={{ fontWeight: 800, fontSize: "12px", minWidth: "60px", color: "#334155" }}>
+                      Pièce {idx + 1} :
+                    </span>
+                    <select
+                      value={v.color}
+                      onChange={e => updatePieceVariant(idx, "color", e.target.value)}
+                      style={{ height: "36px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}
+                    >
+                      {Array.from(new Set([v.color, ...availableColors].filter(Boolean))).map(c => (
+                        <option key={c} value={c}>{c === "Emerald" ? "Emerald (أخضر)" : c === "Noir" ? "Noir (أسود)" : c}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={v.size}
+                      onChange={e => updatePieceVariant(idx, "size", e.target.value)}
+                      style={{ height: "36px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}
+                    >
+                      {["S", "M", "L", "XL", "XXL", "Standard"].map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
                 ))}
-              </select>
-            </label>
-            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
-              Variante · Taille
-              <select value={size} onChange={e => setSize(e.target.value)}>
-                {["S", "M", "L", "XL", "XXL", "Standard"].map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </label>
-          </div>
+              </div>
+            </div>
+          )}
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
             <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
@@ -1106,10 +1364,49 @@ function OrderModal({
                 <option value="office">🏢 Au bureau / Stop Desk (إلى المكتب)</option>
               </select>
             </label>
-            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
-              Total (DA)
-              <input type="number" min={0} value={total} onChange={e => setTotal(Number(e.target.value))} required style={{ fontWeight: 800, color: "#10b981" }} />
-            </label>
+            <div style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>Total commande (DA)</span>
+                <button
+                  type="button"
+                  onClick={() => setTotal(currentGoods + shippingFee)}
+                  style={{
+                    fontSize: "11px",
+                    background: "none",
+                    border: "none",
+                    color: "#2563eb",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    padding: 0,
+                    fontWeight: 600,
+                  }}
+                  title="Recalculer selon le tarif catalogue et frais de livraison"
+                >
+                  Recalculer auto
+                </button>
+              </div>
+              <input
+                type="number"
+                min={0}
+                value={total}
+                onChange={e => setTotal(Number(e.target.value))}
+                required
+                style={{ fontWeight: 800, color: "#10b981", fontSize: "16px", height: "44px" }}
+              />
+              <div style={{ fontSize: "11px", color: "var(--muted, #64748b)", fontWeight: 500 }}>
+                Articles : <strong>{formatDZD(currentGoods)}</strong>
+                {shippingFee > 0 ? (
+                  <> + Livraison : <strong>{formatDZD(shippingFee)}</strong></>
+                ) : (
+                  <> (Livraison incluse / 0 DA)</>
+                )}
+                {total !== currentGoods + shippingFee && (
+                  <span style={{ color: "#d97706", marginLeft: "6px", fontWeight: 600 }}>
+                    (Ajustement manuel)
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
