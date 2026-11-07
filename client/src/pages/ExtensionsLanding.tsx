@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { type Order, type Product } from "@/lib/store-data";
+import { abayaWilayas } from "@/lib/abaya-communes";
 import { trpc } from "@/lib/trpc";
 import { shippingFeeFor } from "@shared/shipping";
 import { useCheckoutDraft } from "@/components/useCheckoutDraft";
@@ -395,7 +396,7 @@ export default function ExtensionsLanding({
           }}
         >
           <option value="" />
-          {WILAYAS_AR.map(w => (
+          {abayaWilayas.map(w => (
             <option key={w} value={w}>
               {w}
             </option>

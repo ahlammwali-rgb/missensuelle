@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { CheckoutOrder, CheckoutPayload } from "../shared/checkout";
-import { shippingFeeFor, wilayaIdFromName, type ShippingRate, type ShippingRates } from "../shared/shipping";
+import { matchEcomCommune, shippingFeeFor, wilayaIdFromName, type ShippingRate, type ShippingRates } from "../shared/shipping";
 import { getCloudToken } from "./persistentStore";
 
 const BASE_URL = "https://ecom-dz.com/api_v2";
@@ -10,7 +10,7 @@ const LOCAL_DIR = path.resolve(process.cwd(), ".data");
 const LOCAL_FILE = path.join(LOCAL_DIR, "ecom-state.json");
 const RATES_TTL = 10 * 60 * 1000;
 
-export type EcomShipment = { tracking: string; at: string; idColis: number | null };
+export type EcomShipment = { tracking: string; at: string; idColis: number | null; readyToShip?: boolean };
 type EcomState = { key: string; token: string; shipments: Record<string, EcomShipment> };
 
 export class EcomError extends Error {
@@ -209,28 +209,37 @@ export async function computeShippingFee(payload: CheckoutPayload) {
 export type EcomCommune = { id: number; commune: string; livrable: boolean };
 export type EcomStopdesk = { code_stopdesk: string; nom_bureau: string; commune: string; adresse: string };
 
+const locationsCache = new Map<number, { at: number; value: { communes: string[]; stopdesks: Array<{ code: string; label: string }> } }>();
+
 export async function getEcomLocations(wilayaId: number) {
+  const cached = locationsCache.get(wilayaId);
+  if (cached && Date.now() - cached.at < RATES_TTL) {
+    return cached.value;
+  }
   const [communes, stopdesks] = await Promise.all([
     ecomRequest<EcomCommune[]>("/communes", { query: { id_wilaya: wilayaId } }),
     ecomRequest<EcomStopdesk[]>("/stopdesks", { query: { id_wilaya: wilayaId } }).catch(() => [] as EcomStopdesk[]),
   ]);
-  return {
+  const value = {
     communes: communes.filter(c => c.livrable).map(c => c.commune),
     stopdesks: stopdesks.map(s => ({
       code: s.code_stopdesk,
       label: `${s.nom_bureau} — ${s.commune}`,
     })),
   };
+  locationsCache.set(wilayaId, { at: Date.now(), value });
+  return value;
 }
 
 export type ShipInput = {
   orderId: string;
+  wilayaId?: number;
   stopdesk: boolean;
   commune?: string;
   codeStopdesk?: string;
   refArticle?: string;
 };
-export type ShipResult = { orderId: string; ok: boolean; tracking?: string; error?: string };
+export type ShipResult = { orderId: string; ok: boolean; tracking?: string; error?: string; readyToShip?: boolean };
 
 type ColisRow = { index: number; ok: boolean; tracking?: string | null; id_colis?: number | null; erreur?: string | null };
 
@@ -246,10 +255,57 @@ export async function shipOrders(orders: CheckoutOrder[], inputs: ShipInput[], c
     const fail = (error: string) => results.set(input.orderId, { orderId: input.orderId, ok: false, error });
     const order = byId.get(input.orderId);
     if (!order) { fail("Commande introuvable"); continue; }
-    if (state.shipments[order.id]) { fail(`Déjà expédiée (${state.shipments[order.id].tracking})`); continue; }
-    const wilayaId = wilayaIdFromName(order.wilaya);
-    if (!wilayaId) { fail(`Wilaya non reconnue : ${order.wilaya}`); continue; }
-    if (input.stopdesk ? !input.codeStopdesk : !input.commune) {
+
+    const existingShipment = state.shipments[order.id];
+    if (existingShipment) {
+      // Si le colis était « En préparation » (readyToShip !== true) et qu'on le scanne / valide en « Prêt à expédier » (confirmee === true)
+      if (confirmee && !existingShipment.readyToShip) {
+        try {
+          if (existingShipment.idColis) {
+            await ecomRequest(`/colis/${existingShipment.idColis}`, {
+              method: "PUT",
+              body: { confirmee: 1 },
+            }).catch(() => null);
+          }
+          await ecomRequest(`/colis/${encodeURIComponent(existingShipment.tracking)}`, {
+            method: "PUT",
+            body: { confirmee: 1 },
+          }).catch(() => null);
+        } catch {
+          // Si l'API E-com gère le passage au scan via le tracking existant
+        }
+        existingShipment.readyToShip = true;
+        results.set(order.id, {
+          orderId: order.id,
+          ok: true,
+          tracking: existingShipment.tracking,
+          readyToShip: true,
+        });
+        continue;
+      }
+      fail(`Déjà expédiée (${existingShipment.tracking})`);
+      continue;
+    }
+
+    const wilayaId = input.wilayaId || wilayaIdFromName(order.wilaya, order.commune);
+    if (!wilayaId) {
+      fail(`Wilaya non reconnue : ${order.wilaya || "Vide"} (Choisissez la wilaya dans la liste)`);
+      continue;
+    }
+
+    let resolvedCommune = (input.commune || "").trim();
+    if (!input.stopdesk) {
+      try {
+        const loc = await getEcomLocations(wilayaId);
+        if (loc.communes.length > 0) {
+          resolvedCommune = matchEcomCommune(wilayaId, resolvedCommune || order.commune, loc.communes);
+        }
+      } catch {
+        // garde resolvedCommune si l'appel /communes échoue
+      }
+    }
+
+    if (input.stopdesk ? !input.codeStopdesk : !resolvedCommune) {
       fail(input.stopdesk ? "Choisissez le bureau stopdesk" : "Choisissez la commune E-com Delivery");
       continue;
     }
@@ -260,7 +316,7 @@ export async function shipOrders(orders: CheckoutOrder[], inputs: ShipInput[], c
       nom_complet: order.customer.slice(0, 60) || "Cliente",
       mobile_1: order.phone.replace(/[\s().\-/]/g, "").slice(0, 25),
       id_wilaya: wilayaId,
-      adresse: (order.address || "").slice(0, 100),
+      adresse: (order.address || order.commune || "").slice(0, 100),
       quantite: Math.max(1, order.quantity || 1),
       total: Math.max(0, Math.round(order.total)),
       stopdesk: input.stopdesk ? 1 : 0,
@@ -269,7 +325,7 @@ export async function shipOrders(orders: CheckoutOrder[], inputs: ShipInput[], c
       confirmee: confirmee ? 1 : 0,
     };
     if (input.stopdesk) row.code_stopdesk = input.codeStopdesk;
-    else row.commune = input.commune;
+    else row.commune = resolvedCommune;
     if (account.stock) row.ref_article = input.refArticle!.trim();
     else row.article = article;
     colis.push(row);
@@ -285,8 +341,13 @@ export async function shipOrders(orders: CheckoutOrder[], inputs: ShipInput[], c
         const orderId = ids[r.index];
         if (!orderId) continue;
         if (r.ok && r.tracking) {
-          state.shipments[orderId] = { tracking: r.tracking, at: new Date().toISOString(), idColis: r.id_colis ?? null };
-          results.set(orderId, { orderId, ok: true, tracking: r.tracking });
+          state.shipments[orderId] = {
+            tracking: r.tracking,
+            at: new Date().toISOString(),
+            idColis: r.id_colis ?? null,
+            readyToShip: Boolean(confirmee),
+          };
+          results.set(orderId, { orderId, ok: true, tracking: r.tracking, readyToShip: Boolean(confirmee) });
         } else {
           results.set(orderId, { orderId, ok: false, error: r.erreur || "Refusé par E-com Delivery" });
         }

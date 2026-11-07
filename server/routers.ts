@@ -427,6 +427,7 @@ export const appRouter = router({
             .array(
               z.object({
                 orderId: z.string().min(1).max(64),
+                wilayaId: z.number().int().min(1).max(58).optional(),
                 stopdesk: z.boolean(),
                 commune: z.string().max(120).optional(),
                 codeStopdesk: z.string().max(20).optional(),
@@ -446,7 +447,7 @@ export const appRouter = router({
           for (const result of results) {
             if (!result.ok) continue;
             const order = orders.find(o => o.id === result.orderId);
-            if (!order) continue;
+            if (!order || order.status === "transferee") continue;
             if (!db) updateMemoryOrderStatus(order.dbId, "transferee", actor);
             else await updateStoreOrderStatus(order.dbId, "transferee");
           }

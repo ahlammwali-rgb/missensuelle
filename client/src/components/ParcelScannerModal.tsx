@@ -138,19 +138,20 @@ export function ParcelScannerModal({
       const productIdentifier = matchedOrder.productId || matchedOrder.product;
 
       if (currentMode === "ship") {
-        // MODE EXPÉDITION ("Prêt à expédier")
-        const alreadyShipped = Boolean(currentShipments[matchedOrder.id]) || matchedOrder.status === "transferee";
-        if (alreadyShipped) {
+        // MODE EXPÉDITION ("Prêt à expédier" au scan)
+        const existingShip = currentShipments[matchedOrder.id];
+        const alreadyReadyToShip = Boolean(existingShip?.readyToShip);
+        if (alreadyReadyToShip) {
           playScanSound(false);
-          const trk = currentShipments[matchedOrder.id]?.tracking || "Déjà expédié";
+          const trk = existingShip?.tracking || "Déjà validé";
           setLastScanned({
             success: false,
             order: matchedOrder,
             tracking: trk,
-            message: `Ce colis a déjà été expédié (${trk}).`,
+            message: `Ce colis est déjà en « Prêt à expédier » (${trk}).`,
             at: new Date().toLocaleTimeString("fr-DZ"),
           });
-          notify(`Colis ${matchedOrder.customer} déjà expédié !`);
+          notify(`Colis ${matchedOrder.customer} déjà en « Prêt à expédier » !`);
           setIsProcessing(false);
           return;
         }

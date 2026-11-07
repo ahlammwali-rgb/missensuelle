@@ -1,4 +1,5 @@
 import type { CheckoutOrder } from "../shared/checkout";
+import { normalizeOrderLocation } from "../shared/shipping";
 import { getDb } from "./db";
 import { getCloudToken } from "./persistentStore";
 
@@ -164,8 +165,11 @@ export async function importGoogleSheetToOrders(
     let product = (idxProd >= 0 ? row[idxProd] : row[2]) || "Abaya Royal Emerald";
     const variant = (idxVar >= 0 ? row[idxVar] : row[3]) || "";
     const qty = Math.max(1, parseInt(idxQty >= 0 ? row[idxQty] : "1", 10) || 1);
-    const wilaya = (idxWil >= 0 ? row[idxWil] : row[5]) || "Alger";
-    const commune = (idxCom >= 0 ? row[idxCom] : row[6]) || "";
+    const rawWilaya = (idxWil >= 0 ? row[idxWil] : row[5]) || "الجزائر";
+    const rawCommune = (idxCom >= 0 ? row[idxCom] : row[6]) || "";
+    const normLoc = normalizeOrderLocation(rawWilaya, rawCommune, "");
+    const wilaya = normLoc.wilaya || "الجزائر";
+    const commune = normLoc.commune || wilaya;
     const rawPriceStr = idxPrix >= 0 && row[idxPrix] ? row[idxPrix].replace(/\D/g, "") : "";
     const total = rawPriceStr ? (parseInt(rawPriceStr, 10) || 0) : 0;
 
@@ -197,7 +201,7 @@ export async function importGoogleSheetToOrders(
       delivery: "home",
       wilaya: wilaya.trim(),
       commune: commune.trim(),
-      address: "",
+      address: normLoc.address || "",
       note: leadId ? `Lead TikTok Ads #${leadId}` : "Importé depuis Google Sheet",
       status: "nouvelle",
     };

@@ -33,6 +33,7 @@ import {
 import { getDb } from "./db";
 import { computeShippingFee } from "./ecomDelivery";
 import { importGoogleSheetToOrders, pushOrderToGoogleSheet } from "./googleSheet";
+import { normalizeOrderLocation } from "../shared/shipping";
 import {
   appendStaffActivityLog,
   ensurePersistentStoreLoaded,
@@ -136,6 +137,7 @@ export function deleteMemoryOrder(id: number): boolean {
 
 const loadStore = async () => {
   await ensurePersistentStoreLoaded(memoryOrders, memorySessions, getCounters, setCounters);
+  let locationNormalized = false;
   for (const o of memoryOrders) {
     if (o.size === "L" && (o.product.includes("EXTENTION") || o.id.startsWith("MS-GS-") || o.id.startsWith("MS-TT-"))) {
       o.size = "";
@@ -143,9 +145,18 @@ const loadStore = async () => {
     if (o.total === 7500 && (o.id.startsWith("MS-GS-") || o.id.startsWith("MS-TT-") || o.product.includes("EXTENTION"))) {
       o.total = 0;
     }
+    const normLoc = normalizeOrderLocation(o.wilaya || "", o.commune || "", o.address || "");
+    if (normLoc.wilayaId && (o.wilaya !== normLoc.wilaya || o.commune !== normLoc.commune)) {
+      o.wilaya = normLoc.wilaya;
+      o.commune = normLoc.commune;
+      if (normLoc.address && normLoc.address !== o.address) {
+        o.address = normLoc.address;
+      }
+      locationNormalized = true;
+    }
   }
   const dedup = autoDeduplicateOrders(memoryOrders);
-  if (dedup.removed > 0) {
+  if (dedup.removed > 0 || locationNormalized) {
     saveStore();
   }
 };
@@ -971,6 +982,7 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
     const number = orderNumber();
     const orderId = nextMemoryOrderId++;
     const now = new Date();
+    const normLoc = normalizeOrderLocation(payload.wilaya, payload.commune, payload.address);
     memoryOrders.unshift({
       dbId: orderId,
       id: number,
@@ -984,9 +996,9 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
       color: payload.items.map(item => item.color).filter(Boolean).join(", "),
       size: payload.items.map(item => item.size).filter(Boolean).join(", "),
       delivery: payload.delivery,
-      wilaya: payload.wilaya,
-      commune: payload.commune,
-      address: payload.address,
+      wilaya: normLoc.wilaya,
+      commune: normLoc.commune,
+      address: normLoc.address,
       note: payload.note ?? "",
       status: "nouvelle",
     });
