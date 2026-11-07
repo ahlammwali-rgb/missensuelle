@@ -100,8 +100,18 @@ function AdminPageContent() {
         const soundUrgentEnabled = localStorage.getItem("ms_sound_urgent_enabled") !== "false";
         const soundVictoryEnabled = localStorage.getItem("ms_sound_victory_enabled") !== "false";
         const soundOrderEnabled = localStorage.getItem("ms_sound_order_enabled") !== "false";
+        const notifNrpEnabled = localStorage.getItem("ms_notif_nrp_enabled") !== "false";
+        const notifCancelEnabled = localStorage.getItem("ms_notif_cancel_enabled") !== "false";
+        const notifDelayEnabled = localStorage.getItem("ms_notif_delay_enabled") !== "false";
 
         if (payload?.type === "urgent_alert" && soundUrgentEnabled) {
+          const body = (payload?.body || "").toLowerCase();
+          const title = (payload?.title || "").toLowerCase();
+          const text = body + " " + title;
+          if (text.includes("repond") && !notifNrpEnabled) return;
+          if ((text.includes("annul") || text.includes("refus") || text.includes("retour")) && !notifCancelEnabled) return;
+          if (text.includes("report") && !notifDelayEnabled) return;
+
           playUrgentAlertSound();
         } else if (payload?.type === "victory" && soundVictoryEnabled) {
           playVictoryDeliveredSound();
@@ -228,13 +238,16 @@ function AdminPageContent() {
 
     const soundUrgentEnabled = localStorage.getItem("ms_sound_urgent_enabled") !== "false";
     const pushEnabled = localStorage.getItem("ms_push_order_enabled") !== "false";
+    const notifNrpEnabled = localStorage.getItem("ms_notif_nrp_enabled") !== "false";
+    const notifCancelEnabled = localStorage.getItem("ms_notif_cancel_enabled") !== "false";
+    const notifDelayEnabled = localStorage.getItem("ms_notif_delay_enabled") !== "false";
 
     for (const o of currentOrders) {
       const prevStatus = orderStatusHistoryRef.current.get(o.id);
       if (prevStatus && prevStatus !== o.status) {
         orderStatusHistoryRef.current.set(o.id, o.status);
 
-        if (o.status === "ne_repond_pas") {
+        if (o.status === "ne_repond_pas" && notifNrpEnabled) {
           if (soundUrgentEnabled) playUrgentAlertSound();
           if (pushEnabled) {
             showPushNotification(
@@ -245,7 +258,7 @@ function AdminPageContent() {
             );
           }
           notify(`🚨 INTERVENTION : ${o.customer || "Cliente"} (${o.phone}) ne répond pas !`, "urgent");
-        } else if (o.status === "annulee") {
+        } else if (o.status === "annulee" && notifCancelEnabled) {
           if (soundUrgentEnabled) playUrgentAlertSound();
           if (pushEnabled) {
             showPushNotification(
@@ -256,7 +269,7 @@ function AdminPageContent() {
             );
           }
           notify(`🚨 ALERTE : Commande ${o.id} annulée / refusée (${o.customer})`, "urgent");
-        } else if (o.status === "reportee") {
+        } else if (o.status === "reportee" && notifDelayEnabled) {
           if (soundUrgentEnabled) playUrgentAlertSound();
           if (pushEnabled) {
             showPushNotification(
@@ -322,6 +335,9 @@ function AdminPageContent() {
     const soundUrgentEnabled = localStorage.getItem("ms_sound_urgent_enabled") !== "false";
     const soundVictoryEnabled = localStorage.getItem("ms_sound_victory_enabled") !== "false";
     const pushEnabled = localStorage.getItem("ms_push_order_enabled") !== "false";
+    const notifNrpEnabled = localStorage.getItem("ms_notif_nrp_enabled") !== "false";
+    const notifCancelEnabled = localStorage.getItem("ms_notif_cancel_enabled") !== "false";
+    const notifDelayEnabled = localStorage.getItem("ms_notif_delay_enabled") !== "false";
 
     const orderIdByTracking = new Map<string, string>();
     for (const [orderId, sh] of Object.entries(shipments)) {
@@ -356,7 +372,7 @@ function AdminPageContent() {
           notify(`🎉 VICTOIRE : Colis ${orderId || tracking} livré à ${customerName} (+${formatDZD(total)}) !`, "victory");
         }
         // 2. Client NE RÉPOND PAS -> RED ALERT
-        else if (currentSit.includes("repond") && !prevSit.includes("repond")) {
+        else if (currentSit.includes("repond") && !prevSit.includes("repond") && notifNrpEnabled) {
           if (soundUrgentEnabled) playUrgentAlertSound();
           if (pushEnabled) {
             showPushNotification(
@@ -369,7 +385,7 @@ function AdminPageContent() {
           notify(`🚨 INTERVENTION : ${customerName} (${phone}) ne répond pas au livreur !`, "urgent");
         }
         // 3. Colis REPORTÉ -> RED / ORANGE ALERT
-        else if (currentSit.includes("report") && !prevSit.includes("report")) {
+        else if (currentSit.includes("report") && !prevSit.includes("report") && notifDelayEnabled) {
           if (soundUrgentEnabled) playUrgentAlertSound();
           if (pushEnabled) {
             showPushNotification(
@@ -383,7 +399,7 @@ function AdminPageContent() {
         }
         // 4. Colis ANNULÉ / RETOUR / REFUSÉ -> RED ALERT
         else if ((currentSit.includes("retour") || currentSit.includes("annul") || currentSit.includes("refus")) &&
-                 (!prevSit.includes("retour") && !prevSit.includes("annul") && !prevSit.includes("refus"))) {
+                 (!prevSit.includes("retour") && !prevSit.includes("annul") && !prevSit.includes("refus")) && notifCancelEnabled) {
           if (soundUrgentEnabled) playUrgentAlertSound();
           if (pushEnabled) {
             showPushNotification(

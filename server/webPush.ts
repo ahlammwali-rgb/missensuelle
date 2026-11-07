@@ -66,7 +66,7 @@ export async function sendAdminPushNotification(
     subscriptions.map(async (sub) => {
       try {
         await webpush.sendNotification(
-          sub as unknown as webpush.PushSubscription,
+          sub as unknown as webpushModule.PushSubscription,
           notificationString,
           {
             TTL: 86400, // 24 hours delivery window

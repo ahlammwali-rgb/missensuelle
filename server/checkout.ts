@@ -31,6 +31,7 @@ import { importGoogleSheetToOrders, pushOrderToGoogleSheet } from "./googleSheet
 import {
   ensurePersistentStoreLoaded,
   schedulePersistentStoreSave,
+  getNotificationPreferences,
 } from "./persistentStore";
 import { sendAdminPushNotification } from "./webPush";
 
@@ -156,23 +157,39 @@ export function updateMemoryOrderStatus(id: number, status: CheckoutOrder["statu
 
     if (prevStatus !== status) {
       const statusKey = String(status);
-      if (statusKey === "ne_repond_pas" || statusKey === "annulee" || statusKey === "reportee") {
-        const labels: Record<string, string> = {
-          ne_repond_pas: "Ne répond pas",
-          annulee: "Annulée",
-          reportee: "Reportée",
-        };
-        const label = labels[statusKey] || statusKey;
+      const prefs = getNotificationPreferences();
+
+      if (statusKey === "ne_repond_pas" && prefs.notifyNeRepondPas) {
         void sendAdminPushNotification({
-          title: `🚨 ALERTE COLIS : ${label} !`,
-          body: `Colis #${found.id} (${found.customer} - ${found.phone}) nécessite une intervention (${label})`,
+          title: "🚨 ALERTE COLIS : Ne répond pas !",
+          body: `Colis #${found.id} (${found.customer} - ${found.phone}) nécessite une intervention (Ne répond pas)`,
           icon: "/icons/icon-192x192.png",
           badge: "/icons/icon-192x192.png",
           tag: `alert-${found.id}`,
           type: "urgent_alert",
           data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert" },
         });
-      } else if (statusKey === "livre" || statusKey === "livree") {
+      } else if (statusKey === "annulee" && prefs.notifyAnnulee) {
+        void sendAdminPushNotification({
+          title: "🚨 ALERTE COLIS : Annulée !",
+          body: `Colis #${found.id} (${found.customer} - ${found.phone}) : Commande annulée`,
+          icon: "/icons/icon-192x192.png",
+          badge: "/icons/icon-192x192.png",
+          tag: `alert-${found.id}`,
+          type: "urgent_alert",
+          data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert" },
+        });
+      } else if (statusKey === "reportee" && prefs.notifyReportee) {
+        void sendAdminPushNotification({
+          title: "⚠️ ALERTE COLIS : Reportée !",
+          body: `Colis #${found.id} (${found.customer} - ${found.phone}) : Livraison reportée`,
+          icon: "/icons/icon-192x192.png",
+          badge: "/icons/icon-192x192.png",
+          tag: `alert-${found.id}`,
+          type: "urgent_alert",
+          data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert" },
+        });
+      } else if ((statusKey === "livre" || statusKey === "livree") && prefs.notifyLivre) {
         void sendAdminPushNotification({
           title: "🎉 COLIS LIVRÉ : Succès !",
           body: `Colis #${found.id} pour ${found.customer} (${found.total.toLocaleString("fr-DZ")} DZD) a été livré ! Encaissement validé.`,
@@ -607,15 +624,17 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
       });
     }
     saveStore();
-    void sendAdminPushNotification({
-      title: "🛍️ Nouvelle Commande Reçue ! 💰",
-      body: `${payload.customer} (${payload.phone}) · ${total.toLocaleString("fr-DZ")} DZD · ${payload.wilaya}`,
-      icon: "/icons/icon-192x192.png",
-      badge: "/icons/icon-192x192.png",
-      tag: `order-${number}`,
-      type: "new_order",
-      data: { url: "/admin", sound: "/sounds/shopify-chaching.mp3", type: "new_order" },
-    });
+    if (getNotificationPreferences().notifyNewOrder) {
+      void sendAdminPushNotification({
+        title: "🛍️ Nouvelle Commande Reçue ! 💰",
+        body: `${payload.customer} (${payload.phone}) · ${total.toLocaleString("fr-DZ")} DZD · ${payload.wilaya}`,
+        icon: "/icons/icon-192x192.png",
+        badge: "/icons/icon-192x192.png",
+        tag: `order-${number}`,
+        type: "new_order",
+        data: { url: "/admin", sound: "/sounds/shopify-chaching.mp3", type: "new_order" },
+      });
+    }
     return { orderId, orderNumber: number, total, created: true };
   }
   return db.transaction(async tx => {
@@ -669,15 +688,17 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
         consentedAt: new Date(),
       });
     }
-    void sendAdminPushNotification({
-      title: "🛍️ Nouvelle Commande Reçue ! 💰",
-      body: `${payload.customer} (${payload.phone}) · ${total.toLocaleString("fr-DZ")} DZD · ${payload.wilaya}`,
-      icon: "/icons/icon-192x192.png",
-      badge: "/icons/icon-192x192.png",
-      tag: `order-${number}`,
-      type: "new_order",
-      data: { url: "/admin", sound: "/sounds/shopify-chaching.mp3", type: "new_order" },
-    });
+    if (getNotificationPreferences().notifyNewOrder) {
+      void sendAdminPushNotification({
+        title: "🛍️ Nouvelle Commande Reçue ! 💰",
+        body: `${payload.customer} (${payload.phone}) · ${total.toLocaleString("fr-DZ")} DZD · ${payload.wilaya}`,
+        icon: "/icons/icon-192x192.png",
+        badge: "/icons/icon-192x192.png",
+        tag: `order-${number}`,
+        type: "new_order",
+        data: { url: "/admin", sound: "/sounds/shopify-chaching.mp3", type: "new_order" },
+      });
+    }
     return { orderId, orderNumber: number, total, created: true };
   });
 }

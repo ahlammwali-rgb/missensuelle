@@ -51,7 +51,11 @@ import {
   shipOrders,
 } from "./ecomDelivery";
 import { VAPID_PUBLIC_KEY, sendAdminPushNotification } from "./webPush";
-import { savePushSubscriptionRecord } from "./persistentStore";
+import {
+  getNotificationPreferences,
+  savePushSubscriptionRecord,
+  setNotificationPreferences,
+} from "./persistentStore";
 import { triggerStoreSave } from "./checkout";
 import { z } from "zod";
 
@@ -251,6 +255,24 @@ export const appRouter = router({
           await runTest();
           return { scheduled: false, sent: true };
         }
+      }),
+    getNotificationPreferences: adminProcedure.query(() => {
+      return getNotificationPreferences();
+    }),
+    setNotificationPreferences: adminProcedure
+      .input(
+        z.object({
+          notifyNewOrder: z.boolean().optional(),
+          notifyNeRepondPas: z.boolean().optional(),
+          notifyAnnulee: z.boolean().optional(),
+          notifyReportee: z.boolean().optional(),
+          notifyLivre: z.boolean().optional(),
+        })
+      )
+      .mutation(({ input }) => {
+        const updated = setNotificationPreferences(input);
+        triggerStoreSave();
+        return updated;
       }),
   }),
   ecom: router({

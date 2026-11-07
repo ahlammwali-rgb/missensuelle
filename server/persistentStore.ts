@@ -32,6 +32,36 @@ export type PushSubscriptionRecord = {
   savedAt?: string;
 };
 
+export type NotificationPreferences = {
+  notifyNewOrder: boolean;
+  notifyNeRepondPas: boolean;
+  notifyAnnulee: boolean;
+  notifyReportee: boolean;
+  notifyLivre: boolean;
+};
+
+let memoryNotificationPreferences: NotificationPreferences = {
+  notifyNewOrder: true,
+  notifyNeRepondPas: true,
+  notifyAnnulee: true,
+  notifyReportee: true,
+  notifyLivre: true,
+};
+
+export function getNotificationPreferences(): NotificationPreferences {
+  return { ...memoryNotificationPreferences };
+}
+
+export function setNotificationPreferences(
+  prefs: Partial<NotificationPreferences>
+): NotificationPreferences {
+  memoryNotificationPreferences = {
+    ...memoryNotificationPreferences,
+    ...prefs,
+  };
+  return { ...memoryNotificationPreferences };
+}
+
 type PersistedState = {
   updatedAt: string;
   nextMemoryOrderId: number;
@@ -39,6 +69,7 @@ type PersistedState = {
   orders: CheckoutOrder[];
   sessions: SerializedSession[];
   pushSubscriptions?: PushSubscriptionRecord[];
+  notificationPreferences?: NotificationPreferences;
 };
 
 const SHIFTED_CODES = [
@@ -189,6 +220,10 @@ async function pushCloudState(state: PersistedState): Promise<void> {
       orders: finalOrders,
       sessions: finalSessions,
       pushSubscriptions: finalPushSubscriptions,
+      notificationPreferences:
+        state.notificationPreferences ??
+        existing.state?.notificationPreferences ??
+        memoryNotificationPreferences,
     };
 
     writeLocalState(finalState);
@@ -250,6 +285,13 @@ function mergeStateIntoMemory(
     }
   }
 
+  if (source.notificationPreferences) {
+    memoryNotificationPreferences = {
+      ...memoryNotificationPreferences,
+      ...source.notificationPreferences,
+    };
+  }
+
   const currentCounters = getCounters();
   const maxOrderId = memoryOrders.reduce(
     (max, o) => Math.max(max, (o.dbId ?? 0) + 1),
@@ -286,6 +328,7 @@ export async function ensurePersistentStoreLoaded(
           orders: [...memoryOrders],
           sessions: serializeSessions(memorySessions),
           pushSubscriptions: Array.from(memoryPushSubscriptions.values()),
+          notificationPreferences: memoryNotificationPreferences,
         });
       }
     })();
@@ -307,6 +350,7 @@ export function schedulePersistentStoreSave(
     orders: [...memoryOrders],
     sessions: serializeSessions(memorySessions),
     pushSubscriptions: Array.from(memoryPushSubscriptions.values()),
+    notificationPreferences: memoryNotificationPreferences,
   };
   writeLocalState(snapshot);
   saveQueue = saveQueue

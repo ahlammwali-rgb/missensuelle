@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Smartphone,
   Bell,
+  BellOff,
   Volume2,
+  VolumeX,
   Download,
   CheckCircle2,
   Share2,
@@ -13,6 +15,10 @@ import {
   Radio,
   Clock,
   Check,
+  X,
+  PhoneOff,
+  XCircle,
+  CalendarClock,
 } from "lucide-react";
 import {
   playChaChingSound,
@@ -119,7 +125,18 @@ export function MobileAppCard({
     return (localStorage.getItem("ms_cash_sound_type") as "shopify" | "vintage") || "shopify";
   });
 
-  // Notification sound & push toggles
+  // Individual problem notification toggles (Ne répond pas, Annulé, Reporté)
+  const [notifNrp, setNotifNrp] = useState<boolean>(() => {
+    return localStorage.getItem("ms_notif_nrp_enabled") !== "false";
+  });
+  const [notifCancel, setNotifCancel] = useState<boolean>(() => {
+    return localStorage.getItem("ms_notif_cancel_enabled") !== "false";
+  });
+  const [notifDelay, setNotifDelay] = useState<boolean>(() => {
+    return localStorage.getItem("ms_notif_delay_enabled") !== "false";
+  });
+
+  // General Notification sound & push toggles
   const [soundOrder, setSoundOrder] = useState<boolean>(() => {
     return localStorage.getItem("ms_sound_order_enabled") !== "false";
   });
@@ -136,12 +153,35 @@ export function MobileAppCard({
     return localStorage.getItem("ms_push_order_enabled") !== "false";
   });
 
-  // TRPC queries & mutations for Web Push VAPID
+  // TRPC queries & mutations for Web Push VAPID & preferences
   const vapidQuery = trpc.admin.getVapidPublicKey.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
   const savePushMutation = trpc.admin.savePushSubscription.useMutation();
   const testPushMutation = trpc.admin.testPushNotification.useMutation();
+
+  const getPrefsQuery = trpc.admin.getNotificationPreferences.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const setPrefsMutation = trpc.admin.setNotificationPreferences.useMutation();
+
+  // Sync server preferences on load
+  useEffect(() => {
+    if (getPrefsQuery.data) {
+      if (getPrefsQuery.data.notifyNeRepondPas !== undefined) {
+        setNotifNrp(getPrefsQuery.data.notifyNeRepondPas);
+        localStorage.setItem("ms_notif_nrp_enabled", String(getPrefsQuery.data.notifyNeRepondPas));
+      }
+      if (getPrefsQuery.data.notifyAnnulee !== undefined) {
+        setNotifCancel(getPrefsQuery.data.notifyAnnulee);
+        localStorage.setItem("ms_notif_cancel_enabled", String(getPrefsQuery.data.notifyAnnulee));
+      }
+      if (getPrefsQuery.data.notifyReportee !== undefined) {
+        setNotifDelay(getPrefsQuery.data.notifyReportee);
+        localStorage.setItem("ms_notif_delay_enabled", String(getPrefsQuery.data.notifyReportee));
+      }
+    }
+  }, [getPrefsQuery.data]);
 
   // Check existing push subscription on load
   const checkSubscription = useCallback(async () => {
@@ -324,6 +364,69 @@ export function MobileAppCard({
     }
   };
 
+  // Problem notification toggles handlers
+  const handleToggleNrp = (newValue: boolean) => {
+    setNotifNrp(newValue);
+    localStorage.setItem("ms_notif_nrp_enabled", String(newValue));
+    setPrefsMutation.mutate({ notifyNeRepondPas: newValue });
+    notify(
+      newValue
+        ? "Alertes 'Ne répond pas' activées 🔔"
+        : "Alertes 'Ne répond pas' désactivées 🔕",
+      newValue ? "victory" : "normal"
+    );
+  };
+
+  const handleToggleCancel = (newValue: boolean) => {
+    setNotifCancel(newValue);
+    localStorage.setItem("ms_notif_cancel_enabled", String(newValue));
+    setPrefsMutation.mutate({ notifyAnnulee: newValue });
+    notify(
+      newValue
+        ? "Alertes 'Commande annulée' activées 🔔"
+        : "Alertes 'Commande annulée' désactivées 🔕",
+      newValue ? "victory" : "normal"
+    );
+  };
+
+  const handleToggleDelay = (newValue: boolean) => {
+    setNotifDelay(newValue);
+    localStorage.setItem("ms_notif_delay_enabled", String(newValue));
+    setPrefsMutation.mutate({ notifyReportee: newValue });
+    notify(
+      newValue
+        ? "Alertes 'Livraison reportée' activées 🔔"
+        : "Alertes 'Livraison reportée' désactivées 🔕",
+      newValue ? "victory" : "normal"
+    );
+  };
+
+  // Master Toggle: Disable or Enable all 3 problem alerts at once
+  const anyProblemEnabled = notifNrp || notifCancel || notifDelay;
+
+  const handleToggleAllProblems = () => {
+    const targetState = !anyProblemEnabled;
+    setNotifNrp(targetState);
+    setNotifCancel(targetState);
+    setNotifDelay(targetState);
+
+    localStorage.setItem("ms_notif_nrp_enabled", String(targetState));
+    localStorage.setItem("ms_notif_cancel_enabled", String(targetState));
+    localStorage.setItem("ms_notif_delay_enabled", String(targetState));
+
+    setPrefsMutation.mutate({
+      notifyNeRepondPas: targetState,
+      notifyAnnulee: targetState,
+      notifyReportee: targetState,
+    });
+
+    if (targetState) {
+      notify("Toutes les alertes de problème (Ne répond pas, Annulé, Reporté) ont été réactivées 🔔", "victory");
+    } else {
+      notify("Toutes les alertes de problème (Ne répond pas, Annulé, Reporté) ont été désactivées 🔕", "normal");
+    }
+  };
+
   // Test 1: Authentic Real Cash Register
   const handleTestCashRegister = (type: "shopify" | "vintage") => {
     playChaChingSound(type);
@@ -392,7 +495,7 @@ export function MobileAppCard({
             </h3>
             <p>
               Notifications push <strong>en temps réel même écran verrouillé ou app fermée</strong>, avec vrais sons
-              de caisse enregistreuse mécanique, sirène d'alerte rouge et fanfare de livraison.
+              de caisse enregistreuse mécanique, sirène d'alerte rouge et contrôle précis de chaque alerte.
             </p>
           </div>
         </div>
@@ -630,6 +733,246 @@ export function MobileAppCard({
         </div>
       </div>
 
+      {/* NEW: Dedicated Problem Notification Controls (Ne répond pas, Annulé, Reporté) */}
+      <div
+        style={{
+          marginTop: "16px",
+          background: anyProblemEnabled ? "#fff7ed" : "#f8fafc",
+          border: anyProblemEnabled ? "1.5px solid #fdba74" : "1.5px solid #e2e8f0",
+          borderRadius: "12px",
+          padding: "14px 16px",
+          transition: "all 0.2s ease",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "10px",
+            marginBottom: "12px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {anyProblemEnabled ? (
+              <AlertTriangle size={20} style={{ color: "#ea580c" }} />
+            ) : (
+              <BellOff size={20} style={{ color: "#64748b" }} />
+            )}
+            <div>
+              <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
+                Gestion des Alertes de Problèmes (Ne répond pas, Annulé, Reporté)
+                {anyProblemEnabled ? (
+                  <span style={{ fontSize: "0.72rem", padding: "2px 8px", background: "#fed7aa", color: "#9a3412", borderRadius: "999px", fontWeight: 700 }}>
+                    🔔 Alertes Actives
+                  </span>
+                ) : (
+                  <span style={{ fontSize: "0.72rem", padding: "2px 8px", background: "#e2e8f0", color: "#475569", borderRadius: "999px", fontWeight: 700 }}>
+                    🔕 Toutes Désactivées
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: "0.78rem", color: "#64748b" }}>
+                Activez ou désactivez les notifications individuellement ou d'un seul clic :
+              </div>
+            </div>
+          </div>
+
+          {/* Master Button to Disable / Re-enable All 3 Problem Alerts */}
+          <button
+            type="button"
+            onClick={handleToggleAllProblems}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 14px",
+              borderRadius: "8px",
+              border: "none",
+              cursor: "pointer",
+              fontWeight: 700,
+              fontSize: "0.82rem",
+              background: anyProblemEnabled ? "#ea580c" : "#10b981",
+              color: "#ffffff",
+              boxShadow: anyProblemEnabled ? "0 2px 8px rgba(234, 88, 12, 0.3)" : "0 2px 8px rgba(16, 185, 129, 0.3)",
+              transition: "transform 0.1s ease",
+            }}
+          >
+            {anyProblemEnabled ? (
+              <>
+                <BellOff size={15} />
+                Désactiver tout (Ne répond pas, Annulé, Reporté)
+              </>
+            ) : (
+              <>
+                <Bell size={15} />
+                Réactiver toutes les alertes de problème
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* 3 Individual Buttons */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "10px",
+          }}
+        >
+          {/* Button 1: Ne Répond Pas */}
+          <button
+            type="button"
+            onClick={() => handleToggleNrp(!notifNrp)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "10px 14px",
+              borderRadius: "8px",
+              border: notifNrp ? "1.5px solid #f97316" : "1.5px solid #cbd5e1",
+              background: notifNrp ? "#ffffff" : "#f1f5f9",
+              color: notifNrp ? "#0f172a" : "#64748b",
+              cursor: "pointer",
+              textAlign: "left",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <PhoneOff size={18} style={{ color: notifNrp ? "#ea580c" : "#94a3b8" }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>Client Ne Répond Pas</div>
+                <div style={{ fontSize: "0.74rem", color: "#64748b" }}>Rappel livreur / client</div>
+              </div>
+            </div>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 800,
+                padding: "3px 8px",
+                borderRadius: "6px",
+                background: notifNrp ? "#ffedd5" : "#e2e8f0",
+                color: notifNrp ? "#c2410c" : "#64748b",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              {notifNrp ? (
+                <>
+                  <Check size={12} /> Actif
+                </>
+              ) : (
+                <>
+                  <X size={12} /> Désactivé
+                </>
+              )}
+            </span>
+          </button>
+
+          {/* Button 2: Annulé / Refusé */}
+          <button
+            type="button"
+            onClick={() => handleToggleCancel(!notifCancel)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "10px 14px",
+              borderRadius: "8px",
+              border: notifCancel ? "1.5px solid #ef4444" : "1.5px solid #cbd5e1",
+              background: notifCancel ? "#ffffff" : "#f1f5f9",
+              color: notifCancel ? "#0f172a" : "#64748b",
+              cursor: "pointer",
+              textAlign: "left",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <XCircle size={18} style={{ color: notifCancel ? "#dc2626" : "#94a3b8" }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>Commande Annulée / Refusée</div>
+                <div style={{ fontSize: "0.74rem", color: "#64748b" }}>Échec ou retour colis</div>
+              </div>
+            </div>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 800,
+                padding: "3px 8px",
+                borderRadius: "6px",
+                background: notifCancel ? "#fee2e2" : "#e2e8f0",
+                color: notifCancel ? "#b91c1c" : "#64748b",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              {notifCancel ? (
+                <>
+                  <Check size={12} /> Actif
+                </>
+              ) : (
+                <>
+                  <X size={12} /> Désactivé
+                </>
+              )}
+            </span>
+          </button>
+
+          {/* Button 3: Reporté */}
+          <button
+            type="button"
+            onClick={() => handleToggleDelay(!notifDelay)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "10px 14px",
+              borderRadius: "8px",
+              border: notifDelay ? "1.5px solid #eab308" : "1.5px solid #cbd5e1",
+              background: notifDelay ? "#ffffff" : "#f1f5f9",
+              color: notifDelay ? "#0f172a" : "#64748b",
+              cursor: "pointer",
+              textAlign: "left",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CalendarClock size={18} style={{ color: notifDelay ? "#ca8a04" : "#94a3b8" }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>Livraison Reportée</div>
+                <div style={{ fontSize: "0.74rem", color: "#64748b" }}>Report demandé par le client</div>
+              </div>
+            </div>
+            <span
+              style={{
+                fontSize: "0.75rem",
+                fontWeight: 800,
+                padding: "3px 8px",
+                borderRadius: "6px",
+                background: notifDelay ? "#fef9c3" : "#e2e8f0",
+                color: notifDelay ? "#a16207" : "#64748b",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              {notifDelay ? (
+                <>
+                  <Check size={12} /> Actif
+                </>
+              ) : (
+                <>
+                  <X size={12} /> Désactivé
+                </>
+              )}
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* Panel 3: Installation & Preferences Bar */}
       <div
         style={{
@@ -680,7 +1023,7 @@ export function MobileAppCard({
               checked={soundUrgent}
               onChange={(e) => toggleOption("ms_sound_urgent_enabled", e.target.checked, setSoundUrgent)}
             />
-            <span>🚨 Alerte Rouge (Problèmes)</span>
+            <span>🚨 Sonnerie Sirène Problèmes</span>
           </label>
 
           <label className="mobile-toggle-item">
