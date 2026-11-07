@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Bell, ChevronDown, ClipboardList, Copy, Download, ExternalLink, Facebook, FileSpreadsheet, Filter, ImagePlus, LayoutDashboard, Moon, MoreHorizontal, Package, PackageCheck, Pencil, Phone, Plus, RefreshCw, RotateCcw, Save, Search, Settings2, Smartphone, Sun, Trash2, Truck, TrendingUp, Upload, Users, X } from "lucide-react";
+import { BarChart3, Bell, ChevronDown, ClipboardList, Copy, Download, ExternalLink, Facebook, FileSpreadsheet, Filter, History, ImagePlus, LayoutDashboard, MessageCircle, Moon, MoreHorizontal, Package, PackageCheck, Pencil, Phone, Plus, RefreshCw, RotateCcw, Save, Search, Settings2, Smartphone, Sun, Trash2, Truck, TrendingUp, Upload, UserCheck, Users, X } from "lucide-react";
 import { Link } from "wouter";
 import { AdminAuthGate } from "@/components/AdminAuthGate";
 import { AbandonedOrders } from "@/components/AbandonedOrders";
@@ -18,12 +18,19 @@ import { EcomDeliveryPanel } from "@/components/EcomDelivery";
 import { GoogleSheetPanel } from "@/components/GoogleSheetPanel";
 import { TransferredOrdersPanel } from "@/components/TransferredOrdersPanel";
 import { ReturnsPanel } from "@/components/ReturnsPanel";
+import { StaffPanel } from "@/components/StaffPanel";
+import { OrderHistoryModal } from "@/components/OrderHistoryModal";
+import {
+  PostponeOrderModal,
+  CancelOrderModal,
+  PostponedReminderPopup,
+} from "@/components/OrderStatusActionModal";
 import { MobileAppCard, showPushNotification } from "@/components/MobileAppCard";
 import { playChaChingSound, playUrgentAlertSound, playVictoryDeliveredSound, playAbandonedAlertSound } from "@/lib/sound";
 import { loadRealOrders, orderMatchesPeriod } from "@/lib/admin-orders";
 
 const actionLabels: { status: OrderStatus; label: string }[] = [{ status: "confirmee", label: "Confirmer" }, { status: "annulee", label: "Annuler" }, { status: "reportee", label: "Reporter" }, { status: "ne_repond_pas", label: "Ne répond pas" }, { status: "transferee", label: "Transférer" }];
-type AdminSection = "dashboard" | "abandoned" | "catalogue" | "settings" | "ecom" | "sheet" | "transferred" | "returns";
+type AdminSection = "dashboard" | "abandoned" | "catalogue" | "settings" | "ecom" | "sheet" | "transferred" | "returns" | "staff";
 
 type DashboardOrder = Order;
 
@@ -32,6 +39,7 @@ const emptyProduct: Product = { id: "", slug: "", name: "", category: "mode", ca
 function toDashboardOrder(order: CheckoutOrder): DashboardOrder {
   return {
     id: order.id,
+    dbId: order.dbId,
     createdAt: order.createdAt,
     customer: order.customer,
     phone: order.phone,
@@ -47,19 +55,41 @@ function toDashboardOrder(order: CheckoutOrder): DashboardOrder {
     address: order.address,
     note: order.note,
     status: order.status,
+    nrpLevel: order.nrpLevel,
+    postponedUntil: order.postponedUntil,
+    postponedNote: order.postponedNote,
+    cancelReason: order.cancelReason,
+    assignedToId: order.assignedToId,
+    assignedToName: order.assignedToName,
+    confirmedById: order.confirmedById,
+    confirmedByName: order.confirmedByName,
+    isDelivered: order.isDelivered,
+    deliveredAt: order.deliveredAt,
+    callCount: order.callCount,
+    whatsappCount: order.whatsappCount,
+    lastCalledAt: order.lastCalledAt,
+    history: order.history,
   };
 }
 
 function AdminPageContent() {
   const { theme, toggleTheme } = useTheme();
+  const meQuery = trpc.auth.me.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
+  const isOwner = !String(meQuery.data?.openId || "").startsWith("staff:");
+  const currentActorName = meQuery.data?.name || "Miss Sensuelle";
   const [section, setSection] = useState<AdminSection>(() => {
     const requested = new URLSearchParams(window.location.search).get("section");
-    return requested === "abandoned" || requested === "catalogue" || requested === "settings" || requested === "ecom" || requested === "sheet" || requested === "transferred" || requested === "returns" ? requested : "dashboard";
+    return requested === "abandoned" || requested === "catalogue" || requested === "settings" || requested === "ecom" || requested === "sheet" || requested === "transferred" || requested === "returns" || requested === "staff" ? requested : "dashboard";
   });
   const [activeStatus, setActiveStatus] = useState<"all" | OrderStatus>("all");
   const [query, setQuery] = useState("");
   const [period, setPeriod] = useState("Toutes les dates");
   const [selected, setSelected] = useState<CheckoutOrder | null>(null);
+  const [historyOrderId, setHistoryOrderId] = useState<string | null>(null);
+  const [postponeOrderId, setPostponeOrderId] = useState<string | null>(null);
+  const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
+  const [dismissedReminders, setDismissedReminders] = useState<Record<string, string>>({});
+  const [dueReminderOrder, setDueReminderOrder] = useState<CheckoutOrder | null>(null);
   type ToastType = "normal" | "urgent" | "victory" | "order";
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
   const notify = (message: string, type: ToastType = "normal") => {
@@ -73,6 +103,7 @@ function AdminPageContent() {
   const abandonedQuery = trpc.admin.abandonedOrders.useQuery(undefined, { refetchInterval: 10000, refetchIntervalInBackground: true, refetchOnWindowFocus: true, retry: false });
   const utils = trpc.useUtils();
   const updateOrderStatus = trpc.admin.updateOrderStatus.useMutation();
+  const recordOrderInteraction = trpc.admin.recordOrderInteraction.useMutation();
   const updateOrderDetails = trpc.admin.updateOrderDetails.useMutation();
   const deleteOrderMutation = trpc.admin.deleteOrder.useMutation();
   const restoreOrders = trpc.admin.restoreOrders.useMutation();
@@ -466,37 +497,115 @@ function AdminPageContent() {
       .filter(o => `${o.id} ${o.customer} ${o.phone} ${o.wilaya} ${o.commune} ${o.product}`.toLowerCase().includes(q))
       .slice(0, 30);
   }, [serverOrders, searchPopupQuery]);
-  const updateStatus = (id: string, status: OrderStatus) => {
+  const updateStatusWithMeta = (
+    id: string,
+    status: OrderStatus,
+    extra?: {
+      nrpLevel?: 1 | 2 | 3;
+      postponedUntil?: string | null;
+      postponedNote?: string;
+      cancelReason?: string;
+    },
+  ) => {
     const source = orderById.get(id);
-    if (!source) { notify("Commande introuvable dans les données serveur"); return; }
-    updateOrderStatus.mutate({ id: source.dbId, status }, {
-      onSuccess: async () => {
-        await utils.admin.orders.invalidate();
-        if (status === "ne_repond_pas") {
-          playUrgentAlertSound();
-          notify(`🚨 Commande ${id} : NE RÉPOND PAS (Intervention requise)`, "urgent");
-        } else if (status === "annulee") {
-          playUrgentAlertSound();
-          notify(`🚨 Commande ${id} : ANNULÉE / REFUSÉE`, "urgent");
-        } else if (status === "reportee") {
-          playUrgentAlertSound();
-          notify(`⚠️ Commande ${id} : REPORTÉE`, "urgent");
-        } else if (status === "confirmee") {
-          notify(`Commande ${id} · confirmée ✦`, "normal");
-        } else {
-          notify(status === "transferee" ? `Commande ${id} transférée vers la section dédiée ✦` : `Commande ${id} · statut mis à jour`);
-        }
-        setSelected(null);
+    if (!source) {
+      notify("Commande introuvable dans les données serveur");
+      return;
+    }
+    updateOrderStatus.mutate(
+      {
+        id: source.dbId,
+        status,
+        nrpLevel: extra?.nrpLevel,
+        postponedUntil: extra?.postponedUntil,
+        postponedNote: extra?.postponedNote,
+        cancelReason: extra?.cancelReason,
       },
-      onError: error => notify(error.message || "Mise à jour impossible")
-    });
+      {
+        onSuccess: async () => {
+          await utils.admin.orders.invalidate();
+          await utils.admin.staffData.invalidate();
+          if (status === "ne_repond_pas") {
+            playUrgentAlertSound();
+            notify(
+              `🚨 Commande ${id} : NE RÉPOND PAS (NRP ${extra?.nrpLevel ?? 1})`,
+              "urgent",
+            );
+          } else if (status === "annulee") {
+            playUrgentAlertSound();
+            notify(
+              `🚨 Commande ${id} : ANNULÉE${extra?.cancelReason ? ` (${extra.cancelReason})` : ""}`,
+              "urgent",
+            );
+          } else if (status === "reportee") {
+            playUrgentAlertSound();
+            notify(
+              extra?.postponedUntil
+                ? `⏰ Commande ${id} reportée au ${new Date(extra.postponedUntil).toLocaleString("fr-DZ", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`
+                : `⚠️ Commande ${id} : REPORTÉE`,
+              "urgent",
+            );
+          } else if (status === "confirmee") {
+            notify(`Commande ${id} · confirmée ✦`, "normal");
+          } else {
+            notify(
+              status === "transferee"
+                ? `Commande ${id} transférée vers la section dédiée ✦`
+                : `Commande ${id} · statut mis à jour`,
+            );
+          }
+          setSelected(null);
+        },
+        onError: error => notify(error.message || "Mise à jour impossible"),
+      },
+    );
   };
+
+  const updateStatus = (id: string, status: OrderStatus) => {
+    updateStatusWithMeta(id, status);
+  };
+
+  // Real-time watcher for due postponed orders (shows popup + sound when scheduled time arrives)
+  const duePostponedOrders = useMemo(() => {
+    const now = Date.now();
+    return serverOrders.filter(o => {
+      if (o.status !== "reportee" || !o.postponedUntil) return false;
+      const dueTime = new Date(o.postponedUntil).getTime();
+      if (Number.isNaN(dueTime) || dueTime > now) return false;
+      if (dismissedReminders[o.id] === o.postponedUntil) return false;
+      return true;
+    });
+  }, [serverOrders, dismissedReminders]);
+
+  const announcedDueSetRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const o of duePostponedOrders) {
+      const key = `${o.id}:${o.postponedUntil}`;
+      if (!announcedDueSetRef.current.has(key)) {
+        announcedDueSetRef.current.add(key);
+        const soundUrgentEnabled = localStorage.getItem("ms_sound_urgent_enabled") !== "false";
+        const pushEnabled = localStorage.getItem("ms_push_order_enabled") !== "false";
+        if (soundUrgentEnabled) playUrgentAlertSound();
+        if (pushEnabled) {
+          showPushNotification(
+            `⏰ RAPPEL COMMANDE REPORTÉE !`,
+            `Il est l'heure de rappeler ${o.customer || "Cliente"} (${o.phone}) · Commande ${o.id}`,
+            `postponed-due-${o.id}`,
+            "urgent_issue",
+          );
+        }
+        notify(`⏰ RAPPEL : Il est l'heure de rappeler ${o.customer} (${o.phone}) !`, "urgent");
+      }
+    }
+  }, [duePostponedOrders]);
+
   const saveOrderDetails = (dbId: number, updates: Omit<Parameters<typeof updateOrderDetails.mutate>[0], "id">) => {
     updateOrderDetails.mutate(
       { id: dbId, ...updates },
       {
         onSuccess: async updated => {
           await utils.admin.orders.invalidate();
+          await utils.admin.staffData.invalidate();
           if (updated) setSelected(updated);
           notify("Modifications de la commande enregistrées ✦");
         },
@@ -518,11 +627,63 @@ function AdminPageContent() {
     );
   };
   const callCustomer = async (phone: string) => { const clean = phone.replace(/[\s().-]/g, ""); try { if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(clean); else throw new Error("clipboard"); } catch { try { const area = document.createElement("textarea"); area.value = clean; area.style.position = "fixed"; area.style.opacity = "0"; document.body.appendChild(area); area.select(); document.execCommand("copy"); area.remove(); } catch {} } notify("Numéro copié · ouverture du téléphone…"); window.location.href = `tel:${clean}`; };
+  const handleCallOrder = (order: Order | CheckoutOrder) => {
+    const source = orderById.get(order.id);
+    if (source?.dbId) {
+      recordOrderInteraction.mutate(
+        { id: source.dbId, type: "call" },
+        {
+          onSuccess: () => {
+            void utils.admin.orders.invalidate();
+            void utils.admin.staffData.invalidate();
+          },
+        },
+      );
+    }
+    void callCustomer(order.phone);
+  };
+  const handleWhatsAppOrder = (order: Order | CheckoutOrder) => {
+    const source = orderById.get(order.id);
+    if (source?.dbId) {
+      recordOrderInteraction.mutate(
+        { id: source.dbId, type: "whatsapp" },
+        {
+          onSuccess: () => {
+            void utils.admin.orders.invalidate();
+            void utils.admin.staffData.invalidate();
+          },
+        },
+      );
+    }
+    const digits = order.phone.replace(/\D/g, "");
+    const intl = digits.startsWith("213")
+      ? digits
+      : digits.startsWith("0")
+        ? `213${digits.slice(1)}`
+        : `213${digits}`;
+    const msg = `Bonjour ${order.customer || ""} 🌸, c'est la boutique Miss Sensuelle concernant votre commande ${order.id} (${order.product} - ${formatDZD(order.total)} vers ${order.wilaya}). Nous avons essayé de vous joindre par téléphone pour confirmer l'expédition. Pouvez-vous nous confirmer votre commande ? Merci !\n\nمرحبا ${order.customer || ""} 🌸، نتصل بك من متجر Miss Sensuelle لتأكيد طلبيتك (${order.product} - ${formatDZD(order.total)}). يرجى الرد لتأكيد الإرسال وشكراً!`;
+    window.open(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+    notify("Ouverture de WhatsApp · action enregistrée dans l'historique ✦");
+  };
   const exportOrders = () => { const header = ["ID", "Date", "Client", "Téléphone", "Produit", "Quantité", "Couleur", "Taille", "Type Livraison", "Total", "Wilaya", "Commune", "Adresse", "Note", "Statut"]; const rows = filtered.map(order => [order.id, order.createdAt, order.customer, order.phone, order.product, order.quantity, order.color ?? "", order.size ?? "", order.delivery === "office" ? "Bureau" : "Domicile", order.total, order.wilaya, order.commune, order.address, order.note, order.status]); const csv = [header, ...rows].map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(",")).join("\n"); const url = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = `miss-sensuelle-commandes-${new Date().toISOString().slice(0, 10)}.csv`; link.click(); URL.revokeObjectURL(url); notify("Export CSV prêt"); };
   const abandonedCount = abandonedQuery.data?.length;
   const go = (next: AdminSection) => setSection(next);
 
-  return <div className="admin-shell"><aside className="admin-sidebar"><Link href="/" className="wordmark admin-wordmark"><span className="wordmark-star">✦</span><span>miss</span><em>sensuelle</em></Link><nav className="admin-mobile-nav" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={17} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={17} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge">{transferredCount}</span>}</button><button type="button" className={section === "ecom" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "ecom" ? "page" : undefined} onClick={() => { go("ecom"); setIsMoreMenuOpen(false); }}><PackageCheck size={17} /><span>Livraison</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={17} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><MoreHorizontal size={17} /><span>Menu</span></button></nav><div className="admin-user"><div className="admin-avatar">MS</div><div><strong>Miss Sensuelle</strong><span>Administratrice</span></div></div><nav className="admin-nav"><span className="admin-nav-label">Workspace</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{orders.filter(order => order.status !== "transferee" && order.status === "nouvelle").length}</b></button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com Delivery <b>{orders.filter(order => order.status === "confirmee").length}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue <b>{getCatalogProducts().length}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button><BarChart3 size={18} />Rapports</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Catalogue produits" : section === "ecom" ? "E-com Delivery" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : "Bonjour, Miss"} <span>✦</span></h1></div><div className="admin-top-actions">
+  const activeHistoryOrder = historyOrderId ? orderById.get(historyOrderId) ?? null : null;
+  const activePostponeOrder = postponeOrderId ? orderById.get(postponeOrderId) ?? null : null;
+  const activeCancelOrder = cancelOrderId ? orderById.get(cancelOrderId) ?? null : null;
+
+  return <div className="admin-shell"><aside className="admin-sidebar"><Link href="/" className="wordmark admin-wordmark"><span className="wordmark-star">✦</span><span>miss</span><em>sensuelle</em></Link><nav className="admin-mobile-nav" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={17} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={17} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge">{transferredCount}</span>}</button><button type="button" className={section === "staff" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "staff" ? "page" : undefined} onClick={() => { go("staff"); setIsMoreMenuOpen(false); }}><Users size={17} /><span>Équipe</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={17} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><MoreHorizontal size={17} /><span>Menu</span></button></nav><div className="admin-user"><div className="admin-avatar">{currentActorName.slice(0, 2).toUpperCase()}</div><div><strong>{currentActorName}</strong><span>{isOwner ? "Administratrice" : "Confirmateur"}</span></div></div><nav className="admin-nav"><span className="admin-nav-label">Workspace</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{orders.filter(order => order.status !== "transferee" && order.status === "nouvelle").length}</b></button><button className={section === "staff" ? "active" : ""} onClick={() => go("staff")}><Users size={18} />Confirmateurs & Salaires</button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com Delivery <b>{orders.filter(order => order.status === "confirmee").length}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue <b>{getCatalogProducts().length}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button onClick={() => go("staff")}><BarChart3 size={18} />Rapports & Performances</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "staff" ? "Confirmateurs, Salaires & Journal d'Activité" : section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Catalogue produits" : section === "ecom" ? "E-com Delivery" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : `Bonjour, ${currentActorName}`} <span>✦</span></h1></div><div className="admin-top-actions">
+  <button
+    type="button"
+    className="neo-darkmode-btn"
+    onClick={() => go("staff")}
+    title="Gérer les confirmateurs, salaires, commissions et appels"
+    style={{ background: "rgba(16, 185, 129, 0.14)", border: "1px solid rgba(16, 185, 129, 0.35)", cursor: "pointer" }}
+  >
+    <Users size={14} style={{ color: "#10b981" }} />
+    <span className="neo-btn-label" style={{ color: "#10b981", fontWeight: 700 }}>Confirmateurs</span>
+  </button>
   <button
     type="button"
     className="neo-darkmode-btn"
@@ -546,7 +707,7 @@ function AdminPageContent() {
       <span className="neo-glow-badge">NEO</span>
     </>
   )}
-</button><button className="icon-button" aria-label="Notifications"><Bell size={19} />{orders.some(order => order.status === "nouvelle") && <i />}</button><div className="admin-profile"><div className="admin-avatar small">MS</div><ChevronDown size={16} /></div></div></header><div className="admin-content">{section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onExport={exportOrders} onUpdateStatus={updateStatus} stockPanel={<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} />} />}</div></main>{isSearchOpen && (
+</button><button className="icon-button" aria-label="Notifications"><Bell size={19} />{orders.some(order => order.status === "nouvelle") && <i />}</button><div className="admin-profile"><div className="admin-avatar small">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></div></div></header><div className="admin-content">{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onExport={exportOrders} onUpdateStatus={updateStatus} stockPanel={<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} />} />}</div></main>{isSearchOpen && (
   <div className="admin-search-modal-overlay" onClick={() => setIsSearchOpen(false)}>
     <div className="admin-search-modal" onClick={e => e.stopPropagation()}>
       <div className="admin-search-modal-head">
@@ -625,7 +786,7 @@ function AdminPageContent() {
                     className="src-call-btn"
                     onClick={e => {
                       e.stopPropagation();
-                      callCustomer(order.phone);
+                      handleCallOrder(order);
                     }}
                   >
                     <Phone size={12} /> Appeler
@@ -656,6 +817,34 @@ function AdminPageContent() {
       </div>
 
       <div className="admin-more-sheet-grid">
+        <button
+          type="button"
+          className={`more-sheet-item ${section === "staff" ? "active" : ""}`}
+          onClick={() => { go("staff"); setIsMoreMenuOpen(false); }}
+        >
+          <div className="more-item-icon icon-emerald">
+            <Users size={20} />
+          </div>
+          <div className="more-item-text">
+            <strong>Confirmateurs & Salaires</strong>
+            <small>Équipe, commissions, appels & journal live</small>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          className={`more-sheet-item ${section === "ecom" ? "active" : ""}`}
+          onClick={() => { go("ecom"); setIsMoreMenuOpen(false); }}
+        >
+          <div className="more-item-icon icon-blue">
+            <PackageCheck size={20} />
+          </div>
+          <div className="more-item-text">
+            <strong>E-com Delivery</strong>
+            <small>Expédition et suivi transporteur</small>
+          </div>
+        </button>
+
         <button
           type="button"
           className={`more-sheet-item ${section === "abandoned" ? "active" : ""}`}
@@ -745,7 +934,57 @@ function AdminPageContent() {
       </div>
     </div>
   </div>
-)}{selected && <OrderModal order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={callCustomer} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onDelete={handleDeleteOrder} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{toast && (
+)}{selected && <OrderModal order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={() => handleCallOrder(selected)} onWhatsApp={() => handleWhatsAppOrder(selected)} onOpenHistory={() => setHistoryOrderId(selected.id)} onOpenPostpone={() => setPostponeOrderId(selected.id)} onOpenCancel={() => setCancelOrderId(selected.id)} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onDelete={handleDeleteOrder} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{activeHistoryOrder && (
+  <OrderHistoryModal
+    order={activeHistoryOrder}
+    onClose={() => setHistoryOrderId(null)}
+    onCall={handleCallOrder}
+    onWhatsApp={handleWhatsAppOrder}
+  />
+)}{activePostponeOrder && (
+  <PostponeOrderModal
+    order={activePostponeOrder}
+    onClose={() => setPostponeOrderId(null)}
+    onConfirm={(postponedUntil, postponedNote) => {
+      updateStatusWithMeta(activePostponeOrder.id, "reportee", {
+        postponedUntil,
+        postponedNote,
+      });
+      setPostponeOrderId(null);
+    }}
+  />
+)}{activeCancelOrder && (
+  <CancelOrderModal
+    order={activeCancelOrder}
+    onClose={() => setCancelOrderId(null)}
+    onConfirm={reason => {
+      updateStatusWithMeta(activeCancelOrder.id, "annulee", {
+        cancelReason: reason,
+      });
+      setCancelOrderId(null);
+    }}
+  />
+)}{duePostponedOrders.length > 0 && (
+  <PostponedReminderPopup
+    orders={duePostponedOrders}
+    onCall={handleCallOrder}
+    onWhatsApp={handleWhatsAppOrder}
+    onOpenOrder={order => setSelected(order)}
+    onSnooze30Min={order => {
+      const next30 = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      updateStatusWithMeta(order.id, "reportee", {
+        postponedUntil: next30,
+        postponedNote: order.postponedNote || "Reporté de +30 min",
+      });
+    }}
+    onDismiss={orderId => {
+      const target = orderById.get(orderId);
+      if (target?.postponedUntil) {
+        setDismissedReminders(prev => ({ ...prev, [orderId]: target.postponedUntil! }));
+      }
+    }}
+  />
+)}{toast && (
   <div className={`toast-admin toast-${toast.type}`}>
     <span>{toast.type === "urgent" ? "🚨" : toast.type === "victory" ? "🎉" : toast.type === "order" ? "💰" : "✦"}</span>
     {toast.message}
@@ -997,6 +1236,10 @@ function OrderModal({
   isSaving,
   onClose,
   onCall,
+  onWhatsApp,
+  onOpenHistory,
+  onOpenPostpone,
+  onOpenCancel,
   onUpdate,
   onSaveDetails,
   onDelete,
@@ -1006,6 +1249,10 @@ function OrderModal({
   isSaving: boolean;
   onClose: () => void;
   onCall: (phone: string) => void;
+  onWhatsApp?: () => void;
+  onOpenHistory?: () => void;
+  onOpenPostpone?: () => void;
+  onOpenCancel?: () => void;
   onUpdate: (id: string, status: OrderStatus) => void;
   onSaveDetails: (dbId: number, updates: OrderDetailsPayload) => void;
   onDelete: (dbId: number) => void;
@@ -1149,15 +1396,47 @@ function OrderModal({
           </button>
         </div>
 
-        <div className="modal-customer">
+        <div className="modal-customer" style={{ flexWrap: "wrap", gap: "10px" }}>
           <div className="admin-avatar">{order.customer.split(" ").map(part => part[0]).join("")}</div>
-          <div>
+          <div style={{ flex: 1, minWidth: "130px" }}>
             <strong>{order.customer}</strong>
             <span>{order.phone}</span>
           </div>
-          <button className="button button-outline call-button" onClick={() => onCall(phone)}>
-            <Phone size={15} />Appeler
-          </button>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <button type="button" className="button button-outline call-button" onClick={() => onCall(phone)}>
+              <Phone size={15} />Appeler
+            </button>
+            {onWhatsApp && (
+              <button
+                type="button"
+                className="button"
+                onClick={onWhatsApp}
+                style={{
+                  background: "rgba(37, 211, 102, 0.14)",
+                  color: "#065f46",
+                  border: "1px solid rgba(37, 211, 102, 0.4)",
+                  fontWeight: 800,
+                }}
+              >
+                <MessageCircle size={15} />WhatsApp
+              </button>
+            )}
+            {onOpenHistory && (
+              <button
+                type="button"
+                className="button"
+                onClick={onOpenHistory}
+                style={{
+                  background: "rgba(99, 102, 241, 0.12)",
+                  color: "#3730a3",
+                  border: "1px solid rgba(99, 102, 241, 0.3)",
+                  fontWeight: 800,
+                }}
+              >
+                <History size={15} />Historique ({order.history?.length || 1})
+              </button>
+            )}
+          </div>
         </div>
 
         <form className="order-edit-form" onSubmit={handleSubmitEdit} style={{ display: "grid", gap: "14px", marginTop: "14px" }}>
@@ -1428,7 +1707,22 @@ function OrderModal({
         <div className="modal-actions" style={{ marginTop: "14px" }}>
           <p>Changer le statut</p>
           {actionLabels.map(action => (
-            <button key={action.status} type="button" className={`action-${action.status}`} onClick={() => onUpdate(order.id, action.status)}>
+            <button
+              key={action.status}
+              type="button"
+              className={`action-${action.status}`}
+              onClick={() => {
+                if (action.status === "reportee" && onOpenPostpone) {
+                  onOpenPostpone();
+                  return;
+                }
+                if (action.status === "annulee" && onOpenCancel) {
+                  onOpenCancel();
+                  return;
+                }
+                onUpdate(order.id, action.status);
+              }}
+            >
               {action.label}
             </button>
           ))}

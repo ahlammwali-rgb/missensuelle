@@ -45,9 +45,116 @@ export const updateOrderDetailsSchema = z.object({
   commune: z.string().trim().min(1).max(120),
   address: z.string().trim().max(500).default(""),
   note: z.string().trim().max(1000).default(""),
+  actorId: z.string().trim().max(80).optional(),
+  actorName: z.string().trim().max(120).optional(),
 });
 
+export const updateOrderStatusWithMetaSchema = z.object({
+  id: z.number().int().positive(),
+  status: checkoutOrderStatusSchema,
+  nrpLevel: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+  postponedUntil: z.string().trim().max(80).optional().nullable(),
+  postponedNote: z.string().trim().max(500).optional(),
+  cancelReason: z.string().trim().max(300).optional(),
+  actorId: z.string().trim().max(80).optional(),
+  actorName: z.string().trim().max(120).optional(),
+});
+
+export const recordOrderInteractionSchema = z.object({
+  id: z.number().int().positive(),
+  type: z.enum(["call", "whatsapp"]),
+  note: z.string().trim().max(500).optional(),
+  actorId: z.string().trim().max(80).optional(),
+  actorName: z.string().trim().max(120).optional(),
+});
+
+export const staffMemberSchema = z.object({
+  id: z.string().trim().min(1).max(80).optional(),
+  name: z.string().trim().min(1).max(120),
+  phone: z.string().trim().max(40).default(""),
+  code: z.string().trim().min(2).max(80),
+  avatarColor: z.string().trim().max(40).default("#ec4899"),
+  baseSalary: z.number().int().min(0).max(10000000).default(0),
+  commissionPerDelivered: z.number().int().min(0).max(1000000).default(150),
+  upsellBonusPerDelivered: z.number().int().min(0).max(1000000).default(50),
+  active: z.boolean().default(true),
+});
+
+export type OrderHistoryChange = {
+  field: string;
+  label: string;
+  before: string;
+  after: string;
+};
+
+export type OrderHistoryEventType =
+  | "created"
+  | "call"
+  | "whatsapp"
+  | "status_change"
+  | "edit"
+  | "postponed"
+  | "shipped"
+  | "delivered"
+  | "return";
+
+export type OrderHistoryEvent = {
+  id: string;
+  at: string;
+  type: OrderHistoryEventType;
+  actorId: string;
+  actorName: string;
+  summary: string;
+  changes?: OrderHistoryChange[];
+  meta?: {
+    statusFrom?: string;
+    statusTo?: string;
+    nrpLevel?: 1 | 2 | 3;
+    postponedUntil?: string | null;
+    postponedNote?: string;
+    cancelReason?: string;
+    callNumber?: number;
+    noPriorCallWarning?: boolean;
+    rapidNrpWarning?: boolean;
+    minutesSinceLastNrp?: number;
+    upsellPack?: boolean;
+    tracking?: string;
+  };
+};
+
+export type StaffMember = {
+  id: string;
+  name: string;
+  phone: string;
+  code: string;
+  avatarColor: string;
+  baseSalary: number;
+  commissionPerDelivered: number;
+  upsellBonusPerDelivered: number;
+  active: boolean;
+  createdAt: string;
+  lastSeenAt?: string;
+};
+
+export type StaffActivityLog = {
+  id: string;
+  at: string;
+  actorId: string;
+  actorName: string;
+  orderDbId?: number;
+  orderId?: string;
+  customer?: string;
+  phone?: string;
+  type: OrderHistoryEventType | "login";
+  summary: string;
+  changes?: OrderHistoryChange[];
+  warning?: string;
+};
+
 export type UpdateOrderDetailsInput = z.infer<typeof updateOrderDetailsSchema>;
+export type UpdateOrderStatusWithMetaInput = z.infer<typeof updateOrderStatusWithMetaSchema>;
+export type RecordOrderInteractionInput = z.infer<typeof recordOrderInteractionSchema>;
+export type StaffMemberInput = z.infer<typeof staffMemberSchema>;
 export type CheckoutPayload = z.infer<typeof checkoutPayloadSchema>;
 export type SaveDraftInput = z.infer<typeof saveDraftSchema>;
 export type SubmitOrderInput = z.infer<typeof submitOrderSchema>;
@@ -61,6 +168,27 @@ export type CheckoutOrder = {
   status: z.infer<typeof checkoutOrderStatusSchema>;
   returnReceived?: boolean;
   returnReceivedAt?: string;
+  nrpLevel?: 1 | 2 | 3;
+  postponedUntil?: string | null;
+  postponedNote?: string;
+  postponedNotified?: boolean;
+  cancelReason?: string;
+  assignedToId?: string;
+  assignedToName?: string;
+  confirmedById?: string;
+  confirmedByName?: string;
+  confirmedAt?: string;
+  isDelivered?: boolean;
+  deliveredAt?: string;
+  initialQuantity?: number;
+  upsellById?: string;
+  upsellByName?: string;
+  callCount?: number;
+  whatsappCount?: number;
+  lastCalledAt?: string;
+  lastCalledBy?: string;
+  lastNrpAt?: string;
+  history?: OrderHistoryEvent[];
 };
 export type AbandonedCheckout = {
   id: number; createdAt: string; updatedAt: string; customer: string; phone: string; product: string;

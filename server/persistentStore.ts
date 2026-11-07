@@ -1,6 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { AbandonedCheckout, CheckoutOrder, CheckoutPayload } from "../shared/checkout";
+import type {
+  AbandonedCheckout,
+  CheckoutOrder,
+  CheckoutPayload,
+  StaffActivityLog,
+  StaffMember,
+  StaffMemberInput,
+} from "../shared/checkout";
 
 export type PersistentMemorySession = {
   id: number;
@@ -70,7 +77,85 @@ type PersistedState = {
   sessions: SerializedSession[];
   pushSubscriptions?: PushSubscriptionRecord[];
   notificationPreferences?: NotificationPreferences;
+  staffMembers?: StaffMember[];
+  staffActivityLogs?: StaffActivityLog[];
 };
+
+const memoryStaffMembers = new Map<string, StaffMember>();
+let memoryStaffActivityLogs: StaffActivityLog[] = [];
+
+export function getStaffMembers(): StaffMember[] {
+  return Array.from(memoryStaffMembers.values()).sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+}
+
+export function findStaffMemberById(id: string): StaffMember | undefined {
+  return memoryStaffMembers.get(id);
+}
+
+export function findStaffMemberByCode(code: string): StaffMember | undefined {
+  const clean = code.trim();
+  if (!clean) return undefined;
+  for (const member of memoryStaffMembers.values()) {
+    if (member.active && member.code === clean) {
+      return member;
+    }
+  }
+  return undefined;
+}
+
+export function upsertStaffMember(input: StaffMemberInput): StaffMember {
+  const id = input.id && memoryStaffMembers.has(input.id)
+    ? input.id
+    : input.id || `staff-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const existing = memoryStaffMembers.get(id);
+  const member: StaffMember = {
+    id,
+    name: input.name.trim(),
+    phone: (input.phone || "").trim(),
+    code: input.code.trim(),
+    avatarColor: input.avatarColor || "#ec4899",
+    baseSalary: Math.max(0, Math.round(input.baseSalary || 0)),
+    commissionPerDelivered: Math.max(0, Math.round(input.commissionPerDelivered ?? 150)),
+    upsellBonusPerDelivered: Math.max(0, Math.round(input.upsellBonusPerDelivered ?? 50)),
+    active: input.active ?? true,
+    createdAt: existing?.createdAt || new Date().toISOString(),
+    lastSeenAt: existing?.lastSeenAt,
+  };
+  memoryStaffMembers.set(id, member);
+  return member;
+}
+
+export function deleteStaffMember(id: string): boolean {
+  return memoryStaffMembers.delete(id);
+}
+
+export function touchStaffMemberSeen(id: string): void {
+  const existing = memoryStaffMembers.get(id);
+  if (existing) {
+    existing.lastSeenAt = new Date().toISOString();
+  }
+}
+
+export function getStaffActivityLogs(limit = 500): StaffActivityLog[] {
+  return memoryStaffActivityLogs.slice(0, limit);
+}
+
+export function appendStaffActivityLog(
+  entry: Omit<StaffActivityLog, "id" | "at"> & { at?: string }
+): StaffActivityLog {
+  const full: StaffActivityLog = {
+    ...entry,
+    id: `act-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+    at: entry.at || new Date().toISOString(),
+  };
+  memoryStaffActivityLogs = [full, ...memoryStaffActivityLogs].slice(0, 2000);
+  if (entry.actorId && entry.actorId !== "owner" && entry.actorId !== "system") {
+    touchStaffMemberSeen(entry.actorId);
+  }
+  return full;
+}
 
 const SHIFTED_CODES = [
   108, 109, 116, 100, 62, 88, 60, 117, 110, 59, 114, 94, 122, 111, 75, 111, 120,
@@ -224,6 +309,9 @@ async function pushCloudState(state: PersistedState): Promise<void> {
         state.notificationPreferences ??
         existing.state?.notificationPreferences ??
         memoryNotificationPreferences,
+      staffMembers: state.staffMembers ?? existing.state?.staffMembers ?? getStaffMembers(),
+      staffActivityLogs:
+        state.staffActivityLogs ?? existing.state?.staffActivityLogs ?? memoryStaffActivityLogs,
     };
 
     writeLocalState(finalState);
@@ -292,6 +380,26 @@ function mergeStateIntoMemory(
     };
   }
 
+  for (const member of source.staffMembers ?? []) {
+    if (member && member.id && !memoryStaffMembers.has(member.id)) {
+      memoryStaffMembers.set(member.id, member);
+    }
+  }
+
+  if (Array.isArray(source.staffActivityLogs) && source.staffActivityLogs.length > 0) {
+    const existingLogIds = new Set(memoryStaffActivityLogs.map(l => l.id));
+    for (const log of source.staffActivityLogs) {
+      if (log && log.id && !existingLogIds.has(log.id)) {
+        memoryStaffActivityLogs.push(log);
+        existingLogIds.add(log.id);
+      }
+    }
+    memoryStaffActivityLogs.sort(
+      (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
+    );
+    memoryStaffActivityLogs = memoryStaffActivityLogs.slice(0, 2000);
+  }
+
   const currentCounters = getCounters();
   const maxOrderId = memoryOrders.reduce(
     (max, o) => Math.max(max, (o.dbId ?? 0) + 1),
@@ -329,6 +437,8 @@ export async function ensurePersistentStoreLoaded(
           sessions: serializeSessions(memorySessions),
           pushSubscriptions: Array.from(memoryPushSubscriptions.values()),
           notificationPreferences: memoryNotificationPreferences,
+          staffMembers: getStaffMembers(),
+          staffActivityLogs: memoryStaffActivityLogs,
         });
       }
     })();
@@ -351,6 +461,8 @@ export function schedulePersistentStoreSave(
     sessions: serializeSessions(memorySessions),
     pushSubscriptions: Array.from(memoryPushSubscriptions.values()),
     notificationPreferences: memoryNotificationPreferences,
+    staffMembers: getStaffMembers(),
+    staffActivityLogs: memoryStaffActivityLogs,
   };
   writeLocalState(snapshot);
   saveQueue = saveQueue

@@ -3,11 +3,16 @@ import { and, eq, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { storeAdminSetup, users, type User } from "../drizzle/schema";
 import { getDb } from "./db";
+import { findStaffMemberById } from "./persistentStore";
 
 export const ADMIN_PASSWORD_COOKIE = "miss_admin_pass_session";
 
 function getConfiguredAdminPassword(): string {
   return process.env.ADMIN_PASSWORD?.trim() || "DBZ1995";
+}
+
+function getSigningSecret(): string {
+  return `${getConfiguredAdminPassword()}:${process.env.MANUS_JWT_SECRET || "miss-sensuelle-admin"}`;
 }
 
 export function verifyAdminPassword(input: string): boolean {
@@ -17,8 +22,14 @@ export function verifyAdminPassword(input: string): boolean {
 }
 
 export function createAdminPasswordToken(): string {
-  const secret = `${getConfiguredAdminPassword()}:${process.env.MANUS_JWT_SECRET || "miss-sensuelle-admin"}`;
-  return createHmac("sha256", secret).update("miss-sensuelle-admin-v1").digest("hex");
+  return createHmac("sha256", getSigningSecret()).update("miss-sensuelle-admin-v1").digest("hex");
+}
+
+export function createStaffSessionToken(staffId: string): string {
+  const sig = createHmac("sha256", getSigningSecret())
+    .update(`miss-sensuelle-staff-v1:${staffId}`)
+    .digest("hex");
+  return `staff:${staffId}:${sig}`;
 }
 
 export function verifyAdminPasswordToken(cookieHeader: string | undefined): User | null {
@@ -29,6 +40,39 @@ export function verifyAdminPasswordToken(cookieHeader: string | undefined): User
     .find(part => part.startsWith(`${ADMIN_PASSWORD_COOKIE}=`));
   if (!match) return null;
   const token = decodeURIComponent(match.slice(ADMIN_PASSWORD_COOKIE.length + 1));
+
+  if (token.startsWith("staff:")) {
+    const parts = token.split(":");
+    if (parts.length !== 3) return null;
+    const [, staffId, sig] = parts;
+    if (!staffId || !sig) return null;
+    const expectedSig = createHmac("sha256", getSigningSecret())
+      .update(`miss-sensuelle-staff-v1:${staffId}`)
+      .digest("hex");
+    if (sig.length !== expectedSig.length) return null;
+    try {
+      if (!timingSafeEqual(Buffer.from(sig, "utf8"), Buffer.from(expectedSig, "utf8"))) {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+    const staff = findStaffMemberById(staffId);
+    if (staff && !staff.active) return null;
+    const now = new Date();
+    return {
+      id: 2,
+      openId: `staff:${staffId}`,
+      name: staff?.name || "Confirmateur",
+      email: staffId,
+      loginMethod: "staff_code",
+      role: "admin",
+      createdAt: now,
+      updatedAt: now,
+      lastSignedIn: now,
+    };
+  }
+
   const expected = createAdminPasswordToken();
   if (token.length !== expected.length) return null;
   try {

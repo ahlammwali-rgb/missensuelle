@@ -26,10 +26,13 @@ export type Product = {
 
 export type CartLine = Product & { quantity: number };
 
+import type { OrderHistoryEvent } from "@shared/checkout";
+
 export type OrderStatus = "nouvelle" | "confirmee" | "annulee" | "reportee" | "ne_repond_pas" | "transferee";
 
 export type Order = {
   id: string;
+  dbId?: number;
   createdAt: string;
   customer: string;
   phone: string;
@@ -45,6 +48,25 @@ export type Order = {
   size?: string;
   delivery?: "home" | "office";
   status: OrderStatus;
+  nrpLevel?: 1 | 2 | 3;
+  postponedUntil?: string | null;
+  postponedNote?: string;
+  cancelReason?: string;
+  assignedToId?: string;
+  assignedToName?: string;
+  confirmedById?: string;
+  confirmedByName?: string;
+  confirmedAt?: string;
+  isDelivered?: boolean;
+  deliveredAt?: string;
+  initialQuantity?: number;
+  upsellById?: string;
+  upsellByName?: string;
+  callCount?: number;
+  whatsappCount?: number;
+  lastCalledAt?: string;
+  lastCalledBy?: string;
+  history?: OrderHistoryEvent[];
 };
 
 export const heroImage = "/manus-storage/async-images/vHn8VKRbVex1NUkhameC59/image-1.webp";

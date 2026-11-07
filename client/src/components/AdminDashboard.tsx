@@ -1,5 +1,6 @@
 import React, { useState, type ReactNode } from "react";
 import {
+  AlarmClock,
   Bell,
   CheckCircle2,
   ChevronDown,
@@ -8,7 +9,9 @@ import {
   Edit3,
   ExternalLink,
   Filter,
+  History,
   MapPin,
+  MessageCircle,
   Package,
   Phone,
   PhoneOff,
@@ -16,6 +19,7 @@ import {
   Search,
   Sparkles,
   TrendingUp,
+  UserCheck,
   XCircle,
 } from "lucide-react";
 import { formatDZD, type Order, type OrderStatus } from "@/lib/store-data";
@@ -32,6 +36,12 @@ type Props = {
   setPeriod: (value: string) => void;
   onSelect: (order: Order) => void;
   onCall: (phone: string) => void;
+  onCallOrder?: (order: Order) => void;
+  onWhatsAppOrder?: (order: Order) => void;
+  onOpenHistory?: (order: Order) => void;
+  onOpenPostponeModal?: (order: Order) => void;
+  onOpenCancelModal?: (order: Order) => void;
+  onSetNrpLevel?: (id: string, level: 1 | 2 | 3) => void;
   onExport: () => void;
   onUpdateStatus?: (id: string, status: OrderStatus) => void;
   stockPanel: ReactNode;
@@ -92,12 +102,19 @@ export function AdminDashboard({
   setPeriod,
   onSelect,
   onCall,
+  onCallOrder,
+  onWhatsAppOrder,
+  onOpenHistory,
+  onOpenPostponeModal,
+  onOpenCancelModal,
+  onSetNrpLevel,
   onExport,
   onUpdateStatus,
   stockPanel,
 }: Props) {
   const stats = getOrderStats(orders);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [nrpSubFilter, setNrpSubFilter] = useState<"all" | 1 | 2 | 3>("all");
 
   const copyId = async (id: string) => {
     try {
@@ -108,6 +125,11 @@ export function AdminDashboard({
       }
     } catch {}
   };
+
+  const displayedOrders =
+    activeStatus === "ne_repond_pas" && nrpSubFilter !== "all"
+      ? filtered.filter(order => (order.nrpLevel ?? 1) === nrpSubFilter)
+      : filtered;
 
   return (
     <div className="admin-app-dashboard">
@@ -174,14 +196,14 @@ export function AdminDashboard({
             <div className="app-head-left">
               <span className="app-head-badge">Gestion Directe</span>
               <h2 className="app-head-title">
-                Flux Commandes <span className="app-count-bubble">{filtered.length}</span>
+                Flux Commandes <span className="app-count-bubble">{displayedOrders.length}</span>
               </h2>
             </div>
             <button
               type="button"
               className="app-export-btn"
               onClick={onExport}
-              disabled={!filtered.length}
+              disabled={!displayedOrders.length}
             >
               <ExternalLink size={15} />
               <span>Exporter CSV</span>
@@ -255,11 +277,94 @@ export function AdminDashboard({
             })}
           </div>
 
+          {/* Sub-filter NRP 1 / NRP 2 / NRP 3 when viewing Sans réponse */}
+          {activeStatus === "ne_repond_pas" && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "8px",
+                marginBottom: "14px",
+                padding: "10px 12px",
+                background: "rgba(245, 158, 11, 0.08)",
+                border: "1px solid rgba(245, 158, 11, 0.25)",
+                borderRadius: "14px",
+                alignItems: "center",
+              }}
+            >
+              <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#92400e", marginRight: "4px" }}>
+                Filtrer par tentative :
+              </span>
+              {([
+                { key: "all" as const, label: "Tous les NRP", count: filtered.length },
+                {
+                  key: 1 as const,
+                  label: "🟠 NRP 1 (1er appel)",
+                  count: filtered.filter(o => (o.nrpLevel ?? 1) === 1).length,
+                },
+                {
+                  key: 2 as const,
+                  label: "🟠 NRP 2 (2e appel)",
+                  count: filtered.filter(o => o.nrpLevel === 2).length,
+                },
+                {
+                  key: 3 as const,
+                  label: "🔴 NRP 3 (Dernière relance)",
+                  count: filtered.filter(o => o.nrpLevel === 3).length,
+                },
+              ]).map(tab => (
+                <button
+                  key={String(tab.key)}
+                  type="button"
+                  onClick={() => setNrpSubFilter(tab.key)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "999px",
+                    border:
+                      nrpSubFilter === tab.key
+                        ? "1.5px solid #d97706"
+                        : "1px solid rgba(217,119,6,0.28)",
+                    background: nrpSubFilter === tab.key ? "#d97706" : "#fff",
+                    color: nrpSubFilter === tab.key ? "#fff" : "#92400e",
+                    fontSize: "0.78rem",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <span>{tab.label}</span>
+                  <b
+                    style={{
+                      background:
+                        nrpSubFilter === tab.key ? "rgba(255,255,255,0.25)" : "rgba(217,119,6,0.12)",
+                      padding: "1px 7px",
+                      borderRadius: "999px",
+                      fontSize: "0.72rem",
+                    }}
+                  >
+                    {tab.count}
+                  </b>
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Orders Stream Cards */}
           <div className="app-orders-stream">
-            {filtered.map(order => {
+            {displayedOrders.map(order => {
               const isNew = order.status === "nouvelle";
               const meta = statusMeta[order.status] ?? statusMeta.nouvelle;
+              const statusLabel =
+                order.status === "ne_repond_pas"
+                  ? `Sans réponse · NRP ${order.nrpLevel ?? 1}`
+                  : meta.label;
+              const handlerName = order.confirmedByName || order.assignedToName;
+              const isPostponeDue =
+                order.status === "reportee" &&
+                Boolean(order.postponedUntil) &&
+                new Date(order.postponedUntil!).getTime() <= Date.now();
 
               return (
                 <article
@@ -268,13 +373,67 @@ export function AdminDashboard({
                 >
                   {/* Top Bar: Dedicated Status Badge on Left + Date on Right */}
                   <div className="aoc-top">
-                    <div className="aoc-status-badge-wrap">
+                    <div className="aoc-status-badge-wrap" style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
                       <span className={`aoc-status-pill ${meta.badgeClass}`}>
                         <span className="aoc-status-glow-dot" />
-                        <span className="aoc-status-text">{meta.label}</span>
+                        <span className="aoc-status-text">{statusLabel}</span>
                       </span>
                       {order.status === "transferee" && (
                         <span className="aoc-carrier-tag">E-com Delivery</span>
+                      )}
+                      {order.isDelivered && (
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            padding: "3px 9px",
+                            borderRadius: "999px",
+                            background: "rgba(16, 185, 129, 0.14)",
+                            color: "#065f46",
+                            fontSize: "0.72rem",
+                            fontWeight: 800,
+                          }}
+                        >
+                          📦 Livrée ✅
+                        </span>
+                      )}
+                      {handlerName && (
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            padding: "3px 9px",
+                            borderRadius: "999px",
+                            background: "rgba(99, 102, 241, 0.12)",
+                            color: "#3730a3",
+                            fontSize: "0.72rem",
+                            fontWeight: 700,
+                          }}
+                          title="Confirmateur en charge de cette commande"
+                        >
+                          <UserCheck size={12} />
+                          <span>Suivi par : {handlerName}</span>
+                        </span>
+                      )}
+                      {(order.callCount ?? 0) > 0 && (
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            padding: "2px 8px",
+                            borderRadius: "999px",
+                            background: "rgba(16, 185, 129, 0.1)",
+                            color: "#047857",
+                            fontSize: "0.71rem",
+                            fontWeight: 700,
+                          }}
+                          title="Nombre d'appels effectués sur cette commande"
+                        >
+                          📞 {order.callCount} appel{(order.callCount ?? 0) > 1 ? "s" : ""}
+                        </span>
                       )}
                     </div>
 
@@ -297,7 +456,88 @@ export function AdminDashboard({
                     </button>
                   </div>
 
-                  {/* Customer Block with Sleek (Compact) Call Button */}
+                  {/* Postponed Reminder Banner */}
+                  {order.status === "reportee" && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: "8px",
+                        padding: "9px 12px",
+                        marginBottom: "10px",
+                        borderRadius: "12px",
+                        background: isPostponeDue
+                          ? "linear-gradient(135deg, rgba(220,38,38,0.14), rgba(245,158,11,0.18))"
+                          : "rgba(37, 99, 235, 0.08)",
+                        border: isPostponeDue
+                          ? "1.5px solid rgba(220,38,38,0.45)"
+                          : "1px solid rgba(37, 99, 235, 0.22)",
+                        color: isPostponeDue ? "#991b1b" : "#1e40af",
+                        fontSize: "0.8rem",
+                        fontWeight: 700,
+                      }}
+                    >
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                        <AlarmClock size={15} />
+                        {order.postponedUntil ? (
+                          <>
+                            {isPostponeDue ? "🚨 RAPPEL ÉCHU — À rappeler maintenant : " : "⏰ Rappel programmé : "}
+                            <b>
+                              {new Intl.DateTimeFormat("fr-DZ", {
+                                day: "2-digit",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }).format(new Date(order.postponedUntil))}
+                            </b>
+                          </>
+                        ) : (
+                          "⏰ Reportée (sans date ni heure précise)"
+                        )}
+                        {order.postponedNote ? ` — « ${order.postponedNote} »` : ""}
+                      </span>
+                      {onOpenPostponeModal && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenPostponeModal(order)}
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: "8px",
+                            border: "1px solid currentColor",
+                            background: "rgba(255,255,255,0.8)",
+                            color: "inherit",
+                            fontSize: "0.73rem",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                          }}
+                        >
+                          Modifier l'heure
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Cancellation Reason Banner */}
+                  {order.status === "annulee" && order.cancelReason && (
+                    <div
+                      style={{
+                        padding: "8px 12px",
+                        marginBottom: "10px",
+                        borderRadius: "10px",
+                        background: "rgba(239, 68, 68, 0.08)",
+                        border: "1px solid rgba(239, 68, 68, 0.22)",
+                        color: "#991b1b",
+                        fontSize: "0.79rem",
+                        fontWeight: 700,
+                      }}
+                    >
+                      ❌ Motif d'annulation : <b>{order.cancelReason}</b>
+                    </div>
+                  )}
+
+                  {/* Customer Block with Sleek (Compact) Call & WhatsApp Buttons */}
                   <div className="aoc-customer-box">
                     <div className="aoc-customer-left">
                       <div className="aoc-avatar">
@@ -328,17 +568,43 @@ export function AdminDashboard({
                       </div>
                     </div>
 
-                    {/* Compact, Sleek 1-Tap Call Button (Not oversized) */}
-                    <button
-                      type="button"
-                      className="aoc-call-compact-btn"
-                      onClick={() => onCall(order.phone)}
-                      aria-label={`Appeler ${order.customer || order.phone}`}
-                      title="Appeler la cliente"
-                    >
-                      <Phone size={14} />
-                      <span className="aoc-call-num">{order.phone}</span>
-                    </button>
+                    {/* Compact Call + WhatsApp Action Group */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        className="aoc-call-compact-btn"
+                        onClick={() => (onCallOrder ? onCallOrder(order) : onCall(order.phone))}
+                        aria-label={`Appeler ${order.customer || order.phone}`}
+                        title="Appeler la cliente (enregistré dans l'historique)"
+                      >
+                        <Phone size={14} />
+                        <span className="aoc-call-num">{order.phone}</span>
+                      </button>
+
+                      {onWhatsAppOrder && (
+                        <button
+                          type="button"
+                          onClick={() => onWhatsAppOrder(order)}
+                          title="Envoyer un message WhatsApp pré-rempli à la cliente"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            padding: "7px 11px",
+                            borderRadius: "10px",
+                            border: "1px solid rgba(37, 211, 102, 0.35)",
+                            background: "rgba(37, 211, 102, 0.12)",
+                            color: "#065f46",
+                            fontSize: "0.76rem",
+                            fontWeight: 800,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <MessageCircle size={14} />
+                          <span>WhatsApp</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Order Content / Variants */}
@@ -380,7 +646,7 @@ export function AdminDashboard({
                     </div>
                   )}
 
-                  {/* Complete 1-Tap Confirmation Actions Bar with ALL buttons: Confirmer, Ne répond pas, Reporter, Annuler, Modifier */}
+                  {/* Complete 1-Tap Confirmation Actions Bar with ALL buttons: Confirmer, NRP 1/2/3, Reporter, Annuler, Modifier, Historique */}
                   <div className="aoc-actions-bar">
                     {order.status !== "confirmee" ? (
                       <button
@@ -398,35 +664,89 @@ export function AdminDashboard({
                       </div>
                     )}
 
-                    {order.status !== "ne_repond_pas" && (
-                      <button
-                        type="button"
-                        className="aoc-btn aoc-btn-noanswer"
-                        onClick={() => onUpdateStatus?.(order.id, "ne_repond_pas")}
-                        title="Marquer sans réponse"
+                    {/* NRP 1 / NRP 2 / NRP 3 Direct Buttons */}
+                    {onSetNrpLevel ? (
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          background: "rgba(245, 158, 11, 0.08)",
+                          padding: "2px 4px",
+                          borderRadius: "10px",
+                          border: "1px solid rgba(245, 158, 11, 0.25)",
+                        }}
                       >
-                        <PhoneOff size={14} />
-                        <span>Ne répond pas</span>
-                      </button>
+                        {([1, 2, 3] as const).map(lvl => {
+                          const isActiveNrp =
+                            order.status === "ne_repond_pas" && (order.nrpLevel ?? 1) === lvl;
+                          return (
+                            <button
+                              key={lvl}
+                              type="button"
+                              onClick={() => onSetNrpLevel(order.id, lvl)}
+                              title={`Marquer Ne répond pas — Tentative NRP ${lvl}`}
+                              style={{
+                                padding: "5px 9px",
+                                borderRadius: "8px",
+                                border: "none",
+                                background: isActiveNrp
+                                  ? lvl === 3
+                                    ? "#dc2626"
+                                  : "#d97706"
+                                  : "transparent",
+                                color: isActiveNrp ? "#fff" : "#92400e",
+                                fontSize: "0.75rem",
+                                fontWeight: 800,
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "3px",
+                              }}
+                            >
+                              <PhoneOff size={12} />
+                              <span>NRP {lvl}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      order.status !== "ne_repond_pas" && (
+                        <button
+                          type="button"
+                          className="aoc-btn aoc-btn-noanswer"
+                          onClick={() => onUpdateStatus?.(order.id, "ne_repond_pas")}
+                          title="Marquer sans réponse"
+                        >
+                          <PhoneOff size={14} />
+                          <span>Ne répond pas</span>
+                        </button>
+                      )
                     )}
 
-                    {order.status !== "reportee" && (
-                      <button
-                        type="button"
-                        className="aoc-btn aoc-btn-postpone"
-                        onClick={() => onUpdateStatus?.(order.id, "reportee")}
-                        title="Reporter la confirmation"
-                      >
-                        <Clock size={14} />
-                        <span>Reporter</span>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="aoc-btn aoc-btn-postpone"
+                      onClick={() =>
+                        onOpenPostponeModal
+                          ? onOpenPostponeModal(order)
+                          : onUpdateStatus?.(order.id, "reportee")
+                      }
+                      title="Reporter la confirmation (avec date/heure optionnelle)"
+                    >
+                      <Clock size={14} />
+                      <span>{order.status === "reportee" ? "Reprogrammer" : "Reporter"}</span>
+                    </button>
 
                     {order.status !== "annulee" ? (
                       <button
                         type="button"
                         className="aoc-btn aoc-btn-cancel"
-                        onClick={() => onUpdateStatus?.(order.id, "annulee")}
+                        onClick={() =>
+                          onOpenCancelModal
+                            ? onOpenCancelModal(order)
+                            : onUpdateStatus?.(order.id, "annulee")
+                        }
                         title="Annuler la commande"
                       >
                         <XCircle size={14} />
@@ -453,12 +773,33 @@ export function AdminDashboard({
                       <Edit3 size={14} />
                       <span>Modifier</span>
                     </button>
+
+                    {onOpenHistory && (
+                      <button
+                        type="button"
+                        className="aoc-btn"
+                        onClick={() => onOpenHistory(order)}
+                        title="Voir l'historique complet des appels, modifications et statuts"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "5px",
+                          background: "rgba(99, 102, 241, 0.1)",
+                          color: "#3730a3",
+                          border: "1px solid rgba(99, 102, 241, 0.28)",
+                          fontWeight: 800,
+                        }}
+                      >
+                        <History size={14} />
+                        <span>Historique ({order.history?.length || 1})</span>
+                      </button>
+                    )}
                   </div>
                 </article>
               );
             })}
 
-            {!filtered.length && (
+            {!displayedOrders.length && (
               <div className="admin-empty-orders" role="status">
                 <strong>{orders.length ? "Aucune commande pour ces filtres" : "Aucune commande enregistrée"}</strong>
                 <p>

@@ -12,6 +12,7 @@ import {
 import {
   checkoutPayloadSchema,
   discardDraftSchema,
+  recordOrderInteractionSchema,
   recoveryStatusSchema,
   saveDraftSchema,
   submitOrderSchema,
@@ -20,15 +21,20 @@ import {
   type CheckoutOrder,
   type CheckoutPayload,
   type DiscardDraftInput,
+  type OrderHistoryChange,
+  type OrderHistoryEvent,
+  type RecordOrderInteractionInput,
   type SaveDraftInput,
   type SubmitOrderInput,
   type SubmitOrderResult,
   type UpdateOrderDetailsInput,
+  type UpdateOrderStatusWithMetaInput,
 } from "../shared/checkout";
 import { getDb } from "./db";
 import { computeShippingFee } from "./ecomDelivery";
 import { importGoogleSheetToOrders, pushOrderToGoogleSheet } from "./googleSheet";
 import {
+  appendStaffActivityLog,
   ensurePersistentStoreLoaded,
   schedulePersistentStoreSave,
   getNotificationPreferences,
@@ -148,21 +154,202 @@ export const triggerStoreSave = () =>
 const saveStore = triggerStoreSave;
 void loadStore();
 
-export function updateMemoryOrderStatus(id: number, status: CheckoutOrder["status"]) {
+const STATUS_HUMAN_LABELS: Record<string, string> = {
+  nouvelle: "Nouvelle",
+  confirmee: "Confirmée",
+  ne_repond_pas: "Ne répond pas",
+  reportee: "Reportée",
+  annulee: "Annulée",
+  transferee: "Transférée E-com",
+};
+
+function ensureOrderSeedHistory(order: CheckoutOrder): OrderHistoryEvent[] {
+  if (!Array.isArray(order.history)) {
+    order.history = [];
+  }
+  if (!order.history.some(e => e.type === "created")) {
+    order.history.push({
+      id: `evt-seed-${order.dbId}`,
+      at: order.createdAt || new Date().toISOString(),
+      type: "created",
+      actorId: "system",
+      actorName: "Boutique en ligne",
+      summary: `Commande créée (${order.product} — ${order.total.toLocaleString("fr-DZ")} DA)`,
+    });
+  }
+  return order.history;
+}
+
+export function appendOrderHistory(
+  order: CheckoutOrder,
+  event: Omit<OrderHistoryEvent, "id" | "at"> & { at?: string },
+  warning?: string
+): OrderHistoryEvent {
+  const history = ensureOrderSeedHistory(order);
+  const full: OrderHistoryEvent = {
+    ...event,
+    id: `evt-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+    at: event.at || new Date().toISOString(),
+  };
+  order.history = [full, ...history];
+  appendStaffActivityLog({
+    at: full.at,
+    actorId: full.actorId,
+    actorName: full.actorName,
+    orderDbId: order.dbId,
+    orderId: order.id,
+    customer: order.customer,
+    phone: order.phone,
+    type: full.type,
+    summary: full.summary,
+    changes: full.changes,
+    warning,
+  });
+  return full;
+}
+
+export type StatusUpdateMeta = {
+  nrpLevel?: 1 | 2 | 3;
+  postponedUntil?: string | null;
+  postponedNote?: string;
+  cancelReason?: string;
+  actorId?: string;
+  actorName?: string;
+};
+
+export function updateMemoryOrderStatus(
+  id: number,
+  status: CheckoutOrder["status"],
+  meta?: StatusUpdateMeta
+) {
   const found = memoryOrders.find(order => order.dbId === id);
   if (found) {
     const prevStatus = found.status;
+    const prevNrpLevel = found.nrpLevel;
+    const nowIso = new Date().toISOString();
+    const actorId = meta?.actorId || "owner";
+    const actorName = meta?.actorName || "Admin (Patron)";
+
     found.status = status;
+    found.assignedToId = actorId;
+    found.assignedToName = actorName;
+
+    // Anti-triche #1 : Changement de statut sans appel préalable enregistré
+    const noPriorCallWarning =
+      (status === "confirmee" || status === "ne_repond_pas" || status === "reportee" || status === "annulee") &&
+      (found.callCount || 0) === 0;
+
+    let rapidNrpWarning = false;
+    let minutesSinceLastNrp: number | undefined;
+    let nextNrpLevel: 1 | 2 | 3 | undefined = found.nrpLevel;
+
+    if (status === "ne_repond_pas") {
+      if (meta?.nrpLevel) {
+        nextNrpLevel = meta.nrpLevel;
+      } else if (prevStatus === "ne_repond_pas") {
+        nextNrpLevel = Math.min(3, (found.nrpLevel || 1) + 1) as 1 | 2 | 3;
+      } else {
+        nextNrpLevel = 1;
+      }
+      if (found.lastNrpAt && (prevStatus === "ne_repond_pas" || (nextNrpLevel && nextNrpLevel > 1))) {
+        const diffMin = Math.round((Date.now() - new Date(found.lastNrpAt).getTime()) / 60000);
+        minutesSinceLastNrp = Math.max(0, diffMin);
+        if (minutesSinceLastNrp < 15) {
+          rapidNrpWarning = true;
+        }
+      }
+      found.nrpLevel = nextNrpLevel;
+      found.lastNrpAt = nowIso;
+    }
+
+    if (status === "reportee") {
+      if (meta?.postponedUntil !== undefined) {
+        found.postponedUntil = meta.postponedUntil || null;
+      }
+      if (meta?.postponedNote !== undefined) {
+        found.postponedNote = meta.postponedNote;
+      }
+      found.postponedNotified = false;
+    } else {
+      found.postponedNotified = true;
+    }
+
+    if (status === "annulee" && meta?.cancelReason !== undefined) {
+      found.cancelReason = meta.cancelReason;
+    }
+
+    if (status === "confirmee") {
+      found.confirmedById = actorId;
+      found.confirmedByName = actorName;
+      found.confirmedAt = nowIso;
+    }
+
+    const fromLabel =
+      prevStatus === "ne_repond_pas" && prevNrpLevel
+        ? `NRP ${prevNrpLevel}`
+        : STATUS_HUMAN_LABELS[prevStatus] || prevStatus;
+    const toLabel =
+      status === "ne_repond_pas" && nextNrpLevel
+        ? `NRP ${nextNrpLevel}`
+        : STATUS_HUMAN_LABELS[status] || status;
+
+    let summary = `Statut : ${fromLabel} ➔ ${toLabel}`;
+    if (status === "reportee" && found.postponedUntil) {
+      const formattedRemind = new Date(found.postponedUntil).toLocaleString("fr-DZ", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      summary += ` (⏰ Rappel prévu le ${formattedRemind})`;
+    }
+    if (status === "reportee" && found.postponedNote) {
+      summary += ` — Note : "${found.postponedNote}"`;
+    }
+    if (status === "annulee" && found.cancelReason) {
+      summary += ` — Motif : "${found.cancelReason}"`;
+    }
+
+    const warnings: string[] = [];
+    if (noPriorCallWarning) {
+      warnings.push("Statut changé sans clic d'appel préalable");
+    }
+    if (rapidNrpWarning) {
+      warnings.push(`NRP ${nextNrpLevel} passé seulement ${minutesSinceLastNrp ?? 0} min après le précédent (< 15 min)`);
+    }
+
+    appendOrderHistory(
+      found,
+      {
+        type: status === "reportee" ? "postponed" : "status_change",
+        actorId,
+        actorName,
+        summary,
+        meta: {
+          statusFrom: prevStatus,
+          statusTo: status,
+          nrpLevel: nextNrpLevel,
+          postponedUntil: found.postponedUntil,
+          postponedNote: found.postponedNote,
+          cancelReason: found.cancelReason,
+          noPriorCallWarning,
+          rapidNrpWarning,
+          minutesSinceLastNrp,
+        },
+      },
+      warnings.length > 0 ? warnings.join(" | ") : undefined
+    );
+
     saveStore();
 
-    if (prevStatus !== status) {
+    if (prevStatus !== status || (status === "ne_repond_pas" && prevNrpLevel !== nextNrpLevel)) {
       const statusKey = String(status);
       const prefs = getNotificationPreferences();
 
       if (statusKey === "ne_repond_pas" && prefs.notifyNeRepondPas) {
         void sendAdminPushNotification({
-          title: "🚨 ALERTE COLIS : Ne répond pas !",
-          body: `Colis #${found.id} (${found.customer} - ${found.phone}) nécessite une intervention (Ne répond pas)`,
+          title: `🚨 ALERTE COLIS : Ne répond pas (NRP ${nextNrpLevel || 1}) !`,
+          body: `Colis #${found.id} (${found.customer} - ${found.phone}) marqué NRP ${nextNrpLevel || 1} par ${actorName}`,
           icon: "/icons/icon-192x192.png",
           badge: "/icons/icon-192x192.png",
           tag: `alert-${found.id}`,
@@ -172,7 +359,7 @@ export function updateMemoryOrderStatus(id: number, status: CheckoutOrder["statu
       } else if (statusKey === "annulee" && prefs.notifyAnnulee) {
         void sendAdminPushNotification({
           title: "🚨 ALERTE COLIS : Annulée !",
-          body: `Colis #${found.id} (${found.customer} - ${found.phone}) : Commande annulée`,
+          body: `Colis #${found.id} (${found.customer} - ${found.phone}) annulé par ${actorName}${found.cancelReason ? ` (${found.cancelReason})` : ""}`,
           icon: "/icons/icon-192x192.png",
           badge: "/icons/icon-192x192.png",
           tag: `alert-${found.id}`,
@@ -182,7 +369,7 @@ export function updateMemoryOrderStatus(id: number, status: CheckoutOrder["statu
       } else if (statusKey === "reportee" && prefs.notifyReportee) {
         void sendAdminPushNotification({
           title: "⚠️ ALERTE COLIS : Reportée !",
-          body: `Colis #${found.id} (${found.customer} - ${found.phone}) : Livraison reportée`,
+          body: `Colis #${found.id} (${found.customer} - ${found.phone}) reporté par ${actorName}${found.postponedNote ? ` : ${found.postponedNote}` : ""}`,
           icon: "/icons/icon-192x192.png",
           badge: "/icons/icon-192x192.png",
           tag: `alert-${found.id}`,
@@ -205,11 +392,102 @@ export function updateMemoryOrderStatus(id: number, status: CheckoutOrder["statu
   return found ? [found] : [];
 }
 
-export function markMemoryOrderReturn(id: number, returnReceived: boolean = true) {
+export async function recordOrderInteraction(
+  input: RecordOrderInteractionInput,
+  fallbackActor?: { actorId: string; actorName: string }
+) {
+  const parsed = recordOrderInteractionSchema.parse(input);
+  await loadStore();
+  const found = memoryOrders.find(order => order.dbId === parsed.id);
+  if (!found) throw new CheckoutValidationError("Commande introuvable");
+
+  const actorId = parsed.actorId || fallbackActor?.actorId || "owner";
+  const actorName = parsed.actorName || fallbackActor?.actorName || "Admin (Patron)";
+  const nowIso = new Date().toISOString();
+
+  found.assignedToId = actorId;
+  found.assignedToName = actorName;
+
+  if (parsed.type === "call") {
+    found.callCount = (found.callCount || 0) + 1;
+    found.lastCalledAt = nowIso;
+    found.lastCalledBy = actorName;
+    appendOrderHistory(found, {
+      at: nowIso,
+      type: "call",
+      actorId,
+      actorName,
+      summary: `📞 Appel téléphonique #${found.callCount} vers ${found.phone}${parsed.note ? ` (${parsed.note})` : ""}`,
+      meta: { callNumber: found.callCount },
+    });
+  } else {
+    found.whatsappCount = (found.whatsappCount || 0) + 1;
+    appendOrderHistory(found, {
+      at: nowIso,
+      type: "whatsapp",
+      actorId,
+      actorName,
+      summary: `💬 Relance WhatsApp #${found.whatsappCount} envoyée au ${found.phone}`,
+    });
+  }
+
+  saveStore();
+  return found;
+}
+
+export async function markOrderDelivered(
+  id: number,
+  isDelivered: boolean = true,
+  actor?: { actorId: string; actorName: string }
+) {
+  await loadStore();
+  const found = memoryOrders.find(order => order.dbId === id);
+  if (!found) throw new CheckoutValidationError("Commande introuvable");
+
+  const wasDelivered = Boolean(found.isDelivered);
+  found.isDelivered = isDelivered;
+  if (isDelivered && !wasDelivered) {
+    found.deliveredAt = new Date().toISOString();
+    appendOrderHistory(found, {
+      type: "delivered",
+      actorId: actor?.actorId || "system",
+      actorName: actor?.actorName || "Système / Livraison",
+      summary: `🎉 Colis Livré et encaissé (${found.total.toLocaleString("fr-DZ")} DA)${found.confirmedByName ? ` — Commission validée pour ${found.confirmedByName}` : ""}`,
+    });
+    const prefs = getNotificationPreferences();
+    if (prefs.notifyLivre) {
+      void sendAdminPushNotification({
+        title: "🎉 COLIS LIVRÉ : Succès !",
+        body: `Colis #${found.id} pour ${found.customer} (${found.total.toLocaleString("fr-DZ")} DZD) a été livré !`,
+        icon: "/icons/icon-192x192.png",
+        badge: "/icons/icon-192x192.png",
+        tag: `victory-${found.id}`,
+        type: "victory",
+        data: { url: "/admin", sound: "/sounds/victory-delivered.wav", type: "victory" },
+      });
+    }
+  } else if (!isDelivered) {
+    found.deliveredAt = undefined;
+  }
+  saveStore();
+  return found;
+}
+
+export function markMemoryOrderReturn(
+  id: number,
+  returnReceived: boolean = true,
+  actor?: { actorId: string; actorName: string }
+) {
   const found = memoryOrders.find(order => order.dbId === id);
   if (found) {
     found.returnReceived = returnReceived;
     found.returnReceivedAt = returnReceived ? new Date().toISOString() : undefined;
+    appendOrderHistory(found, {
+      type: "return",
+      actorId: actor?.actorId || "owner",
+      actorName: actor?.actorName || "Admin (Patron)",
+      summary: returnReceived ? "↩️ Colis Retour reçu au dépôt" : "↩️ Marquage Retour annulé",
+    });
     saveStore();
   }
   return found ? [found] : [];
@@ -290,13 +568,95 @@ export function startGoogleSheetAutoSync(intervalMs = 45000) {
   }, intervalMs);
 }
 
-export async function updateCheckoutOrderDetails(input: UpdateOrderDetailsInput) {
+let postponedReminderTimer: NodeJS.Timeout | null = null;
+
+export function startPostponedReminderScheduler(intervalMs = 25000) {
+  if (postponedReminderTimer) return;
+  postponedReminderTimer = setInterval(() => {
+    try {
+      const now = Date.now();
+      let updatedAny = false;
+      for (const order of memoryOrders) {
+        if (
+          order.status === "reportee" &&
+          order.postponedUntil &&
+          !order.postponedNotified
+        ) {
+          const targetMs = new Date(order.postponedUntil).getTime();
+          if (Number.isFinite(targetMs) && targetMs <= now) {
+            order.postponedNotified = true;
+            updatedAny = true;
+            void sendAdminPushNotification({
+              title: "⏰ RAPPEL CLIENT À APPELER MAINTENANT !",
+              body: `Commande #${order.id} — ${order.customer} (${order.phone})${order.postponedNote ? ` · Note : ${order.postponedNote}` : ""}`,
+              icon: "/icons/icon-192x192.png",
+              badge: "/icons/icon-192x192.png",
+              tag: `reminder-${order.id}-${targetMs}`,
+              type: "urgent_alert",
+              data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert", orderId: order.id },
+            });
+          }
+        }
+      }
+      if (updatedAny) {
+        saveStore();
+      }
+    } catch {
+      // Ignore background scheduler error
+    }
+  }, intervalMs);
+}
+
+startPostponedReminderScheduler();
+
+export async function updateCheckoutOrderDetails(
+  input: UpdateOrderDetailsInput,
+  fallbackActor?: { actorId: string; actorName: string }
+) {
   const parsed = updateOrderDetailsSchema.parse(input);
   const db = await getDb();
   if (!db) {
     await loadStore();
     const found = memoryOrders.find(order => order.dbId === parsed.id);
     if (!found) throw new CheckoutValidationError("Commande introuvable");
+
+    const actorId = parsed.actorId || fallbackActor?.actorId || "owner";
+    const actorName = parsed.actorName || fallbackActor?.actorName || "Admin (Patron)";
+
+    if (found.initialQuantity === undefined) {
+      found.initialQuantity = found.quantity || 1;
+    }
+
+    const changes: OrderHistoryChange[] = [];
+    const checkDiff = (field: string, label: string, beforeVal: unknown, afterVal: unknown) => {
+      const b = String(beforeVal ?? "").trim();
+      const a = String(afterVal ?? "").trim();
+      if (b !== a) {
+        changes.push({ field, label, before: b || "—", after: a || "—" });
+      }
+    };
+
+    checkDiff("customer", "Client(e)", found.customer, parsed.customer);
+    checkDiff("phone", "Téléphone", found.phone, parsed.phone);
+    checkDiff("product", "Produit", found.product, parsed.product);
+    checkDiff("quantity", "Quantité", found.quantity, parsed.quantity);
+    checkDiff("total", "Total (DA)", `${found.total} DA`, `${parsed.total} DA`);
+    checkDiff("color", "Couleur", found.color, parsed.color);
+    checkDiff("size", "Taille", found.size, parsed.size);
+    checkDiff(
+      "delivery",
+      "Livraison",
+      found.delivery === "office" ? "Stop Desk" : "À domicile",
+      parsed.delivery === "office" ? "Stop Desk" : "À domicile"
+    );
+    checkDiff("wilaya", "Wilaya", found.wilaya, parsed.wilaya);
+    checkDiff("commune", "Commune", found.commune, parsed.commune);
+    checkDiff("address", "Adresse", found.address, parsed.address);
+    checkDiff("note", "Note", found.note, parsed.note);
+
+    const prevQty = found.quantity || 1;
+    const isUpsellPack = parsed.quantity >= 2 && (found.initialQuantity || 1) === 1 && parsed.quantity > prevQty;
+
     found.customer = parsed.customer;
     found.phone = parsed.phone;
     if (parsed.productId) found.productId = parsed.productId;
@@ -310,6 +670,29 @@ export async function updateCheckoutOrderDetails(input: UpdateOrderDetailsInput)
     found.commune = parsed.commune;
     found.address = parsed.address;
     found.note = parsed.note;
+    found.assignedToId = actorId;
+    found.assignedToName = actorName;
+
+    if (isUpsellPack || (parsed.quantity >= 2 && (found.initialQuantity || 1) === 1 && !found.upsellById)) {
+      found.upsellById = actorId;
+      found.upsellByName = actorName;
+    }
+
+    if (changes.length > 0) {
+      const summaryParts = changes.map(c => `${c.label}: ${c.before} ➔ ${c.after}`);
+      const summary = isUpsellPack
+        ? `🔥 Upsell Pack Duo & modification (${summaryParts.join(" · ")})`
+        : `✏️ Modification : ${summaryParts.join(" · ")}`;
+      appendOrderHistory(found, {
+        type: "edit",
+        actorId,
+        actorName,
+        summary,
+        changes,
+        meta: { upsellPack: isUpsellPack },
+      });
+    }
+
     saveStore();
     return found;
   }

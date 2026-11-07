@@ -7,16 +7,20 @@ import {
   ADMIN_PASSWORD_COOKIE,
   claimAdmin,
   createAdminPasswordToken,
+  createStaffSessionToken,
   getAdminSetupStatus,
   verifyAdminPassword,
 } from "./adminSetup";
 import {
   discardDraftSchema,
+  recordOrderInteractionSchema,
   recoveryStatusSchema,
   saveDraftSchema,
+  staffMemberSchema,
   submitOrderSchema,
   checkoutOrderStatusSchema,
   updateOrderDetailsSchema,
+  updateOrderStatusWithMetaSchema,
 } from "../shared/checkout";
 import {
   discardCheckoutDraft,
@@ -33,6 +37,8 @@ import {
   updateCheckoutOrderDetails,
   updateMemoryOrderStatus,
   markMemoryOrderReturn,
+  markOrderDelivered,
+  recordOrderInteraction,
   deleteMemoryOrder,
   autoDeduplicateOrders,
   syncGoogleSheetOrders,
@@ -52,12 +58,46 @@ import {
 } from "./ecomDelivery";
 import { VAPID_PUBLIC_KEY, sendAdminPushNotification } from "./webPush";
 import {
+  appendStaffActivityLog,
+  deleteStaffMember,
+  findStaffMemberByCode,
   getNotificationPreferences,
+  getStaffActivityLogs,
+  getStaffMembers,
   savePushSubscriptionRecord,
   setNotificationPreferences,
+  upsertStaffMember,
 } from "./persistentStore";
 import { triggerStoreSave } from "./checkout";
 import { z } from "zod";
+
+function isOwnerUser(user: { openId?: string | null; loginMethod?: string | null } | null | undefined): boolean {
+  if (!user) return false;
+  return user.loginMethod !== "staff_code" && !String(user.openId || "").startsWith("staff:");
+}
+
+function resolveActor(
+  user: { openId?: string | null; name?: string | null; email?: string | null; loginMethod?: string | null } | null | undefined,
+  override?: { actorId?: string; actorName?: string }
+): { actorId: string; actorName: string } {
+  if (user && (user.loginMethod === "staff_code" || String(user.openId || "").startsWith("staff:"))) {
+    const staffId = user.email || String(user.openId || "").replace(/^staff:/, "") || "staff";
+    return {
+      actorId: staffId,
+      actorName: user.name || "Confirmateur",
+    };
+  }
+  if (override?.actorId && override?.actorName) {
+    return {
+      actorId: override.actorId,
+      actorName: override.actorName,
+    };
+  }
+  return {
+    actorId: "owner",
+    actorName: "Admin (Patron)",
+  };
+}
 
 async function ecomGuard<T>(fn: () => Promise<T>): Promise<T> {
   try {
@@ -74,19 +114,45 @@ export const appRouter = router({
     me: publicProcedure.query(opts => opts.ctx.user),
     loginPassword: publicProcedure
       .input(z.object({ password: z.string().min(1).max(256) }))
-      .mutation(({ ctx, input }) => {
-        if (!verifyAdminPassword(input.password)) {
-          throw new TRPCError({ code: "UNAUTHORIZED", message: "Mot de passe administrateur incorrect." });
-        }
+      .mutation(async ({ ctx, input }) => {
         const isHttps = ctx.req.protocol === "https" || ctx.req.headers["x-forwarded-proto"] === "https";
-        ctx.res.cookie(ADMIN_PASSWORD_COOKIE, createAdminPasswordToken(), {
-          httpOnly: true,
-          path: "/",
-          sameSite: "lax",
-          secure: isHttps,
-          maxAge: 1000 * 60 * 60 * 24 * 30,
-        });
-        return { success: true } as const;
+        if (verifyAdminPassword(input.password)) {
+          ctx.res.cookie(ADMIN_PASSWORD_COOKIE, createAdminPasswordToken(), {
+            httpOnly: true,
+            path: "/",
+            sameSite: "lax",
+            secure: isHttps,
+            maxAge: 1000 * 60 * 60 * 24 * 30,
+          });
+          appendStaffActivityLog({
+            actorId: "owner",
+            actorName: "Admin (Patron)",
+            type: "login",
+            summary: "🔑 Connexion Propriétaire (Admin)",
+          });
+          triggerStoreSave();
+          return { success: true, role: "owner" as const };
+        }
+        await listCheckoutOrders();
+        const staff = findStaffMemberByCode(input.password);
+        if (staff) {
+          ctx.res.cookie(ADMIN_PASSWORD_COOKIE, createStaffSessionToken(staff.id), {
+            httpOnly: true,
+            path: "/",
+            sameSite: "lax",
+            secure: isHttps,
+            maxAge: 1000 * 60 * 60 * 24 * 30,
+          });
+          appendStaffActivityLog({
+            actorId: staff.id,
+            actorName: staff.name,
+            type: "login",
+            summary: `🔑 Connexion Confirmateur (${staff.name})`,
+          });
+          triggerStoreSave();
+          return { success: true, role: "staff" as const, staffName: staff.name };
+        }
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Mot de passe ou code confirmateur incorrect." });
       }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -117,21 +183,90 @@ export const appRouter = router({
       .query(() => listCheckoutOrders()),
     abandonedOrders: adminProcedure.query(() => listAbandonedCheckouts()),
     updateOrderStatus: adminProcedure
-      .input(z.object({ id: z.number().int().positive(), status: checkoutOrderStatusSchema }))
-      .mutation(async ({ input }) => {
+      .input(updateOrderStatusWithMetaSchema)
+      .mutation(async ({ ctx, input }) => {
+        const actor = resolveActor(ctx.user, { actorId: input.actorId, actorName: input.actorName });
         const db = await getDb();
-        if (!db) return updateMemoryOrderStatus(input.id, input.status);
+        if (!db) {
+          return updateMemoryOrderStatus(input.id, input.status, {
+            nrpLevel: input.nrpLevel,
+            postponedUntil: input.postponedUntil,
+            postponedNote: input.postponedNote,
+            cancelReason: input.cancelReason,
+            actorId: actor.actorId,
+            actorName: actor.actorName,
+          });
+        }
         return updateStoreOrderStatus(input.id, input.status);
+      }),
+    recordOrderInteraction: adminProcedure
+      .input(recordOrderInteractionSchema)
+      .mutation(({ ctx, input }) => {
+        const actor = resolveActor(ctx.user, { actorId: input.actorId, actorName: input.actorName });
+        return recordOrderInteraction(input, actor);
+      }),
+    markOrderDelivered: adminProcedure
+      .input(z.object({ id: z.number().int().positive(), isDelivered: z.boolean().default(true) }))
+      .mutation(({ ctx, input }) => {
+        const actor = resolveActor(ctx.user);
+        return markOrderDelivered(input.id, input.isDelivered, actor);
       }),
     markReturnReceived: adminProcedure
       .input(z.object({ id: z.number().int().positive(), returnReceived: z.boolean().default(true) }))
-      .mutation(({ input }) => markMemoryOrderReturn(input.id, input.returnReceived)),
+      .mutation(({ ctx, input }) => {
+        const actor = resolveActor(ctx.user);
+        return markMemoryOrderReturn(input.id, input.returnReceived, actor);
+      }),
     updateOrderDetails: adminProcedure
       .input(updateOrderDetailsSchema)
-      .mutation(({ input }) => updateCheckoutOrderDetails(input)),
+      .mutation(({ ctx, input }) => {
+        const actor = resolveActor(ctx.user, { actorId: input.actorId, actorName: input.actorName });
+        return updateCheckoutOrderDetails(input, actor);
+      }),
     deleteOrder: adminProcedure
       .input(z.object({ id: z.number().int().positive() }))
-      .mutation(({ input }) => ({ deleted: deleteMemoryOrder(input.id) })),
+      .mutation(({ ctx, input }) => {
+        if (!isOwnerUser(ctx.user)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Seul le propriétaire peut supprimer définitivement une commande." });
+        }
+        return { deleted: deleteMemoryOrder(input.id) };
+      }),
+    staffData: adminProcedure.query(async ({ ctx }) => {
+      await listCheckoutOrders();
+      const isOwner = isOwnerUser(ctx.user);
+      const currentActor = resolveActor(ctx.user);
+      const allStaff = getStaffMembers();
+      return {
+        isOwner,
+        currentActor,
+        staff: isOwner
+          ? allStaff
+          : allStaff.map(s => (s.id === currentActor.actorId ? s : { ...s, code: "••••" })),
+        activityLogs: getStaffActivityLogs(800),
+      };
+    }),
+    staffUpsert: adminProcedure
+      .input(staffMemberSchema)
+      .mutation(async ({ ctx, input }) => {
+        if (!isOwnerUser(ctx.user)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Seul le propriétaire peut gérer les employés et salaires." });
+        }
+        await listCheckoutOrders();
+        const saved = upsertStaffMember(input);
+        triggerStoreSave();
+        return saved;
+      }),
+    staffDelete: adminProcedure
+      .input(z.object({ id: z.string().min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        if (!isOwnerUser(ctx.user)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Seul le propriétaire peut supprimer un employé." });
+        }
+        await listCheckoutOrders();
+        const deleted = deleteStaffMember(input.id);
+        triggerStoreSave();
+        return { deleted };
+      }),
     deduplicateOrders: adminProcedure
       .mutation(async () => {
         const orders = await listCheckoutOrders();
@@ -302,8 +437,9 @@ export const appRouter = router({
             .max(100),
         }),
       )
-      .mutation(({ input }) =>
+      .mutation(({ ctx, input }) =>
         ecomGuard(async () => {
+          const actor = resolveActor(ctx.user);
           const orders = await listCheckoutOrders();
           const results = await shipOrders(orders, input.items, input.confirmee);
           const db = await getDb();
@@ -311,7 +447,7 @@ export const appRouter = router({
             if (!result.ok) continue;
             const order = orders.find(o => o.id === result.orderId);
             if (!order) continue;
-            if (!db) updateMemoryOrderStatus(order.dbId, "transferee");
+            if (!db) updateMemoryOrderStatus(order.dbId, "transferee", actor);
             else await updateStoreOrderStatus(order.dbId, "transferee");
           }
           return results;
@@ -322,7 +458,39 @@ export const appRouter = router({
         .query(({ input }) => ecomGuard(() => getEcomTracking(input.tracking))),
       trackBatch: adminProcedure
         .input(z.object({ trackings: z.array(z.string()).max(100) }))
-        .query(({ input }) => ecomGuard(() => getEcomTrackingBatch(input.trackings))),
+        .query(({ input }) =>
+          ecomGuard(async () => {
+            const batch = await getEcomTrackingBatch(input.trackings);
+            try {
+              const ecomStatus = await getEcomStatus();
+              const shipments = ecomStatus.shipments || {};
+              const orders = await listCheckoutOrders();
+              for (const order of orders) {
+                if (order.isDelivered) continue;
+                const sh = shipments[order.id];
+                if (!sh?.tracking) continue;
+                const trkData = batch[sh.tracking];
+                if (!trkData) continue;
+                const sit = (trkData.situation || "").toLowerCase();
+                if (
+                  sit.includes("livr") ||
+                  sit.includes("encaiss") ||
+                  sit.includes("recouvr") ||
+                  Boolean(trkData.encaisser) ||
+                  Boolean(trkData.recouvert)
+                ) {
+                  await markOrderDelivered(order.dbId, true, {
+                    actorId: "system",
+                    actorName: "E-com Delivery (Auto)",
+                  });
+                }
+              }
+            } catch {
+              // Ignore auto-delivery sync error
+            }
+            return batch;
+          })
+        ),
   }),
   googleSheet: router({
     getConfig: adminProcedure.query(async () => {

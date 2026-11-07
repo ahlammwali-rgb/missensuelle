@@ -63,9 +63,9 @@ export function AdminAuthGate({ children }: Props) {
           <div className="admin-auth-icon"><KeyRound size={24} /></div>
           <span className="eyebrow">Espace Administration</span>
           <h1>Connexion Miss Sensuelle</h1>
-          <p>Saisissez votre mot de passe administrateur pour accéder aux commandes, au catalogue et aux pixels.</p>
+          <p>Saisissez votre mot de passe administrateur ou votre code confirmateur personnel pour accéder aux commandes.</p>
           <form className="admin-activation-form" onSubmit={submitPassword}>
-            <label htmlFor="admin-password-input">Mot de passe administrateur</label>
+            <label htmlFor="admin-password-input">Mot de passe Admin ou Code Confirmateur</label>
             <input
               id="admin-password-input"
               type="password"
