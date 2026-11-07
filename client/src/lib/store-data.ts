@@ -176,19 +176,22 @@ export const products: Product[] = [
   {
     id: "p-005",
     slug: "extensions-silk-wave",
-    name: "Extensions Silk Wave",
+    name: "Extensions Cheveux Naturel",
     category: "extensions",
     categoryLabel: "Extensions cheveux",
-    price: 9800,
-    oldPrice: 11200,
-    badge: "Volume XXL",
-    description: "Des longueurs souples et brillantes qui se fondent dans tes cheveux pour un effet naturel.",
-    details: ["Ondulation souple", "Longueur 55 cm", "Clip-in 7 pièces"],
-    colors: ["Natural black", "Chocolate", "Honey brown"],
-    image: extensionsImage,
-    gallery: [extensionsImage, beautyImage, fashionImage, heroImage, firstProductStudio, cosmeticsImage],
-    accent: "#A36A52",
-    stock: 7,
+    price: 2700,
+    oldPrice: 3500,
+    badge: "Offre 2 700 DA",
+    description: "Extensions cheveux naturel 50%, longueur et volume instantanés, pose facile et tenue longue durée.",
+    details: ["Cheveux naturels 50%", "Pose facile et rapide", "Volume et longueur immédiats", "Longue durée de vie"],
+    colors: ["شاتان فونس", "أسود", "بني غامق", "شاتان روكس", "أشقر فاتح", "نور بالياح غري"],
+    image: "/manus-storage/extensions-poster.jpg",
+    gallery: ["/manus-storage/extensions-poster.jpg", extensionsImage, beautyImage, fashionImage, heroImage, firstProductStudio],
+    arName: "إكستنشن الشعر — طول أكبر وكثافة أكثر",
+    arCategoryLabel: "وصلات شعر",
+    arDescription: "إكستنشن شعر طبيعي 50% بمظهر أنثوي رائع، سهل التركيب ويدوم لفترة طويلة.",
+    accent: "#c0307f",
+    stock: 30,
   },
   {
     id: "p-006",
@@ -258,9 +261,16 @@ export const wilayas = [
 ];
 
 export const formatDZD = (value: number) => `${new Intl.NumberFormat("fr-DZ").format(value)} DA`;
-export const getProduct = (slug: string) =>
-  getCatalogProducts().find(product => product.slug === slug) ??
-  products.find(product => product.slug === slug);
+export const getProduct = (slug: string) => {
+  const normalizedSlug =
+    slug === "extensions-cheveux" || slug === "extensions"
+      ? "extensions-silk-wave"
+      : slug;
+  return (
+    getCatalogProducts().find(product => product.slug === normalizedSlug) ??
+    products.find(product => product.slug === normalizedSlug)
+  );
+};
 
 
 export const CATALOG_STORAGE_KEY = "miss-sensuelle-catalog";
@@ -273,6 +283,7 @@ export function getCatalogProducts(): Product[] {
     // Migration additive : les catalogues déjà enregistrés avant l'ajout de l'Abaya
     // sont conservés, mais les nouveaux produits intégrés au code sont ajoutés une fois.
     let colorsChanged = false;
+    const canonicalExtensions = products.find(p => p.id === "p-005")!;
     const normalized = saved.map(product => {
       if (product.id === "p-001" && product.image === firstProductImage) {
         colorsChanged = true;
@@ -282,6 +293,26 @@ export function getCatalogProducts(): Product[] {
           image: coatImages.black.hero,
           gallery: product.gallery?.[0] === firstProductImage ? products[0].gallery : product.gallery,
           colors: JSON.stringify(product.colors) === JSON.stringify(["Lilac", "Ivoire", "Bleu ciel"]) ? ["Noir", "Blanc"] : product.colors,
+        };
+      }
+      if (product.id === "p-005" && (product.price === 9800 || product.image === extensionsImage)) {
+        colorsChanged = true;
+        return {
+          ...product,
+          name: canonicalExtensions.name,
+          price: canonicalExtensions.price,
+          oldPrice: canonicalExtensions.oldPrice,
+          badge: canonicalExtensions.badge,
+          description: canonicalExtensions.description,
+          details: canonicalExtensions.details,
+          colors: canonicalExtensions.colors,
+          image: canonicalExtensions.image,
+          gallery: canonicalExtensions.gallery,
+          arName: canonicalExtensions.arName,
+          arCategoryLabel: canonicalExtensions.arCategoryLabel,
+          arDescription: canonicalExtensions.arDescription,
+          accent: canonicalExtensions.accent,
+          stock: Math.max(product.stock || 0, canonicalExtensions.stock),
         };
       }
       if (product.id !== "p-007") return product;

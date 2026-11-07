@@ -29,7 +29,7 @@ import { MobileAppCard, showPushNotification } from "@/components/MobileAppCard"
 import { playChaChingSound, playUrgentAlertSound, playVictoryDeliveredSound, playAbandonedAlertSound } from "@/lib/sound";
 import { loadRealOrders, orderMatchesPeriod } from "@/lib/admin-orders";
 
-const actionLabels: { status: OrderStatus; label: string }[] = [{ status: "confirmee", label: "Confirmer" }, { status: "annulee", label: "Annuler" }, { status: "reportee", label: "Reporter" }, { status: "ne_repond_pas", label: "Ne répond pas" }, { status: "transferee", label: "Transférer" }];
+const actionLabels: { status: OrderStatus; label: string }[] = [{ status: "confirmee", label: "Confirmer" }, { status: "annulee", label: "Annuler" }, { status: "reportee", label: "Reporter" }, { status: "ne_repond_pas", label: "Pas de réponse" }, { status: "transferee", label: "Transférer" }];
 type AdminSection = "dashboard" | "abandoned" | "catalogue" | "settings" | "ecom" | "sheet" | "transferred" | "returns" | "staff";
 
 type DashboardOrder = Order;
@@ -934,7 +934,7 @@ function AdminPageContent() {
       </div>
     </div>
   </div>
-)}{selected && <OrderModal order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={() => handleCallOrder(selected)} onWhatsApp={() => handleWhatsAppOrder(selected)} onOpenHistory={() => setHistoryOrderId(selected.id)} onOpenPostpone={() => setPostponeOrderId(selected.id)} onOpenCancel={() => setCancelOrderId(selected.id)} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onDelete={handleDeleteOrder} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{activeHistoryOrder && (
+)}{selected && <OrderModal order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={() => handleCallOrder(selected)} onWhatsApp={() => handleWhatsAppOrder(selected)} onOpenHistory={() => setHistoryOrderId(selected.id)} onOpenPostpone={() => setPostponeOrderId(selected.id)} onOpenCancel={() => setCancelOrderId(selected.id)} onSetNrpLevel={lvl => updateStatusWithMeta(selected.id, "ne_repond_pas", { nrpLevel: lvl })} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onDelete={handleDeleteOrder} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{activeHistoryOrder && (
   <OrderHistoryModal
     order={activeHistoryOrder}
     onClose={() => setHistoryOrderId(null)}
@@ -1158,6 +1158,10 @@ function findMatchingCatalogProduct(catalog: Product[], orderProductId?: string,
   if (raw) {
     const exact = catalog.find(p => raw.includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(raw));
     if (exact) return exact;
+    if (raw.includes("extension") || raw.includes("extention") || raw.includes("إكستنشن") || raw.includes("شعر")) {
+      const ext = catalog.find(p => p.id === "p-005" || p.slug.includes("extensions"));
+      if (ext) return ext;
+    }
     if (raw.includes("doudoune") || raw.includes("دواقون")) {
       const d = catalog.find(p => p.id === "p-008" || p.slug.includes("doudoune"));
       if (d) return d;
@@ -1191,6 +1195,25 @@ function findMatchingCatalogProduct(catalog: Product[], orderProductId?: string,
   };
 }
 
+function getColorsForProduct(product: Product | undefined): string[] {
+  if (!product) return ["Noir"];
+  const isDoudoune = product.id === "p-008" || product.slug.includes("doudoune") || product.name.toLowerCase().includes("doudoune");
+  if (isDoudoune) return ["أزرق سماوي", "أبيض", "أسود"];
+  const isExtensions = product.id === "p-005" || product.slug.includes("extensions") || product.category === "extensions";
+  if (isExtensions) {
+    return ["شاتان فونس", "أسود", "بني غامق", "شاتان روكس", "أشقر فاتح", "نور بالياح غري"];
+  }
+  return product.colors?.length ? product.colors : ["Emerald", "Noir"];
+}
+
+function getDefaultSizeForProduct(product: Product | undefined): string {
+  if (!product) return "M";
+  if (product.id === "p-005" || product.category === "extensions" || product.category === "beaute" || product.category === "lentilles") {
+    return "Standard";
+  }
+  return "M";
+}
+
 function computeProductGoodsPrice(product: Product | undefined, qty: number): number {
   if (!product) return 0;
   const isDoudoune = product.id === "p-008" || product.slug.includes("doudoune") || product.name.toLowerCase().includes("doudoune");
@@ -1204,10 +1227,9 @@ function computeProductGoodsPrice(product: Product | undefined, qty: number): nu
 
 type PieceVariant = { color: string; size: string };
 
-function parseVariants(rawColor: string | undefined, rawSize: string | undefined, count: number, availableColors: string[]): PieceVariant[] {
+function parseVariants(rawColor: string | undefined, rawSize: string | undefined, count: number, availableColors: string[], defaultSize = "M"): PieceVariant[] {
   const result: PieceVariant[] = [];
   const defaultColor = availableColors[0] || "Noir";
-  const defaultSize = "M";
 
   for (let i = 1; i <= count; i++) {
     const cMatch = rawColor ? rawColor.match(new RegExp(`(?:^|\\|\\s*)${i}\\s*:\\s*([^|]+)`, "i")) : null;
@@ -1231,6 +1253,71 @@ function parseVariants(rawColor: string | undefined, rawSize: string | undefined
   return result;
 }
 
+function parseInitialOrderItems(order: CheckoutOrder, catalog: Product[]) {
+  const rawProductStr = (order.product || "").trim();
+  const hasPlusSeparator = rawProductStr.includes(" + ");
+  if (hasPlusSeparator) {
+    const parts = rawProductStr.split(" + ").map(s => s.trim()).filter(Boolean);
+    const firstPart = parts[0] || rawProductStr;
+    const secondPart = parts.slice(1).join(" + ") || "";
+
+    const extractQtyAndName = (segment: string, fallbackQty: number) => {
+      const m = segment.match(/^(.*?)\s*×\s*(\d+)$/);
+      if (m) {
+        return { name: m[1].trim(), qty: Math.max(1, parseInt(m[2], 10) || 1) };
+      }
+      if (segment.includes("عرض 2 دواقون")) {
+        return { name: segment.replace(/\s*\(عرض 2 دواقون.*?\)/, "").trim(), qty: 2 };
+      }
+      return { name: segment.trim(), qty: fallbackQty };
+    };
+
+    const parsed1 = extractQtyAndName(firstPart, 1);
+    const parsed2 = extractQtyAndName(secondPart, Math.max(1, (order.quantity || 2) - parsed1.qty));
+
+    const prod1 = findMatchingCatalogProduct(catalog, order.productId, parsed1.name);
+    const prod2 = findMatchingCatalogProduct(catalog, undefined, parsed2.name);
+
+    const colorParts = (order.color || "").split(" + ").map(s => s.replace(/^\[Art\.\d+\]\s*/i, "").trim());
+    const sizeParts = (order.size || "").split(" + ").map(s => s.replace(/^\[Art\.\d+\]\s*/i, "").trim());
+
+    return {
+      hasSecond: true,
+      prod1,
+      prod1Name: prod1.name || parsed1.name,
+      qty1: parsed1.qty,
+      rawColor1: colorParts[0] || "",
+      rawSize1: sizeParts[0] || "",
+      prod2,
+      prod2Name: prod2.name || parsed2.name,
+      qty2: parsed2.qty,
+      rawColor2: colorParts.slice(1).join(" | ") || "",
+      rawSize2: sizeParts.slice(1).join(" | ") || "",
+    };
+  }
+
+  const prod1 = findMatchingCatalogProduct(catalog, order.productId, order.product);
+  const defaultSecond =
+    catalog.find(p => p.id === "p-005" && p.id !== prod1.id) ||
+    catalog.find(p => p.id === "p-008" && p.id !== prod1.id) ||
+    catalog.find(p => p.id !== prod1.id) ||
+    prod1;
+
+  return {
+    hasSecond: false,
+    prod1,
+    prod1Name: prod1?.name || order.product.replace(/\s*×\s*\d+$/, "").trim(),
+    qty1: Math.max(1, order.quantity || 1),
+    rawColor1: order.color || "",
+    rawSize1: order.size || "",
+    prod2: defaultSecond,
+    prod2Name: defaultSecond.name,
+    qty2: 1,
+    rawColor2: "",
+    rawSize2: "",
+  };
+}
+
 function OrderModal({
   order,
   isSaving,
@@ -1240,6 +1327,7 @@ function OrderModal({
   onOpenHistory,
   onOpenPostpone,
   onOpenCancel,
+  onSetNrpLevel,
   onUpdate,
   onSaveDetails,
   onDelete,
@@ -1253,21 +1341,29 @@ function OrderModal({
   onOpenHistory?: () => void;
   onOpenPostpone?: () => void;
   onOpenCancel?: () => void;
+  onSetNrpLevel?: (level: 1 | 2 | 3) => void;
   onUpdate: (id: string, status: OrderStatus) => void;
   onSaveDetails: (dbId: number, updates: OrderDetailsPayload) => void;
   onDelete: (dbId: number) => void;
   onCopy: () => void;
 }) {
   const catalog = useMemo(() => getCatalogProducts(), []);
-  const initialBaseProduct = useMemo(() => {
-    return findMatchingCatalogProduct(catalog, order.productId, order.product);
-  }, [catalog, order.product, order.productId]);
+  const initialParsed = useMemo(() => parseInitialOrderItems(order, catalog), [order, catalog]);
 
   const [customer, setCustomer] = useState(order.customer);
   const [phone, setPhone] = useState(order.phone);
-  const [productId, setProductId] = useState(order.productId || initialBaseProduct?.id || "p-008");
-  const [productName, setProductName] = useState(() => initialBaseProduct?.name || order.product.replace(/\s*×\s*\d+$/, "").trim());
-  const [quantity, setQuantity] = useState(Math.max(1, order.quantity || 1));
+  const [productId, setProductId] = useState(initialParsed.prod1.id || "p-008");
+  const [productName, setProductName] = useState(initialParsed.prod1Name);
+  const [quantity, setQuantity] = useState(initialParsed.qty1);
+
+  // 2nd Product (Cross-Sell) states
+  const [hasSecondProduct, setHasSecondProduct] = useState<boolean>(initialParsed.hasSecond);
+  const [secondProductId, setSecondProductId] = useState<string>(initialParsed.prod2.id);
+  const [secondProductName, setSecondProductName] = useState<string>(initialParsed.prod2Name);
+  const [secondQuantity, setSecondQuantity] = useState<number>(initialParsed.qty2);
+  const [crossSellDiscount, setCrossSellDiscount] = useState<number>(0);
+  const [showModalNrpOptions, setShowModalNrpOptions] = useState<boolean>(false);
+
   const [total, setTotal] = useState(order.total);
   const [delivery, setDelivery] = useState<"home" | "office">(order.delivery || "home");
   const [wilaya, setWilaya] = useState(order.wilaya);
@@ -1275,42 +1371,81 @@ function OrderModal({
   const [address, setAddress] = useState(order.address || "");
   const [note, setNote] = useState(order.note || "");
 
-  const selectedCatalogProduct = catalog.find(p => p.id === productId) || initialBaseProduct;
+  const selectedCatalogProduct = catalog.find(p => p.id === productId) || initialParsed.prod1;
   const isDoudoune = selectedCatalogProduct?.id === "p-008" || selectedCatalogProduct?.slug.includes("doudoune") || selectedCatalogProduct?.name.toLowerCase().includes("doudoune");
 
-  const availableColors = useMemo(() => {
-    if (isDoudoune) {
-      return ["أزرق سماوي", "أبيض", "أسود"];
-    }
-    return selectedCatalogProduct?.colors?.length ? selectedCatalogProduct.colors : ["Emerald", "Noir"];
-  }, [selectedCatalogProduct, isDoudoune]);
+  const secondCatalogProduct = catalog.find(p => p.id === secondProductId) || initialParsed.prod2;
+  const isSecondDoudoune = secondCatalogProduct?.id === "p-008" || secondCatalogProduct?.slug.includes("doudoune") || secondCatalogProduct?.name.toLowerCase().includes("doudoune");
+
+  const availableColors = useMemo(() => getColorsForProduct(selectedCatalogProduct), [selectedCatalogProduct]);
+  const secondAvailableColors = useMemo(() => getColorsForProduct(secondCatalogProduct), [secondCatalogProduct]);
 
   // Conserve le frais de livraison d'origine de la commande
   const initialShippingFee = useMemo(() => {
-    const initialGoods = computeProductGoodsPrice(initialBaseProduct, order.quantity || 1);
-    const diff = order.total - initialGoods;
+    const initialGoods1 = computeProductGoodsPrice(initialParsed.prod1, initialParsed.qty1);
+    const initialGoods2 = initialParsed.hasSecond
+      ? computeProductGoodsPrice(initialParsed.prod2, initialParsed.qty2)
+      : 0;
+    const diff = order.total - (initialGoods1 + initialGoods2);
     return diff > 0 ? diff : 0;
-  }, [initialBaseProduct, order.quantity, order.total]);
+  }, [initialParsed, order.total]);
 
   const [shippingFee, setShippingFee] = useState<number>(initialShippingFee);
 
   const [variants, setVariants] = useState<PieceVariant[]>(() =>
-    parseVariants(order.color, order.size, Math.max(1, order.quantity || 1), availableColors)
+    parseVariants(
+      initialParsed.rawColor1,
+      initialParsed.rawSize1,
+      initialParsed.qty1,
+      availableColors,
+      getDefaultSizeForProduct(initialParsed.prod1),
+    )
+  );
+
+  const [secondVariants, setSecondVariants] = useState<PieceVariant[]>(() =>
+    parseVariants(
+      initialParsed.rawColor2,
+      initialParsed.rawSize2,
+      initialParsed.qty2,
+      secondAvailableColors,
+      getDefaultSizeForProduct(initialParsed.prod2),
+    )
   );
 
   const allWilayas = useMemo(() => Array.from(new Set([order.wilaya, ...abayaWilayas, ...wilayas].filter(Boolean))), [order.wilaya]);
   const arabicCommunes = abayaCommunesByWilaya[wilaya] ?? [];
+
+  const recomputeCombinedTotal = (
+    prod1: Product | undefined,
+    qty1: number,
+    withSecond: boolean,
+    prod2: Product | undefined,
+    qty2: number,
+    ship: number,
+    discount: number
+  ) => {
+    const g1 = computeProductGoodsPrice(prod1, qty1);
+    const g2 = withSecond ? computeProductGoodsPrice(prod2, qty2) : 0;
+    return Math.max(0, g1 + g2 - discount + ship);
+  };
 
   const handleProductChange = (nextId: string) => {
     setProductId(nextId);
     const found = catalog.find(p => p.id === nextId);
     if (found) {
       setProductName(found.name);
-      const isFree = found.id === "p-007" || found.slug.includes("abaya");
+      const nextColors = getColorsForProduct(found);
+      const nextDefaultSize = getDefaultSizeForProduct(found);
+      setVariants(prev =>
+        prev.map(v => ({
+          color: nextColors.includes(v.color) ? v.color : (nextColors[0] || "Noir"),
+          size: nextDefaultSize === "Standard" ? "Standard" : v.size || nextDefaultSize,
+        }))
+      );
+      const isFree = (found.id === "p-007" || found.slug.includes("abaya")) && !hasSecondProduct;
       const currentShip = isFree ? 0 : shippingFee;
       if (isFree) setShippingFee(0);
-      const nextGoods = computeProductGoodsPrice(found, quantity);
-      setTotal(nextGoods + currentShip);
+      setTotal(recomputeCombinedTotal(found, quantity, hasSecondProduct, secondCatalogProduct, secondQuantity, currentShip, crossSellDiscount));
     }
   };
 
@@ -1318,19 +1453,17 @@ function OrderModal({
     const safeQty = Math.max(1, Math.min(10, nextQty || 1));
     setQuantity(safeQty);
 
-    // Ajuste dynamiquement la liste des variantes
+    const defSize = getDefaultSizeForProduct(selectedCatalogProduct);
     setVariants(prev => {
       const next = [...prev];
       while (next.length < safeQty) {
-        const last = next[next.length - 1] || { color: availableColors[0] || "Noir", size: "M" };
+        const last = next[next.length - 1] || { color: availableColors[0] || "Noir", size: defSize };
         next.push({ ...last });
       }
       return next.slice(0, safeQty);
     });
 
-    // Recalcule automatiquement le Total : Prix des articles (avec promo duo) + Livraison
-    const nextGoods = computeProductGoodsPrice(selectedCatalogProduct, safeQty);
-    setTotal(nextGoods + shippingFee);
+    setTotal(recomputeCombinedTotal(selectedCatalogProduct, safeQty, hasSecondProduct, secondCatalogProduct, secondQuantity, shippingFee, crossSellDiscount));
   };
 
   const updatePieceVariant = (index: number, field: "color" | "size", val: string) => {
@@ -1343,34 +1476,135 @@ function OrderModal({
     });
   };
 
-  const currentGoods = computeProductGoodsPrice(selectedCatalogProduct, quantity);
+  // Handlers for 2nd Product (Cross-Sell)
+  const activateSecondProduct = (targetProductId?: string) => {
+    const chosenId =
+      targetProductId ||
+      secondProductId ||
+      catalog.find(p => p.id === "p-005" && p.id !== productId)?.id ||
+      catalog.find(p => p.id !== productId)?.id ||
+      catalog[0]?.id ||
+      "p-005";
+    const found = catalog.find(p => p.id === chosenId) || secondCatalogProduct;
+    const cols = getColorsForProduct(found);
+    const defSize = getDefaultSizeForProduct(found);
+    setHasSecondProduct(true);
+    setSecondProductId(found.id);
+    setSecondProductName(found.name);
+    setSecondQuantity(1);
+    setSecondVariants([{ color: cols[0] || "Noir", size: defSize }]);
+    setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, true, found, 1, shippingFee, crossSellDiscount));
+  };
+
+  const removeSecondProduct = () => {
+    setHasSecondProduct(false);
+    setCrossSellDiscount(0);
+    setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, false, secondCatalogProduct, secondQuantity, shippingFee, 0));
+  };
+
+  const handleSecondProductChange = (nextId: string) => {
+    setSecondProductId(nextId);
+    const found = catalog.find(p => p.id === nextId);
+    if (found) {
+      setSecondProductName(found.name);
+      const nextColors = getColorsForProduct(found);
+      const nextDefSize = getDefaultSizeForProduct(found);
+      setSecondVariants(prev =>
+        prev.map(v => ({
+          color: nextColors.includes(v.color) ? v.color : (nextColors[0] || "Noir"),
+          size: nextDefSize === "Standard" ? "Standard" : (v.size === "Standard" ? "M" : v.size || nextDefSize),
+        }))
+      );
+      setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, true, found, secondQuantity, shippingFee, crossSellDiscount));
+    }
+  };
+
+  const handleSecondQuantityChange = (nextQty: number) => {
+    const safeQty = Math.max(1, Math.min(10, nextQty || 1));
+    setSecondQuantity(safeQty);
+    const defSize = getDefaultSizeForProduct(secondCatalogProduct);
+    setSecondVariants(prev => {
+      const next = [...prev];
+      while (next.length < safeQty) {
+        const last = next[next.length - 1] || { color: secondAvailableColors[0] || "Noir", size: defSize };
+        next.push({ ...last });
+      }
+      return next.slice(0, safeQty);
+    });
+    setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, true, secondCatalogProduct, safeQty, shippingFee, crossSellDiscount));
+  };
+
+  const updateSecondPieceVariant = (index: number, field: "color" | "size", val: string) => {
+    setSecondVariants(prev => {
+      const next = [...prev];
+      if (next[index]) {
+        next[index] = { ...next[index], [field]: val };
+      }
+      return next;
+    });
+  };
+
+  const applyCrossSellDiscount = (discountAmount: number, freeShip = false) => {
+    const nextShip = freeShip ? 0 : initialShippingFee;
+    setShippingFee(nextShip);
+    setCrossSellDiscount(discountAmount);
+    setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, hasSecondProduct, secondCatalogProduct, secondQuantity, nextShip, discountAmount));
+  };
+
+  const firstGoods = computeProductGoodsPrice(selectedCatalogProduct, quantity);
+  const secondGoods = hasSecondProduct ? computeProductGoodsPrice(secondCatalogProduct, secondQuantity) : 0;
+  const currentGoods = Math.max(0, firstGoods + secondGoods - crossSellDiscount);
 
   const handleSubmitEdit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const activeVariants = variants.slice(0, quantity);
-    const finalColor = quantity === 1
-      ? (activeVariants[0]?.color || availableColors[0] || "")
-      : activeVariants.map((v, i) => `${i + 1}: ${v.color}`).join(" | ");
+    const activeVariants1 = variants.slice(0, quantity);
+    const color1 = quantity === 1
+      ? (activeVariants1[0]?.color || availableColors[0] || "")
+      : activeVariants1.map((v, i) => `${i + 1}: ${v.color}`).join(" | ");
 
-    const finalSize = quantity === 1
-      ? (activeVariants[0]?.size || "M")
-      : activeVariants.map((v, i) => `${i + 1}: ${v.size}`).join(" | ");
+    const size1 = quantity === 1
+      ? (activeVariants1[0]?.size || getDefaultSizeForProduct(selectedCatalogProduct))
+      : activeVariants1.map((v, i) => `${i + 1}: ${v.size}`).join(" | ");
 
-    let formattedProduct = "";
+    let formattedProduct1 = "";
     if (isDoudoune && quantity === 2) {
-      formattedProduct = `${productName} (عرض 2 دواقون بـ 12900 دج)`;
-    } else if (quantity > 1) {
-      formattedProduct = `${productName} × ${quantity}`;
+      formattedProduct1 = `${productName} (عرض 2 دواقون بـ 12900 دج)`;
+    } else if (quantity > 1 || hasSecondProduct) {
+      formattedProduct1 = `${productName} × ${quantity}`;
     } else {
-      formattedProduct = productName;
+      formattedProduct1 = productName;
+    }
+
+    let finalProduct = formattedProduct1;
+    let finalQuantity = quantity;
+    let finalColor = color1;
+    let finalSize = size1;
+
+    if (hasSecondProduct && secondCatalogProduct) {
+      const activeVariants2 = secondVariants.slice(0, secondQuantity);
+      const color2 = secondQuantity === 1
+        ? (activeVariants2[0]?.color || secondAvailableColors[0] || "")
+        : activeVariants2.map((v, i) => `${i + 1}: ${v.color}`).join(" | ");
+      const size2 = secondQuantity === 1
+        ? (activeVariants2[0]?.size || getDefaultSizeForProduct(secondCatalogProduct))
+        : activeVariants2.map((v, i) => `${i + 1}: ${v.size}`).join(" | ");
+
+      const formattedProduct2 = isSecondDoudoune && secondQuantity === 2
+        ? `${secondProductName} (عرض 2 دواقون بـ 12900 دج)`
+        : `${secondProductName} × ${secondQuantity}`;
+
+      finalProduct = `${formattedProduct1} + ${formattedProduct2}`;
+      finalQuantity = quantity + secondQuantity;
+      finalColor = `[Art.1] ${color1} + [Art.2] ${color2}`;
+      finalSize = `[Art.1] ${size1} + [Art.2] ${size2}`;
     }
 
     onSaveDetails(order.dbId, {
       customer: customer.trim() || order.customer,
       phone: phone.trim() || order.phone,
       productId,
-      product: formattedProduct,
-      quantity,
+      product: finalProduct,
+      quantity: finalQuantity,
       total: Number(total) || 0,
       color: finalColor.trim(),
       size: finalSize.trim(),
@@ -1604,6 +1838,276 @@ function OrderModal({
             </div>
           )}
 
+          {/* ===== BLOC 2ÈME PRODUIT (CROSS-SELL / PANIER COMBINÉ) ===== */}
+          {!hasSecondProduct ? (
+            <div
+              style={{
+                padding: "12px 14px",
+                borderRadius: "14px",
+                background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.04))",
+                border: "1.5px dashed rgba(16, 185, 129, 0.45)",
+                display: "grid",
+                gap: "10px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+                <div>
+                  <strong style={{ fontSize: "13px", fontWeight: 800, color: "#065f46", display: "flex", alignItems: "center", gap: "6px" }}>
+                    🛍️ Cross-Sell : Ajouter un 2ème produit au même colis
+                  </strong>
+                  <small style={{ fontSize: "11px", color: "#047857" }}>
+                    1 seul frais de livraison facturé + Bonus Upsell/Cross-Sell crédité au confirmateur !
+                  </small>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => activateSecondProduct()}
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid #10b981",
+                    background: "#10b981",
+                    color: "#fff",
+                    fontWeight: 800,
+                    fontSize: "12.5px",
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)",
+                  }}
+                >
+                  <Plus size={15} /> Ajouter un 2ème produit
+                </button>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#065f46" }}>Ajout rapide 1-clic :</span>
+                {catalog
+                  .filter(p => ["p-005", "p-008", "p-007", "p-003", "p-004"].includes(p.id))
+                  .map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => activateSecondProduct(item.id)}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: "999px",
+                        border: "1px solid rgba(16, 185, 129, 0.35)",
+                        background: "#fff",
+                        color: "#065f46",
+                        fontSize: "11px",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                      }}
+                    >
+                      + {item.name} ({formatDZD(item.price)})
+                    </button>
+                  ))}
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: "14px",
+                borderRadius: "14px",
+                background: "linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.06))",
+                border: "1.5px solid rgba(16, 185, 129, 0.45)",
+                display: "grid",
+                gap: "12px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <span
+                    style={{
+                      background: "#10b981",
+                      color: "#fff",
+                      fontSize: "11px",
+                      fontWeight: 900,
+                      padding: "3px 9px",
+                      borderRadius: "999px",
+                    }}
+                  >
+                    PRODUIT #2 (CROSS-SELL)
+                  </span>
+                  <strong style={{ fontSize: "13px", color: "#064e3b" }}>
+                    +{formatDZD(secondGoods)}
+                  </strong>
+                </div>
+                <button
+                  type="button"
+                  onClick={removeSecondProduct}
+                  style={{
+                    padding: "5px 10px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(239, 68, 68, 0.35)",
+                    background: "rgba(255, 255, 255, 0.9)",
+                    color: "#dc2626",
+                    fontSize: "11.5px",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                >
+                  <Trash2 size={13} /> Retirer le 2ème produit
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+                <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+                  2ème Produit
+                  <select value={secondProductId} onChange={e => handleSecondProductChange(e.target.value)}>
+                    {catalog.map(item => (
+                      <option key={item.id} value={item.id}>
+                        {item.name} ({formatDZD(item.price)})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+                  Quantité 2ème produit
+                  <select
+                    value={secondQuantity}
+                    onChange={e => handleSecondQuantityChange(Number(e.target.value))}
+                    style={{
+                      height: "44px",
+                      borderRadius: "10px",
+                      border: "1px solid #cbd5e1",
+                      padding: "0 12px",
+                      fontWeight: 700,
+                      fontSize: "14px",
+                      backgroundColor: "var(--input-bg, #fff)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(qty => {
+                      const goods = computeProductGoodsPrice(secondCatalogProduct, qty);
+                      let label = `${qty} pièce${qty > 1 ? "s" : ""} — ${formatDZD(goods)}`;
+                      if (isSecondDoudoune && qty === 2) {
+                        label = `2 pièces (Pack Duo 12 900 DA - Promo 🔥)`;
+                      }
+                      return (
+                        <option key={qty} value={qty}>
+                          {label}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+              </div>
+
+              {secondQuantity === 1 ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+                  <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+                    Couleur (2ème produit)
+                    <select
+                      value={secondVariants[0]?.color || secondAvailableColors[0]}
+                      onChange={e => updateSecondPieceVariant(0, "color", e.target.value)}
+                    >
+                      {Array.from(new Set([secondVariants[0]?.color, ...secondAvailableColors].filter(Boolean))).map(c => (
+                        <option key={c} value={c}>
+                          {c === "Emerald" ? "Emerald (أخضر)" : c === "Noir" ? "Noir (أسود)" : c}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+                    Taille (2ème produit)
+                    <select
+                      value={secondVariants[0]?.size || getDefaultSizeForProduct(secondCatalogProduct)}
+                      onChange={e => updateSecondPieceVariant(0, "size", e.target.value)}
+                    >
+                      {["Standard", "S", "M", "L", "XL", "XXL"].map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              ) : (
+                <div style={{ display: "grid", gap: "8px" }}>
+                  <span style={{ fontSize: "12px", fontWeight: 800, color: "#065f46" }}>
+                    Variantes du 2ème produit ({secondQuantity} pièces) :
+                  </span>
+                  {secondVariants.slice(0, secondQuantity).map((v, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "auto 1fr 1fr",
+                        gap: "8px",
+                        alignItems: "center",
+                        background: "rgba(255, 255, 255, 0.9)",
+                        padding: "8px 10px",
+                        borderRadius: "10px",
+                        border: "1px solid rgba(0,0,0,0.08)",
+                      }}
+                    >
+                      <span style={{ fontWeight: 800, fontSize: "12px", minWidth: "60px", color: "#334155" }}>
+                        Pièce {idx + 1} :
+                      </span>
+                      <select
+                        value={v.color}
+                        onChange={e => updateSecondPieceVariant(idx, "color", e.target.value)}
+                        style={{ height: "36px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}
+                      >
+                        {Array.from(new Set([v.color, ...secondAvailableColors].filter(Boolean))).map(c => (
+                          <option key={c} value={c}>
+                            {c === "Emerald" ? "Emerald (أخضر)" : c === "Noir" ? "Noir (أسود)" : c}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={v.size}
+                        onChange={e => updateSecondPieceVariant(idx, "size", e.target.value)}
+                        style={{ height: "36px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}
+                      >
+                        {["Standard", "S", "M", "L", "XL", "XXL"].map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Offres commerciales rapides Cross-Sell */}
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", paddingTop: "4px", borderTop: "1px dashed rgba(16, 185, 129, 0.3)" }}>
+                <span style={{ fontSize: "11px", fontWeight: 800, color: "#065f46" }}>🎁 Geste commercial Cross-Sell :</span>
+                {[
+                  { label: "Tarif normal", discount: 0, freeShip: false },
+                  { label: "-300 DA (Remise Duo)", discount: 300, freeShip: false },
+                  { label: "-500 DA (Pack Combiné)", discount: 500, freeShip: false },
+                  { label: "🚚 Livraison Offerte", discount: 0, freeShip: true },
+                ].map(offer => {
+                  const isSelected = crossSellDiscount === offer.discount && (offer.freeShip ? shippingFee === 0 : shippingFee === initialShippingFee);
+                  return (
+                    <button
+                      key={offer.label}
+                      type="button"
+                      onClick={() => applyCrossSellDiscount(offer.discount, offer.freeShip)}
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: "999px",
+                        border: isSelected ? "1.5px solid #059669" : "1px solid rgba(16, 185, 129, 0.3)",
+                        background: isSelected ? "#059669" : "#fff",
+                        color: isSelected ? "#fff" : "#065f46",
+                        fontSize: "11px",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {offer.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
             <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Wilaya
@@ -1672,8 +2176,17 @@ function OrderModal({
                 required
                 style={{ fontWeight: 800, color: "#10b981", fontSize: "16px", height: "44px" }}
               />
-              <div style={{ fontSize: "11px", color: "var(--muted, #64748b)", fontWeight: 500 }}>
-                Articles : <strong>{formatDZD(currentGoods)}</strong>
+              <div style={{ fontSize: "11px", color: "var(--muted, #64748b)", fontWeight: 500, lineHeight: 1.45 }}>
+                {hasSecondProduct ? (
+                  <>
+                    Produit 1 : <strong>{formatDZD(firstGoods)}</strong> + Produit 2 : <strong>{formatDZD(secondGoods)}</strong>
+                    {crossSellDiscount > 0 && (
+                      <> − Remise : <strong style={{ color: "#059669" }}>{formatDZD(crossSellDiscount)}</strong></>
+                    )}
+                  </>
+                ) : (
+                  <>Articles : <strong>{formatDZD(currentGoods)}</strong></>
+                )}
                 {shippingFee > 0 ? (
                   <> + Livraison : <strong>{formatDZD(shippingFee)}</strong></>
                 ) : (
@@ -1712,6 +2225,10 @@ function OrderModal({
               type="button"
               className={`action-${action.status}`}
               onClick={() => {
+                if (action.status === "ne_repond_pas" && onSetNrpLevel) {
+                  setShowModalNrpOptions(prev => !prev);
+                  return;
+                }
                 if (action.status === "reportee" && onOpenPostpone) {
                   onOpenPostpone();
                   return;
@@ -1724,9 +2241,77 @@ function OrderModal({
               }}
             >
               {action.label}
+              {action.status === "ne_repond_pas" && order.status === "ne_repond_pas" ? ` (NRP ${order.nrpLevel ?? 1})` : ""}
             </button>
           ))}
         </div>
+
+        {showModalNrpOptions && onSetNrpLevel && (
+          <div
+            style={{
+              marginTop: "10px",
+              padding: "12px",
+              borderRadius: "12px",
+              background: "rgba(245, 158, 11, 0.1)",
+              border: "1px solid rgba(245, 158, 11, 0.35)",
+              display: "grid",
+              gap: "8px",
+            }}
+          >
+            <span style={{ fontSize: "12px", fontWeight: 800, color: "#92400e" }}>
+              📵 Choisis le niveau « Pas de réponse » :
+            </span>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {([1, 2, 3] as const).map(lvl => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => {
+                    onSetNrpLevel(lvl);
+                    setShowModalNrpOptions(false);
+                  }}
+                  style={{
+                    flex: "1 1 90px",
+                    padding: "8px 10px",
+                    borderRadius: "9px",
+                    border: "1px solid rgba(217, 119, 6, 0.35)",
+                    background: lvl === 3 ? "#dc2626" : "#d97706",
+                    color: "#fff",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  {lvl === 3 ? `🔴 NRP 3 (Dernière)` : `🟠 NRP ${lvl} (${lvl === 1 ? "1er" : "2e"} appel)`}
+                </button>
+              ))}
+              {onWhatsApp && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextLvl = Math.min(3, (order.status === "ne_repond_pas" ? (order.nrpLevel ?? 1) : 0) + 1) as 1 | 2 | 3;
+                    onSetNrpLevel(nextLvl);
+                    onWhatsApp();
+                    setShowModalNrpOptions(false);
+                  }}
+                  style={{
+                    flex: "1 1 140px",
+                    padding: "8px 10px",
+                    borderRadius: "9px",
+                    border: "1px solid rgba(16, 185, 129, 0.45)",
+                    background: "#059669",
+                    color: "#fff",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  💬 NRP + Relance WhatsApp
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <button type="button" className="copy-order" onClick={onCopy}>
           <Copy size={15} />Copier les détails de la commande
         </button>

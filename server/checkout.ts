@@ -655,7 +655,8 @@ export async function updateCheckoutOrderDetails(
     checkDiff("note", "Note", found.note, parsed.note);
 
     const prevQty = found.quantity || 1;
-    const isUpsellPack = parsed.quantity >= 2 && (found.initialQuantity || 1) === 1 && parsed.quantity > prevQty;
+    const isCrossSell = parsed.product.includes(" + ") && !found.product.includes(" + ");
+    const isUpsellPack = isCrossSell || (parsed.quantity >= 2 && (found.initialQuantity || 1) === 1 && parsed.quantity > prevQty);
 
     found.customer = parsed.customer;
     found.phone = parsed.phone;
@@ -680,9 +681,11 @@ export async function updateCheckoutOrderDetails(
 
     if (changes.length > 0) {
       const summaryParts = changes.map(c => `${c.label}: ${c.before} ➔ ${c.after}`);
-      const summary = isUpsellPack
-        ? `🔥 Upsell Pack Duo & modification (${summaryParts.join(" · ")})`
-        : `✏️ Modification : ${summaryParts.join(" · ")}`;
+      const summary = isCrossSell
+        ? `🛍️ Cross-Sell (2ème produit ajouté) & modification (${summaryParts.join(" · ")})`
+        : isUpsellPack
+          ? `🔥 Upsell Pack Duo & modification (${summaryParts.join(" · ")})`
+          : `✏️ Modification : ${summaryParts.join(" · ")}`;
       appendOrderHistory(found, {
         type: "edit",
         actorId,

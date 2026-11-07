@@ -115,6 +115,7 @@ export function AdminDashboard({
   const stats = getOrderStats(orders);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [nrpSubFilter, setNrpSubFilter] = useState<"all" | 1 | 2 | 3>("all");
+  const [openNrpMenuOrderId, setOpenNrpMenuOrderId] = useState<string | null>(null);
 
   const copyId = async (id: string) => {
     try {
@@ -664,65 +665,34 @@ export function AdminDashboard({
                       </div>
                     )}
 
-                    {/* NRP 1 / NRP 2 / NRP 3 Direct Buttons */}
-                    {onSetNrpLevel ? (
-                      <div
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "4px",
-                          background: "rgba(245, 158, 11, 0.08)",
-                          padding: "2px 4px",
-                          borderRadius: "10px",
-                          border: "1px solid rgba(245, 158, 11, 0.25)",
-                        }}
-                      >
-                        {([1, 2, 3] as const).map(lvl => {
-                          const isActiveNrp =
-                            order.status === "ne_repond_pas" && (order.nrpLevel ?? 1) === lvl;
-                          return (
-                            <button
-                              key={lvl}
-                              type="button"
-                              onClick={() => onSetNrpLevel(order.id, lvl)}
-                              title={`Marquer Ne répond pas — Tentative NRP ${lvl}`}
-                              style={{
-                                padding: "5px 9px",
-                                borderRadius: "8px",
-                                border: "none",
-                                background: isActiveNrp
-                                  ? lvl === 3
-                                    ? "#dc2626"
-                                  : "#d97706"
-                                  : "transparent",
-                                color: isActiveNrp ? "#fff" : "#92400e",
-                                fontSize: "0.75rem",
-                                fontWeight: 800,
-                                cursor: "pointer",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "3px",
-                              }}
-                            >
-                              <PhoneOff size={12} />
-                              <span>NRP {lvl}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      order.status !== "ne_repond_pas" && (
-                        <button
-                          type="button"
-                          className="aoc-btn aoc-btn-noanswer"
-                          onClick={() => onUpdateStatus?.(order.id, "ne_repond_pas")}
-                          title="Marquer sans réponse"
-                        >
-                          <PhoneOff size={14} />
-                          <span>Ne répond pas</span>
-                        </button>
-                      )
-                    )}
+                    {/* Bouton unique « Pas de réponse » qui ouvre les options au clic */}
+                    <button
+                      type="button"
+                      className="aoc-btn aoc-btn-noanswer"
+                      onClick={() => {
+                        if (onSetNrpLevel) {
+                          setOpenNrpMenuOrderId(prev => (prev === order.id ? null : order.id));
+                        } else {
+                          onUpdateStatus?.(order.id, "ne_repond_pas");
+                        }
+                      }}
+                      title="Marquer Pas de réponse et choisir le niveau de relance (NRP 1, 2, 3 ou WhatsApp)"
+                      style={
+                        openNrpMenuOrderId === order.id
+                          ? {
+                              boxShadow: "0 0 0 2px #f59e0b",
+                              background: "rgba(245, 158, 11, 0.22)",
+                            }
+                          : undefined
+                      }
+                    >
+                      <PhoneOff size={14} />
+                      <span>
+                        Pas de réponse
+                        {order.status === "ne_repond_pas" ? ` (NRP ${order.nrpLevel ?? 1})` : ""}
+                      </span>
+                      {onSetNrpLevel && <ChevronDown size={13} />}
+                    </button>
 
                     <button
                       type="button"
@@ -795,6 +765,147 @@ export function AdminDashboard({
                       </button>
                     )}
                   </div>
+
+                  {/* Panneau d'options « Pas de réponse » affiché au clic sur le bouton */}
+                  {onSetNrpLevel && openNrpMenuOrderId === order.id && (() => {
+                    const currentLvl = order.status === "ne_repond_pas" ? (order.nrpLevel ?? 1) : 0;
+                    const recommendedLvl = Math.min(3, currentLvl + 1) as 1 | 2 | 3;
+                    return (
+                      <div
+                        style={{
+                          marginTop: "10px",
+                          padding: "12px 14px",
+                          borderRadius: "14px",
+                          background: "linear-gradient(135deg, rgba(245, 158, 11, 0.11), rgba(234, 88, 12, 0.06))",
+                          border: "1.5px solid rgba(245, 158, 11, 0.38)",
+                          display: "grid",
+                          gap: "10px",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "#92400e", display: "flex", alignItems: "center", gap: "6px" }}>
+                            <PhoneOff size={14} />
+                            Choisis le niveau « Pas de réponse » (NRP) :
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setOpenNrpMenuOrderId(null)}
+                            style={{
+                              background: "rgba(255,255,255,0.8)",
+                              border: "1px solid rgba(146, 64, 14, 0.2)",
+                              borderRadius: "999px",
+                              padding: "3px 10px",
+                              fontSize: "0.72rem",
+                              fontWeight: 800,
+                              color: "#92400e",
+                              cursor: "pointer",
+                            }}
+                          >
+                            ✕ Fermer
+                          </button>
+                        </div>
+
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                          {([
+                            { lvl: 1 as const, title: "NRP 1 — 1er appel", sub: "1ère tentative sans réponse" },
+                            { lvl: 2 as const, title: "NRP 2 — 2e appel", sub: "2ème relance téléphonique" },
+                            { lvl: 3 as const, title: "NRP 3 — 3e appel", sub: "Dernière relance avant annulation" },
+                          ]).map(opt => {
+                            const isCurrent = order.status === "ne_repond_pas" && (order.nrpLevel ?? 1) === opt.lvl;
+                            const isRecommended = recommendedLvl === opt.lvl && !isCurrent;
+                            return (
+                              <button
+                                key={opt.lvl}
+                                type="button"
+                                onClick={() => {
+                                  onSetNrpLevel(order.id, opt.lvl);
+                                  setOpenNrpMenuOrderId(null);
+                                }}
+                                style={{
+                                  flex: "1 1 150px",
+                                  padding: "9px 12px",
+                                  borderRadius: "11px",
+                                  border: isCurrent
+                                    ? opt.lvl === 3
+                                      ? "2px solid #dc2626"
+                                      : "2px solid #d97706"
+                                    : isRecommended
+                                      ? "2px solid #f59e0b"
+                                      : "1px solid rgba(217, 119, 6, 0.28)",
+                                  background: isCurrent
+                                    ? opt.lvl === 3
+                                      ? "#dc2626"
+                                      : "#d97706"
+                                    : "#fff",
+                                  color: isCurrent ? "#fff" : opt.lvl === 3 ? "#991b1b" : "#92400e",
+                                  textAlign: "left",
+                                  cursor: "pointer",
+                                  display: "grid",
+                                  gap: "2px",
+                                  boxShadow: isRecommended ? "0 4px 12px rgba(245, 158, 11, 0.18)" : "none",
+                                }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px" }}>
+                                  <strong style={{ fontSize: "0.8rem", fontWeight: 900 }}>
+                                    {opt.lvl === 3 ? "🔴" : "🟠"} {opt.title}
+                                  </strong>
+                                  {isRecommended && (
+                                    <span
+                                      style={{
+                                        fontSize: "0.65rem",
+                                        padding: "1px 6px",
+                                        borderRadius: "999px",
+                                        background: "rgba(245, 158, 11, 0.2)",
+                                        color: "#b45309",
+                                        fontWeight: 800,
+                                      }}
+                                    >
+                                      Suivant
+                                    </span>
+                                  )}
+                                  {isCurrent && (
+                                    <span style={{ fontSize: "0.65rem", fontWeight: 800 }}>✓ Actif</span>
+                                  )}
+                                </div>
+                                <small style={{ fontSize: "0.7rem", opacity: isCurrent ? 0.9 : 0.75 }}>{opt.sub}</small>
+                              </button>
+                            );
+                          })}
+
+                          {onWhatsAppOrder && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSetNrpLevel(order.id, recommendedLvl);
+                                onWhatsAppOrder({ ...order, status: "ne_repond_pas", nrpLevel: recommendedLvl });
+                                setOpenNrpMenuOrderId(null);
+                              }}
+                              style={{
+                                flex: "1 1 200px",
+                                padding: "9px 12px",
+                                borderRadius: "11px",
+                                border: "1.5px solid rgba(16, 185, 129, 0.45)",
+                                background: "linear-gradient(135deg, #ecfdf5, #d1fae5)",
+                                color: "#065f46",
+                                textAlign: "left",
+                                cursor: "pointer",
+                                display: "grid",
+                                gap: "2px",
+                              }}
+                            >
+                              <strong style={{ fontSize: "0.8rem", fontWeight: 900, display: "flex", alignItems: "center", gap: "5px" }}>
+                                <MessageCircle size={14} />
+                                NRP {recommendedLvl} + Relance WhatsApp
+                              </strong>
+                              <small style={{ fontSize: "0.7rem", color: "#047857" }}>
+                                Marque NRP {recommendedLvl} et ouvre WhatsApp pré-rempli en 1 clic
+                              </small>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </article>
               );
             })}

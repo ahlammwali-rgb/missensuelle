@@ -171,7 +171,10 @@ export async function importGoogleSheetToOrders(
 
     const prodLower = `${product} ${variant}`.toLowerCase();
     let productId = "p-007";
-    if (prodLower.includes("doudoune") || prodLower.includes("دواقون") || prodLower.includes("جاكيت") || prodLower.includes("hiver") || prodLower.includes("p-008")) {
+    if (prodLower.includes("extention") || prodLower.includes("extension") || prodLower.includes("إكستنشن") || prodLower.includes("شعر") || prodLower.includes("p-005")) {
+      productId = "p-005";
+      if (!idxProd || !row[idxProd]) product = "Extensions Cheveux Naturel";
+    } else if (prodLower.includes("doudoune") || prodLower.includes("دواقون") || prodLower.includes("جاكيت") || prodLower.includes("hiver") || prodLower.includes("p-008")) {
       productId = "p-008";
       if (!idxProd || !row[idxProd]) product = "Doudoune Hiver de Luxe";
     } else if (prodLower.includes("manteau") || prodLower.includes("blazer") || prodLower.includes("coat") || prodLower.includes("p-001")) {
