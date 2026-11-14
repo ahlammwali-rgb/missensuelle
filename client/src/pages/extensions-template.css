@@ -1,25 +1,21 @@
 @import url("https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&display=swap");
 
 .ext-m2-root {
-  --bg: #fbe4ec;
-  --bg-soft: #fdf2f6;
+  --bg: #ecd5d7;
   --tx: #1a1a1a;
   --gold: #e8b53a;
   --gold-bright: #ffd24d;
-  --gold-deep: #b88318;
-  --espresso: #15100d;
-  --espresso-card: #1f1713;
   min-height: 100vh;
   width: 100%;
   margin: 0;
-  background: var(--bg);
+  padding: 0;
+  background: linear-gradient(180deg, #1b0f0a 0%, #ecd5d7 35%, #140e0b 100%);
   color: var(--tx);
   font-family: "Cairo", Tahoma, sans-serif;
   display: flex;
   justify-content: center;
   direction: rtl;
   box-sizing: border-box;
-  padding-top: env(safe-area-inset-top, 0px);
 }
 
 .ext-m2-root *,
@@ -30,10 +26,10 @@
 
 .ext-m2-root .w {
   width: 100%;
-  max-width: 520px;
+  max-width: 760px;
   background: var(--bg);
   overflow-x: hidden;
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.18);
 }
 
 .ext-m2-root img {
@@ -43,40 +39,55 @@
 }
 
 /* =========================================================
-   1. BIGGER HERO (.hero) + SMOOTH BOTTOM GRADIENT FADE
+   1. FULL-SCREEN & BIGGER HERO (.hero) + SEAMLESS GRADIENT
    ========================================================= */
 .ext-m2-root .hero {
   position: relative;
   container-type: inline-size;
   width: 100%;
+  min-height: 56svh;
   overflow: hidden;
   background: #1b0f0a;
+  margin: 0;
+  padding: 0;
 }
 
-/* Make the hero noticeably taller & more impactful while keeping full width */
 .ext-m2-root .hero > img {
   display: block;
-  width: 100%;
-  aspect-ratio: 16 / 11.4;
+  width: 104%;
+  max-width: none;
+  margin-right: -2%;
+  min-height: 56svh;
+  aspect-ratio: 16 / 13.4;
   object-fit: fill;
-  transform: scale(1.015);
-  transform-origin: top center;
 }
 
-/* Smooth gradient transition ("dégradé fini avec le reste") at bottom of hero */
+@media (min-width: 640px) {
+  .ext-m2-root .hero {
+    min-height: 76vh;
+  }
+  .ext-m2-root .hero > img {
+    width: 100%;
+    margin-right: 0;
+    min-height: 76vh;
+    aspect-ratio: 16 / 11.5;
+  }
+}
+
+/* Multi-stop gradient blending bottom of Hero directly into Slider section */
 .ext-m2-root .hero::after {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
   bottom: -1px;
-  height: 19%;
+  height: 28%;
   background: linear-gradient(
     180deg,
-    rgba(251, 228, 236, 0) 0%,
-    rgba(251, 228, 236, 0.28) 42%,
-    rgba(251, 228, 236, 0.78) 78%,
-    #fbe4ec 100%
+    rgba(27, 15, 10, 0) 0%,
+    rgba(27, 15, 10, 0.25) 32%,
+    rgba(237, 212, 219, 0.78) 76%,
+    #edd4db 100%
   );
   pointer-events: none;
   z-index: 2;
@@ -84,76 +95,95 @@
 
 .ext-m2-root .rw {
   position: absolute;
-  right: 2.2%;
-  height: 6.8%;
+  right: 2%;
+  height: 7%;
   display: flex;
   align-items: center;
   gap: 1.3cqw;
   transform: translateY(-50%);
   font-weight: 900;
-  font-size: 3.35cqw;
+  font-size: 3.55cqw;
   color: #fff;
-  -webkit-text-stroke: 0.52cqw #1b0f0a;
+  -webkit-text-stroke: 0.55cqw #1b0f0a;
   paint-order: stroke fill;
-  text-shadow: 0 0.35cqw 0.9cqw rgba(0, 0, 0, 0.75);
+  text-shadow: 0 0.35cqw 0.9cqw rgba(0, 0, 0, 0.8);
   white-space: nowrap;
   z-index: 3;
 }
 
 .ext-m2-root .rw i {
   font-style: normal;
-  width: 4.5cqw;
-  height: 4.5cqw;
+  width: 4.7cqw;
+  height: 4.7cqw;
   border-radius: 50%;
   background: linear-gradient(180deg, #ffd24d, #e8a317);
   color: #3b2a00;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2.75cqw;
-  box-shadow: 0 0 0 0.32cqw rgba(255, 255, 255, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
+  font-size: 2.85cqw;
+  box-shadow: 0 0 0 0.32cqw rgba(255, 255, 255, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 /* =========================================================
-   2. VARIANT SLIDER SECTION (Smoothly blended with Hero)
+   2. VARIANT SLIDER SECTION (Minimal margin + Gradient blend)
    ========================================================= */
 .ext-m2-slider-sec {
   position: relative;
-  padding-top: 2px;
-  padding-bottom: 10px;
+  z-index: 4;
+  margin-top: -26px;
+  padding: 0 0 2px;
   background: linear-gradient(
     180deg,
-    #fbe4ec 0%,
-    #fdf1f5 45%,
-    #f9e5ec 85%,
-    #f3dede 100%
+    rgba(237, 212, 219, 0) 0%,
+    #edd4db 14%,
+    #f3dfe4 55%,
+    #ecd5d7 100%
   );
+}
+
+/* Gradient feather overlapping top of the next section so sections melt together */
+.ext-m2-slider-sec::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -22px;
+  height: 28px;
+  background: linear-gradient(
+    180deg,
+    #ecd5d7 0%,
+    rgba(236, 213, 215, 0.68) 48%,
+    rgba(236, 213, 215, 0) 100%
+  );
+  pointer-events: none;
+  z-index: 3;
 }
 
 .ext-m2-root .pill {
   position: relative;
-  z-index: 3;
+  z-index: 4;
   display: block;
   width: max-content;
-  margin: -6px auto 12px;
+  margin: 0 auto 6px;
   background: linear-gradient(90deg, #231612 0%, #3d241c 50%, #231612 100%);
   color: #ffd24d;
   border: 1.5px solid #e8b53a;
   font-weight: 900;
-  font-size: 18.5px;
-  padding: 6px 30px;
+  font-size: 18px;
+  padding: 5px 28px;
   border-radius: 999px;
   box-shadow:
-    0 6px 18px rgba(27, 15, 10, 0.22),
+    0 5px 14px rgba(27, 15, 10, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .ext-m2-root .sl {
   display: flex;
-  gap: 14px;
+  gap: 10px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  padding: 6px 12% 12px;
+  padding: 2px 10% 6px;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -164,13 +194,14 @@
 
 .ext-m2-root .cd {
   position: relative;
-  flex: 0 0 76%;
+  flex: 0 0 78%;
+  max-width: 300px;
   scroll-snap-align: center;
   background: #1a120f;
   border: 2.5px solid #e8b53a;
-  border-radius: 22px;
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 10px 24px rgba(27, 15, 10, 0.22);
+  box-shadow: 0 8px 20px rgba(27, 15, 10, 0.2);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
@@ -178,25 +209,25 @@
   border-color: #ffd24d;
   box-shadow:
     0 0 0 3px rgba(232, 181, 58, 0.45),
-    0 12px 26px rgba(27, 15, 10, 0.32);
+    0 10px 22px rgba(27, 15, 10, 0.3);
 }
 
 .ext-m2-root .cd img {
   width: 100%;
-  aspect-ratio: 1 / 1.75;
+  aspect-ratio: 1 / 1.72;
   object-fit: cover;
 }
 
 .ext-m2-cd-badge {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 8px;
+  right: 8px;
   background: rgba(21, 16, 13, 0.9);
   color: #ffd24d;
   border: 1.5px solid #e8b53a;
   border-radius: 999px;
-  padding: 3px 11px;
-  font-size: 12px;
+  padding: 2px 10px;
+  font-size: 11.5px;
   font-weight: 900;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
 }
@@ -209,10 +240,9 @@
   color: #ffd24d;
   font: inherit;
   font-weight: 900;
-  font-size: 16px;
-  padding: 11px 10px;
+  font-size: 15.5px;
+  padding: 9px 10px;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease;
 }
 
 .ext-m2-root .cd button:active {
@@ -222,30 +252,29 @@
 
 .ext-m2-root .hint {
   text-align: center;
-  font-size: 13.5px;
+  font-size: 12.5px;
   font-weight: 800;
   color: #6e3b4b;
-  margin-bottom: 4px;
+  margin: 0;
+  padding: 0 0 2px;
 }
 
 /* =========================================================
-   3. PROMO BANNERS WITH SEAMLESS GRADIENT BLENDING
+   3. PROMO BANNERS (Zero gap + Seamless gradient transitions)
    ========================================================= */
 .ext-m2-banners {
   position: relative;
-  background: #f3dede;
+  margin-top: -4px;
+  background: #ecd5d7;
+  line-height: 0;
 }
 
-.ext-m2-banners::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 22px;
-  background: linear-gradient(180deg, #f3dede 0%, rgba(243, 222, 222, 0) 100%);
-  pointer-events: none;
-  z-index: 2;
+.ext-m2-banners > img,
+.ext-m2-cta-link > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: -1px;
 }
 
 .ext-m2-cta-link {
@@ -253,6 +282,7 @@
   position: relative;
   text-decoration: none;
   background: #140e0b;
+  margin-top: -1px;
 }
 
 /* Smooth fade at bottom of CTA image into the dark luxury form */
@@ -262,31 +292,37 @@
   left: 0;
   right: 0;
   bottom: -1px;
-  height: 24px;
-  background: linear-gradient(180deg, rgba(20, 14, 11, 0) 0%, #140e0b 100%);
+  height: 30px;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 14, 11, 0) 0%,
+    rgba(20, 14, 11, 0.72) 55%,
+    #140e0b 100%
+  );
   pointer-events: none;
 }
 
 /* =========================================================
    4. REDESIGNED LUXURY ORDER FORM (.fm / .fb) — LESS PINK!
-   Warm Espresso / Obsidian / Champagne Gold / Ivory Palette
+   Minimal top margin, blended directly with CTA section
    ========================================================= */
 .ext-m2-root .fm {
   background:
-    radial-gradient(circle at 50% 0%, rgba(232, 181, 58, 0.16) 0%, transparent 58%),
+    radial-gradient(circle at 50% 0%, rgba(232, 181, 58, 0.15) 0%, transparent 55%),
     linear-gradient(180deg, #140e0b 0%, #18110e 45%, #110c0a 100%);
-  padding: 32px 14px 34px;
-  margin-top: 0;
+  padding: 14px 12px 26px;
+  margin-top: -4px;
   position: relative;
+  z-index: 4;
 }
 
 .ext-m2-root .fb {
-  background: linear-gradient(180deg, rgba(36, 26, 20, 0.92) 0%, rgba(22, 16, 13, 0.96) 100%);
+  background: linear-gradient(180deg, rgba(36, 26, 20, 0.94) 0%, rgba(22, 16, 13, 0.98) 100%);
   border: 1.5px solid rgba(232, 181, 58, 0.65);
-  border-radius: 26px;
-  padding: 20px 15px 22px;
+  border-radius: 24px;
+  padding: 16px 14px 18px;
   box-shadow:
-    0 18px 40px rgba(0, 0, 0, 0.55),
+    0 14px 34px rgba(0, 0, 0, 0.55),
     inset 0 1px 0 rgba(255, 226, 148, 0.22);
   position: relative;
 }
@@ -294,30 +330,30 @@
 .ext-m2-root .ft {
   display: block;
   width: max-content;
-  margin: -38px auto 14px;
+  margin: -30px auto 10px;
   background: linear-gradient(135deg, #1a120d 0%, #2f2015 100%);
   color: #ffd24d;
   border: 1.5px solid #e8b53a;
   font-weight: 900;
-  font-size: 21px;
-  padding: 6px 28px;
+  font-size: 19.5px;
+  padding: 4px 24px;
   border-radius: 999px;
   box-shadow:
-    0 6px 18px rgba(0, 0, 0, 0.5),
-    0 0 0 3px rgba(232, 181, 58, 0.16);
+    0 5px 14px rgba(0, 0, 0, 0.5),
+    0 0 0 3px rgba(232, 181, 58, 0.14);
 }
 
-/* Luxury Offer Banner (replaces the loud magenta .of block) */
+/* Luxury Offer Banner */
 .ext-m2-root .of {
   background: linear-gradient(135deg, #271c13 0%, #1b130d 50%, #2c1f14 100%);
   border: 1.5px solid rgba(232, 181, 58, 0.55);
-  border-radius: 18px;
-  padding: 12px 12px 11px;
+  border-radius: 16px;
+  padding: 10px 10px 9px;
   text-align: center;
   color: #fdf8f0;
   font-weight: 900;
-  margin-bottom: 14px;
-  line-height: 1.4;
+  margin-bottom: 10px;
+  line-height: 1.35;
   box-shadow: inset 0 0 24px rgba(232, 181, 58, 0.08);
 }
 
@@ -326,25 +362,25 @@
   background: rgba(232, 181, 58, 0.16);
   border: 1px solid rgba(232, 181, 58, 0.5);
   color: #ffd24d;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 900;
-  padding: 3px 14px;
+  padding: 2px 12px;
   border-radius: 999px;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .ext-m2-root .of b {
   display: block;
-  font-size: 33px;
+  font-size: 31px;
   color: #ffd24d;
   letter-spacing: 0.5px;
   text-shadow: 0 2px 10px rgba(232, 181, 58, 0.28);
-  margin: 2px 0;
+  margin: 1px 0;
 }
 
 .ext-m2-root .of span.ext-m2-of-sub {
   display: block;
-  font-size: 14px;
+  font-size: 13.5px;
   color: #e5d5c3;
   font-weight: 700;
 }
@@ -354,15 +390,15 @@
   display: grid;
   grid-template-columns: 1.25fr 0.95fr;
   gap: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .ext-m2-mode-btn {
   border: 1.5px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.04);
   color: #dfd3c6;
-  border-radius: 14px;
-  padding: 8px 8px;
+  border-radius: 13px;
+  padding: 7px 8px;
   font: inherit;
   cursor: pointer;
   text-align: center;
@@ -371,7 +407,7 @@
 
 .ext-m2-mode-btn strong {
   display: block;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 900;
 }
 
@@ -397,8 +433,8 @@
   justify-content: space-between;
   color: #f6e7cf;
   font-weight: 900;
-  font-size: 14.5px;
-  margin: 11px 2px 7px;
+  font-size: 14px;
+  margin: 8px 2px 6px;
 }
 
 .ext-m2-root .fb label.gf {
@@ -409,7 +445,7 @@
   background: rgba(232, 181, 58, 0.18);
   border: 1px solid rgba(232, 181, 58, 0.55);
   color: #ffd24d;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
   padding: 1px 10px;
   border-radius: 999px;
@@ -420,16 +456,16 @@
 .ext-m2-root .fb select {
   width: 100%;
   font: inherit;
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 700;
-  padding: 13px 14px;
+  padding: 11px 13px;
   border: 1.5px solid rgba(232, 181, 58, 0.55);
-  border-radius: 14px;
-  margin-bottom: 9px;
+  border-radius: 13px;
+  margin-bottom: 7px;
   background: #fcfaf7;
   color: #1a1410;
   outline: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .ext-m2-root .fb input::placeholder {
@@ -447,25 +483,25 @@
 .ext-m2-row-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 7px;
 }
 
 /* 2-Color Swatch Grids (#g0 and #g1) */
 .ext-m2-root .ch {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 7px;
+  margin-bottom: 6px;
 }
 
 .ext-m2-root .ch > div {
   position: relative;
   border: 1.5px solid rgba(255, 255, 255, 0.18);
-  border-radius: 15px;
-  padding: 7px 4px 6px;
+  border-radius: 14px;
+  padding: 6px 4px 5px;
   text-align: center;
   color: #f3ece4;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
   cursor: pointer;
   background: rgba(255, 255, 255, 0.05);
@@ -473,47 +509,41 @@
   user-select: none;
 }
 
-.ext-m2-root .ch > div:hover {
-  border-color: rgba(232, 181, 58, 0.55);
-  background: rgba(255, 255, 255, 0.09);
-}
-
 .ext-m2-root .ch img {
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   object-fit: cover;
   object-position: top;
-  margin: 0 auto 4px;
+  margin: 0 auto 3px;
   border: 2px solid rgba(255, 255, 255, 0.75);
   transition: transform 0.18s ease, border-color 0.18s ease;
 }
 
-/* Active state: Champagne Gold & Rich Espresso instead of hot pink! */
 .ext-m2-root .ch > div.on {
   border-color: #ffd24d;
   background: linear-gradient(145deg, rgba(232, 181, 58, 0.32) 0%, rgba(120, 82, 18, 0.45) 100%);
   color: #ffffff;
   box-shadow:
     0 0 0 1.5px #ffd24d,
-    0 6px 14px rgba(0, 0, 0, 0.35);
+    0 5px 12px rgba(0, 0, 0, 0.35);
 }
 
 .ext-m2-root .ch > div.on img {
   border-color: #ffd24d;
-  transform: scale(1.06);
+  transform: scale(1.05);
 }
 
 .ext-m2-ch-check {
   position: absolute;
-  top: 5px;
-  left: 5px;
-  width: 18px;
-  height: 18px;
+  top: 4px;
+  left: 4px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
   background: linear-gradient(180deg, #ffd24d, #e8a317);
   color: #2b1a00;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 900;
   display: flex;
   align-items: center;
@@ -521,33 +551,33 @@
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
 }
 
-/* Recap Box inside dark luxury form */
+/* Recap Box */
 .ext-m2-recap {
   background: rgba(255, 255, 255, 0.04);
   border: 1px dashed rgba(232, 181, 58, 0.5);
-  border-radius: 15px;
-  padding: 10px 13px;
-  margin: 12px 0 10px;
+  border-radius: 14px;
+  padding: 8px 12px;
+  margin: 8px 0;
 }
 
 .ext-m2-recap-line {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
   color: #dfd3c6;
   padding: 2px 0;
 }
 
 .ext-m2-recap-total {
-  margin-top: 5px;
-  padding-top: 6px;
+  margin-top: 4px;
+  padding-top: 5px;
   border-top: 1px solid rgba(232, 181, 58, 0.28);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 16.5px;
+  font-size: 16px;
   font-weight: 900;
   color: #ffd24d;
 }
@@ -560,20 +590,19 @@
   color: #231409;
   font: inherit;
   font-weight: 900;
-  font-size: 21px;
-  padding: 14px;
+  font-size: 20.5px;
+  padding: 13px;
   border-radius: 40px;
-  margin-top: 8px;
+  margin-top: 6px;
   box-shadow:
-    0 5px 0 #9c6800,
-    0 10px 24px rgba(240, 165, 0, 0.3);
+    0 4px 0 #9c6800,
+    0 8px 20px rgba(240, 165, 0, 0.3);
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .ext-m2-root .go:active {
   transform: translateY(2px);
-  box-shadow: 0 3px 0 #9c6800;
+  box-shadow: 0 2px 0 #9c6800;
 }
 
 .ext-m2-root .go:disabled {
@@ -588,9 +617,9 @@
   background: rgba(16, 185, 129, 0.14);
   border: 1.5px solid rgba(125, 255, 154, 0.45);
   border-radius: 14px;
-  padding: 12px;
-  margin-top: 12px;
-  line-height: 1.6;
+  padding: 10px;
+  margin-top: 10px;
+  line-height: 1.5;
 }
 
 .ext-m2-root .er {
@@ -598,11 +627,11 @@
   background: rgba(239, 68, 68, 0.15);
   border: 1px solid rgba(252, 165, 165, 0.4);
   border-radius: 10px;
-  padding: 7px 10px;
-  margin-top: 6px;
+  padding: 6px 10px;
+  margin-top: 5px;
   font-weight: 800;
   text-align: center;
-  font-size: 13.5px;
+  font-size: 13px;
 }
 
 @media (max-width: 380px) {
