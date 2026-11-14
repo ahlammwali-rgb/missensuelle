@@ -33,24 +33,35 @@ const SIZES = ["S", "M", "L", "XL", "XXL"];
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export default function AbayaLanding({ product, quantity = 1 }: { product: Product; quantity?: number }) {
-  const isBuiltIn = product.id === "p-007" || product.slug === "abaya-royal-emerald";
-  const dynamicColorChoices = !isBuiltIn && product.variantImages && product.variantImages.length > 0
-    ? product.variantImages.map((v, idx) => ({
-        id: `c-${idx}`,
-        label: v.name,
-        storeValue: v.name,
-        hex: idx % 2 === 0 ? "#0d4b37" : "#111111",
-        thumb: v.image || product.image,
-      }))
-    : !isBuiltIn && product.colors && product.colors.length > 0
-      ? product.colors.map((c, idx) => ({
+  const isBuiltIn =
+    (product.id === "p-007" || product.slug === "abaya-royal-emerald") &&
+    (!product.image || product.image === "/manus-storage/v-hero_de8d807e.jpg");
+  const dynamicColorChoices =
+    product.variantImages && product.variantImages.length > 0 && !isBuiltIn
+      ? product.variantImages.map((v, idx) => ({
           id: `c-${idx}`,
-          label: c,
-          storeValue: c,
+          label: v.name || `اللون ${idx + 1}`,
+          storeValue: v.name || `اللون ${idx + 1}`,
           hex: idx % 2 === 0 ? "#0d4b37" : "#111111",
-          thumb: product.gallery?.[idx] || product.image,
+          thumb: v.image || product.gallery?.[idx] || product.image,
         }))
-      : colorChoices;
+      : !isBuiltIn && product.colors && product.colors.length > 0
+        ? product.colors.map((c, idx) => ({
+            id: `c-${idx}`,
+            label: c,
+            storeValue: c,
+            hex: idx % 2 === 0 ? "#0d4b37" : "#111111",
+            thumb: product.gallery?.[idx] || product.image,
+          }))
+        : !isBuiltIn && product.gallery && product.gallery.length > 0
+          ? product.gallery.map((img, idx) => ({
+              id: `c-${idx}`,
+              label: `الموديل ${idx + 1}`,
+              storeValue: `الموديل ${idx + 1}`,
+              hex: idx % 2 === 0 ? "#0d4b37" : "#111111",
+              thumb: img,
+            }))
+          : colorChoices;
 
   const [color, setColor] = useState<string>(dynamicColorChoices[0]?.id ?? "green");
   const [wilaya, setWilaya] = useState("");

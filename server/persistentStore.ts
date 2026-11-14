@@ -79,10 +79,21 @@ type PersistedState = {
   notificationPreferences?: NotificationPreferences;
   staffMembers?: StaffMember[];
   staffActivityLogs?: StaffActivityLog[];
+  catalogProducts?: Record<string, unknown>[];
 };
 
 const memoryStaffMembers = new Map<string, StaffMember>();
 let memoryStaffActivityLogs: StaffActivityLog[] = [];
+let memoryCatalogProducts: Record<string, unknown>[] = [];
+
+export function getServerCatalogProducts(): Record<string, unknown>[] {
+  return memoryCatalogProducts;
+}
+
+export function setServerCatalogProducts(productsList: Record<string, unknown>[]): void {
+  if (!Array.isArray(productsList)) return;
+  memoryCatalogProducts = productsList.filter(p => p && typeof p === "object" && typeof p.id === "string");
+}
 
 export function getStaffMembers(): StaffMember[] {
   return Array.from(memoryStaffMembers.values()).sort(
@@ -338,6 +349,10 @@ async function pushCloudState(state: PersistedState): Promise<void> {
       staffMembers: state.staffMembers ?? existing.state?.staffMembers ?? getStaffMembers(),
       staffActivityLogs:
         state.staffActivityLogs ?? existing.state?.staffActivityLogs ?? memoryStaffActivityLogs,
+      catalogProducts:
+        state.catalogProducts && state.catalogProducts.length > 0
+          ? state.catalogProducts
+          : existing.state?.catalogProducts ?? memoryCatalogProducts,
     };
 
     writeLocalState(finalState);
@@ -426,6 +441,12 @@ function mergeStateIntoMemory(
     memoryStaffActivityLogs = memoryStaffActivityLogs.slice(0, 2000);
   }
 
+  if (Array.isArray(source.catalogProducts) && source.catalogProducts.length > 0) {
+    memoryCatalogProducts = source.catalogProducts.filter(
+      p => p && typeof p === "object" && typeof (p as { id?: unknown }).id === "string"
+    );
+  }
+
   const currentCounters = getCounters();
   const maxOrderId = memoryOrders.reduce(
     (max, o) => Math.max(max, (o.dbId ?? 0) + 1),
@@ -465,6 +486,7 @@ export async function ensurePersistentStoreLoaded(
           notificationPreferences: memoryNotificationPreferences,
           staffMembers: getStaffMembers(),
           staffActivityLogs: memoryStaffActivityLogs,
+          catalogProducts: memoryCatalogProducts,
         });
       }
     })();
@@ -489,6 +511,7 @@ export function schedulePersistentStoreSave(
     notificationPreferences: memoryNotificationPreferences,
     staffMembers: getStaffMembers(),
     staffActivityLogs: memoryStaffActivityLogs,
+    catalogProducts: memoryCatalogProducts,
   };
   writeLocalState(snapshot);
   saveQueue = saveQueue

@@ -35,12 +35,30 @@ export default function DoudouneLanding({
   product: Product;
   quantity: number;
 }) {
-  const isBuiltIn = product.id === "p-008" || product.slug === "doudoune-hiver-luxe";
-  const customVariants = !isBuiltIn && product.variantImages && product.variantImages.length > 0
-    ? product.variantImages
-    : !isBuiltIn && product.colors && product.colors.length > 0
-      ? product.colors.map((c, idx) => ({ name: c, image: product.gallery?.[idx] || product.image }))
-      : [];
+  const isBuiltIn =
+    (product.id === "p-008" || product.slug === "doudoune-hiver-luxe") &&
+    (!product.image || product.image === "/manus-storage/doudoune-bg.jpg");
+  const customVariants =
+    product.variantImages && product.variantImages.length > 0
+      ? product.variantImages
+      : product.colors && product.colors.length > 0
+        ? product.colors.map((c, idx) => ({
+            name: c,
+            image: product.gallery?.[idx] || product.image,
+          }))
+        : (product.gallery ?? []).map((img, idx) => ({
+            name: `اللون ${idx + 1}`,
+            image: img,
+          }));
+  const defaultDoudouneGallery = new Set([
+    "/manus-storage/doudoune-bg.jpg",
+    "/manus-storage/doudoune-white.jpg",
+    "/manus-storage/doudoune-blue.jpg",
+    "/manus-storage/doudoune-black.jpg",
+  ]);
+  const extraGalleryPhotos = (product.gallery ?? []).filter(
+    img => Boolean(img) && !(isBuiltIn && defaultDoudouneGallery.has(img))
+  );
   const PACK_2_PRICE = product.packPrice || (isBuiltIn ? DEFAULT_PACK_2_PRICE : Math.round((product.price || 7600) * 1.7));
 
   const [color, setColor] = useState<string>(isBuiltIn ? "blue" : (customVariants[0]?.name ?? "اللون 1"));
@@ -391,6 +409,20 @@ export default function DoudouneLanding({
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {extraGalleryPhotos.length > 0 && (
+          <div style={{ display: "grid", gap: 0, lineHeight: 0, background: "#fff" }}>
+            {extraGalleryPhotos.map((imgUrl, idx) => (
+              <img
+                key={`${imgUrl}-${idx}`}
+                src={imgUrl}
+                alt={`${product.arName || product.name} - ${idx + 1}`}
+                style={{ width: "100%", height: "auto", display: "block" }}
+                loading="lazy"
+              />
+            ))}
           </div>
         )}
 

@@ -47,7 +47,16 @@ function CataloguePage({ onAdd }: { onAdd: (product: typeof products[number]) =>
   return <><StoreHeader cartCount={0} onOpenCart={() => window.dispatchEvent(new CustomEvent("open-cart"))} /><main className="catalogue-page container"><div className="catalogue-hero"><div><span className="eyebrow">{lang === "ar" ? "اكتشفي مزاجك" : "Shop the mood"}</span><h1>{lang === "ar" ? <>كل ما<br /><em>يناسبك.</em></> : <>Tout ce qui te<br /><em>va si bien.</em></>}</h1></div><p>{lang === "ar" ? "قصات سهلة، ألوان تمنحك الابتسامة وتفاصيل جمال تجمعينها بحب." : "Des silhouettes faciles, des couleurs qui donnent le sourire et des détails beauté à collectionner."}</p></div><div className="catalogue-toolbar"><div className="filter-pills"><button className={active === "all" ? "active" : ""} onClick={() => setActive("all")}>{lang === "ar" ? "الكل" : "Tout"} <span>{catalog.length}</span></button>{categories.map(category => <button key={category.id} className={active === category.id ? "active" : ""} onClick={() => setActive(category.id)}>{lang === "ar" ? category.arLabel : category.label} <span>{catalog.filter(product => product.category === category.id).length}</span></button>)}</div><label className="search-field"><SearchIcon /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={lang === "ar" ? "ابحثي عن قطعة تحبينها" : "Rechercher un coup de cœur"} /></label></div><div className="catalogue-result"><span>{visibleProducts.length} {lang === "ar" ? "قطعة" : "pièces à shopper"}</span><button className="sort-button">{lang === "ar" ? "ترتيب حسب" : "Trier par"} <b>{lang === "ar" ? "المفضلة" : "Nos favoris"}</b><ChevronDown size={15} /></button></div><div className="product-grid catalogue-grid">{visibleProducts.map((product, index) => <ProductCard key={product.id} product={product} onAdd={onAdd} index={index} />)}</div>{visibleProducts.length === 0 && <div className="empty-state"><div className="empty-orb">✦</div><h2>{lang === "ar" ? "لا توجد نتائج بعد." : "Pas encore de match."}</h2><p>{lang === "ar" ? "جربي بحثاً آخر أو اكتشفي كل القطع." : "Essaie une autre recherche ou explore toutes les pièces."}</p><button className="button button-dark" onClick={() => { setActive("all"); setQuery(""); }}>{lang === "ar" ? "إعادة التعيين" : "Réinitialiser"}</button></div>}</main><StoreFooter /></>;
 }
 
-function useCatalogProducts() { const [catalog, setCatalog] = useState<Product[]>(products); useEffect(() => setCatalog(getCatalogProducts()), []); return catalog; }
+function useCatalogProducts() {
+  const [catalog, setCatalog] = useState<Product[]>(() => getCatalogProducts());
+  useEffect(() => {
+    const refresh = () => setCatalog(getCatalogProducts());
+    refresh();
+    window.addEventListener("miss-sensuelle-catalog-updated", refresh);
+    return () => window.removeEventListener("miss-sensuelle-catalog-updated", refresh);
+  }, []);
+  return catalog;
+}
 
 function SearchIcon() { return <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>; }
 
@@ -56,6 +65,7 @@ function ProductPage({ onAdd, slugOverride }: { onAdd: (product: typeof products
   const [, paramsAlt] = useRoute("/produits/:slug");
   const [, paramsEn] = useRoute("/product/:slug");
   const slug = slugOverride ?? params?.slug ?? paramsAlt?.slug ?? paramsEn?.slug ?? "";
+  useCatalogProducts();
   const product = getProduct(slug);
   const effectiveTemplate = product?.landingTemplate ?? (
     product?.id === "p-001" ? "coat" :

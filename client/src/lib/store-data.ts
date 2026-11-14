@@ -127,6 +127,10 @@ export const products: Product[] = [
     description: "Un manteau hivernal élégant avec col et poignets en fausse fourrure, boutons dorés et une coupe féminine évasée.",
     details: ["Col et poignets en fausse fourrure", "Boutons dorés", "Coupe féminine évasée", "Tailles S à XXL"],
     colors: ["Noir", "Blanc"],
+    variantImages: [
+      { name: "Noir", image: coatImages.black.hero },
+      { name: "Blanc", image: coatImages.white.hero },
+    ],
     image: coatImages.black.hero,
     gallery: [coatImages.black.hero, coatImages.black.collar, coatImages.black.buttons, coatImages.black.cuffs, coatImages.black.back, coatImages.black.mannequin],
     arName: "معطف شتوي فاخر",
@@ -196,10 +200,18 @@ export const products: Product[] = [
     landingTemplate: "extensions",
     badge: "Offre 2 700 DA",
     description: "Extensions cheveux naturel 50%, longueur et volume instantanés, pose facile et tenue longue durée.",
-    details: ["Cheveux naturels 50%", "Pose facile et rapide", "Volume et longueur immédiats", "Longue durée de vie"],
-    colors: ["أسود طبيعي", "بني غامق", "بني عسلي", "شاتين روكس", "أشقر فاتح", "نور بليلي غري"],
-    image: "/manus-storage/ext-pink-1.jpg",
-    gallery: ["/manus-storage/extensions-poster.jpg", extensionsImage, beautyImage, fashionImage, heroImage, firstProductStudio],
+    details: ["Cheveux naturels 60%", "Pose facile et rapide", "Volume et longueur immédiats", "Longue durée de vie"],
+    colors: ["أسود طبيعي", "بني غامق", "بني عسلي", "شاتين روكس", "أشقر فاتح", "نور بليلج غري"],
+    variantImages: [
+      { name: "أسود طبيعي", image: "/manus-storage/ext-m2-v1.jpg" },
+      { name: "بني غامق", image: "/manus-storage/ext-m2-v2.jpg" },
+      { name: "بني عسلي", image: "/manus-storage/ext-m2-v3.jpg" },
+      { name: "شاتين روكس", image: "/manus-storage/ext-m2-v4.jpg" },
+      { name: "أشقر فاتح", image: "/manus-storage/ext-m2-v5.jpg" },
+      { name: "نور بليلج غري", image: "/manus-storage/ext-m2-v6.jpg" },
+    ],
+    image: "/manus-storage/ext-m2-hero.jpg",
+    gallery: ["/manus-storage/ext-m2-s1.jpg", "/manus-storage/ext-m2-s2.jpg"],
     arName: "إكستنشن الشعر — طول أكبر وكثافة أكثر",
     arCategoryLabel: "وصلات شعر",
     arDescription: "إكستنشن شعر طبيعي 50% بمظهر أنثوي رائع، سهل التركيب ويدوم لفترة طويلة.",
@@ -235,6 +247,10 @@ export const products: Product[] = [
     description: "Une silhouette emerald majestueuse, fluide et confortable, avec une broderie signature qui attire tous les regards.",
     details: ["Velours emerald doux", "Broderie décorative premium", "Coupe ample et confortable", "Tailles S à XL"],
     colors: ["Emerald", "Noir"],
+    variantImages: [
+      { name: "Emerald", image: maquetteAbayaHero },
+      { name: "Noir", image: emeraldAbayaBack },
+    ],
     image: maquetteAbayaHero,
     gallery: replaceAnnotatedAbayaPhotos([maquetteAbayaHero, maquetteAbayaT1, maquetteAbayaT2, maquetteAbayaT3, maquetteAbayaT4, maquetteAbayaT5]),
     arName: "عباية رويال إيميرالد",
@@ -257,6 +273,11 @@ export const products: Product[] = [
     description: "Doudoune d'hiver luxueuse avec col en fourrure douce, isolation thermique optimale et coupe moderne.",
     details: ["Fourrure luxueuse douce", "Excellente isolation contre le froid", "Coupe moderne et légère", "Tailles S à XXL"],
     colors: ["أزرق سماوي", "أبيض", "أسود"],
+    variantImages: [
+      { name: "أزرق سماوي", image: "/manus-storage/doudoune-blue.jpg" },
+      { name: "أبيض", image: "/manus-storage/doudoune-white.jpg" },
+      { name: "أسود", image: "/manus-storage/doudoune-black.jpg" },
+    ],
     image: "/manus-storage/doudoune-bg.jpg",
     gallery: [
       "/manus-storage/doudoune-bg.jpg",
@@ -362,8 +383,101 @@ export function getCatalogProducts(): Product[] {
   }
 }
 
+export function getProductVariantOptions(product: Product | undefined): ProductVariantImage[] {
+  if (!product) return [{ name: "Noir", image: "" }];
+  if (product.variantImages && product.variantImages.length > 0) {
+    return product.variantImages.map((v, idx) => ({
+      name: v.name || product.colors?.[idx] || `اللون ${idx + 1}`,
+      image: v.image || product.gallery?.[idx] || product.image || "",
+    }));
+  }
+  const isDoudoune = product.id === "p-008" || product.slug === "doudoune-hiver-luxe";
+  if (isDoudoune) {
+    const dCols = product.colors?.length ? product.colors : ["أزرق سماوي", "أبيض", "أسود"];
+    const dImgs = [
+      "/manus-storage/doudoune-blue.jpg",
+      "/manus-storage/doudoune-white.jpg",
+      "/manus-storage/doudoune-black.jpg",
+    ];
+    return dCols.map((c, idx) => ({
+      name: c,
+      image: product.gallery?.[idx] || dImgs[idx] || product.image,
+    }));
+  }
+  const isExtensions =
+    product.id === "p-005" ||
+    product.slug === "extensions-silk-wave" ||
+    product.slug === "extensions-cheveux";
+  if (isExtensions) {
+    return [
+      { name: "أسود طبيعي", image: "/manus-storage/ext-m2-v1.jpg" },
+      { name: "بني غامق", image: "/manus-storage/ext-m2-v2.jpg" },
+      { name: "بني عسلي", image: "/manus-storage/ext-m2-v3.jpg" },
+      { name: "شاتين روكس", image: "/manus-storage/ext-m2-v4.jpg" },
+      { name: "أشقر فاتح", image: "/manus-storage/ext-m2-v5.jpg" },
+      { name: "نور بليلج غري", image: "/manus-storage/ext-m2-v6.jpg" },
+    ];
+  }
+  if (product.colors && product.colors.length > 0) {
+    return product.colors.map((c, idx) => ({
+      name: c,
+      image: product.gallery?.[idx] || product.image || "",
+    }));
+  }
+  if (product.gallery && product.gallery.length > 0) {
+    return product.gallery.map((img, idx) => ({
+      name: `اللون ${idx + 1}`,
+      image: img,
+    }));
+  }
+  return [{ name: "Standard", image: product.image || "" }];
+}
+
 export function saveCatalogProducts(next: Product[]) {
-  if (typeof window !== "undefined") localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(next));
+  if (typeof window === "undefined") return;
+  localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent("miss-sensuelle-catalog-updated"));
+  void fetch("/api/checkout/catalog", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ products: next }),
+  }).catch(() => {});
+}
+
+let catalogSyncStarted = false;
+export function syncCatalogFromServer() {
+  if (typeof window === "undefined" || catalogSyncStarted) return;
+  catalogSyncStarted = true;
+  void fetch("/api/checkout/catalog")
+    .then(r => (r.ok ? r.json() : null))
+    .then((data: { products?: Product[] } | null) => {
+      const serverProducts = data?.products;
+      if (!Array.isArray(serverProducts) || serverProducts.length === 0) return;
+      const localProducts = getCatalogProducts();
+      const byId = new Map<string, Product>();
+      for (const p of localProducts) {
+        if (p && p.id) byId.set(p.id, p);
+      }
+      let changed = false;
+      for (const sp of serverProducts) {
+        if (!sp || !sp.id) continue;
+        const existing = byId.get(sp.id);
+        if (!existing || JSON.stringify(existing) !== JSON.stringify(sp)) {
+          byId.set(sp.id, sp);
+          changed = true;
+        }
+      }
+      if (changed) {
+        const merged = Array.from(byId.values());
+        localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(merged));
+        window.dispatchEvent(new CustomEvent("miss-sensuelle-catalog-updated"));
+      }
+    })
+    .catch(() => {});
+}
+
+if (typeof window !== "undefined") {
+  syncCatalogFromServer();
 }
 
 export function adjustProductStock(productIdentifier: string, delta: number): Product | null {

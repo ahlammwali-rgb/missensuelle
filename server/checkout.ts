@@ -41,6 +41,8 @@ import {
   ensurePersistentStoreLoaded,
   schedulePersistentStoreSave,
   getNotificationPreferences,
+  getServerCatalogProducts,
+  setServerCatalogProducts,
 } from "./persistentStore";
 import { sendAdminPushNotification } from "./webPush";
 
@@ -904,7 +906,39 @@ type Transaction = Database extends { transaction: (fn: infer F) => unknown }
   : never;
 
 function getCanonicalProduct(productId: string) {
-  return canonicalProducts.get(productId) ?? canonicalSlugs.get(productId);
+  const customList = getServerCatalogProducts() as Array<(typeof products)[number]>;
+  if (Array.isArray(customList) && customList.length > 0) {
+    const foundCustom = customList.find(
+      p => p && (p.id === productId || p.slug === productId)
+    );
+    if (foundCustom) {
+      return {
+        ...foundCustom,
+        price: Number(foundCustom.price) || 0,
+        packPrice: foundCustom.packPrice ? Number(foundCustom.packPrice) : undefined,
+        stock: Number(foundCustom.stock) || 10,
+      };
+    }
+  }
+  const builtIn = canonicalProducts.get(productId) ?? canonicalSlugs.get(productId);
+  if (builtIn) return builtIn;
+  if (productId && productId.startsWith("p-")) {
+    return {
+      id: productId,
+      slug: productId,
+      name: `Produit (${productId})`,
+      category: "mode" as const,
+      categoryLabel: "Mode femme",
+      price: 4500,
+      description: "",
+      details: [],
+      colors: [],
+      image: "",
+      accent: "#ec4899",
+      stock: 20,
+    };
+  }
+  return undefined;
 }
 
 async function ensureApprovedBaseline(tx: Transaction, productId: string) {
@@ -1015,6 +1049,12 @@ export async function saveCheckoutDraft(input: SaveDraftInput): Promise<{ sessio
 }
 
 function computeLineTotal(slugOrId: string, unitPrice: number, quantity: number) {
+  const customProd = getCanonicalProduct(slugOrId);
+  if (customProd?.packPrice && customProd.packPrice > 0 && quantity >= 2) {
+    const pairs = Math.floor(quantity / 2);
+    const singles = quantity % 2;
+    return pairs * customProd.packPrice + singles * unitPrice;
+  }
   if ((slugOrId === "p-008" || slugOrId === "doudoune-hiver-luxe") && quantity === 2) {
     return 12900;
   }
@@ -1548,5 +1588,16 @@ export function registerCheckoutHttpRoutes(app: Express) {
   app.post("/api/checkout/discard", route(req => {
     const parsed = discardDraftSchema.parse(req.body);
     return discardCheckoutDraft(parsed);
+  }));
+  app.get("/api/checkout/catalog", route(async () => {
+    await loadStore();
+    return { products: getServerCatalogProducts() };
+  }));
+  app.post("/api/checkout/catalog", route(async req => {
+    await loadStore();
+    const list = Array.isArray(req.body?.products) ? req.body.products : [];
+    setServerCatalogProducts(list);
+    saveStore();
+    return { ok: true, count: getServerCatalogProducts().length };
   }));
 }

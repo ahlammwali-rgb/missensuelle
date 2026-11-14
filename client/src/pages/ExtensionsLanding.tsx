@@ -42,20 +42,59 @@ export default function ExtensionsLanding({
     product.slug === "extensions-silk-wave" ||
     product.slug === "extensions-cheveux";
 
-  const VARIANT_CARDS =
-    !isBuiltIn && product.variantImages && product.variantImages.length > 0
-      ? product.variantImages.map((v, idx) => ({
+  const hasCustomVariants =
+    Array.isArray(product.variantImages) &&
+    product.variantImages.some(v => v && (v.image || v.name));
+
+  const VARIANT_CARDS = hasCustomVariants
+    ? product.variantImages!.map((v, idx) => ({
+        id: `v${idx + 1}`,
+        name: v.name || product.colors?.[idx] || `اللون ${idx + 1}`,
+        image:
+          v.image ||
+          product.gallery?.[idx] ||
+          product.image ||
+          DEFAULT_VARIANT_CARDS[idx % DEFAULT_VARIANT_CARDS.length].image,
+      }))
+    : !isBuiltIn && product.colors && product.colors.length > 0
+      ? product.colors.map((c, idx) => ({
           id: `v${idx + 1}`,
-          name: v.name || `اللون ${idx + 1}`,
-          image: v.image || product.image,
+          name: c,
+          image: product.gallery?.[idx] || product.image,
         }))
-      : !isBuiltIn && product.colors && product.colors.length > 0
-        ? product.colors.map((c, idx) => ({
+      : !isBuiltIn && product.gallery && product.gallery.length > 0
+        ? product.gallery.map((img, idx) => ({
             id: `v${idx + 1}`,
-            name: c,
-            image: product.gallery?.[idx] || product.image,
+            name: product.colors?.[idx] || `الموديل ${idx + 1}`,
+            image: img,
           }))
         : DEFAULT_VARIANT_CARDS;
+
+  const isCustomHeroImage =
+    Boolean(product.image) &&
+    product.image !== "/manus-storage/ext-pink-1.jpg" &&
+    product.image !== "/manus-storage/ext-m2-hero.jpg";
+
+  const heroImageSrc = isCustomHeroImage
+    ? product.image
+    : isBuiltIn
+      ? "/manus-storage/ext-m2-hero.jpg"
+      : product.image ||
+        product.gallery?.[0] ||
+        VARIANT_CARDS[0]?.image ||
+        "/manus-storage/ext-m2-hero.jpg";
+
+  const legacyDefaultGallery = new Set([
+    "/manus-storage/extensions-poster.jpg",
+    "/manus-storage/async-images/uM7lQJWYdXHIVBYkKtIu8c/image-3.webp",
+    "/manus-storage/async-images/vHn8VKRbVex1NUkhameC59/image-3.webp",
+    "/manus-storage/async-images/vHn8VKRbVex1NUkhameC59/image-2.webp",
+    "/manus-storage/async-images/vHn8VKRbVex1NUkhameC59/image-1.webp",
+    "/manus-storage/async-images/CiRxshIVQV0OT7GfuQSZCa/image-5.webp",
+  ]);
+  const effectiveGallery = (product.gallery ?? []).filter(
+    img => Boolean(img) && !(isBuiltIn && legacyDefaultGallery.has(img))
+  );
 
   const PACK_2_PRICE =
     product.packPrice ||
@@ -289,19 +328,16 @@ export default function ExtensionsLanding({
         {/* 1. BIGGER HERO WITH 6 FEATURE ROWS + SMOOTH BOTTOM GRADIENT */}
         <div className="hero">
           <img
-            src={
-              isBuiltIn
-                ? "/manus-storage/ext-m2-hero.jpg"
-                : product.image || "/manus-storage/ext-m2-hero.jpg"
-            }
+            src={heroImageSrc}
             alt={product.arName || product.name}
           />
-          {HERO_FEATURES.map((feat, idx) => (
-            <div key={idx} className="rw" style={{ top: feat.top }}>
-              <span>{feat.text}</span>
-              <i>✔</i>
-            </div>
-          ))}
+          {isBuiltIn && !isCustomHeroImage &&
+            HERO_FEATURES.map((feat, idx) => (
+              <div key={idx} className="rw" style={{ top: feat.top }}>
+                <span>{feat.text}</span>
+                <i>✔</i>
+              </div>
+            ))}
         </div>
 
         {/* 2. VARIANT CARDS SLIDER */}
@@ -340,16 +376,16 @@ export default function ExtensionsLanding({
 
         {/* 3. STACKED PROMO SECTIONS + CTA IMAGE */}
         <div className="ext-m2-banners">
-          {isBuiltIn ? (
+          {effectiveGallery.length > 0 ? (
+            effectiveGallery.map((sliceUrl, idx) => (
+              <img key={`${sliceUrl}-${idx}`} src={sliceUrl} alt="" />
+            ))
+          ) : isBuiltIn ? (
             <>
               <img src="/manus-storage/ext-m2-s1.jpg" alt="" />
               <img src="/manus-storage/ext-m2-s2.jpg" alt="" />
             </>
-          ) : (
-            (product.gallery ?? []).map((sliceUrl, idx) => (
-              <img key={`${sliceUrl}-${idx}`} src={sliceUrl} alt="" />
-            ))
-          )}
+          ) : null}
 
           <a
             href="#f"

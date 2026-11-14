@@ -14,12 +14,32 @@ const detailNames = { collar: "ياقة فرو ناعمة", buttons: "أزرار
 const colorChoices = [{ id: "black" as const, label: "أسود", hex: "#111" }, { id: "white" as const, label: "أبيض", hex: "#f4ecdf" }];
 
 export default function CoatLanding({ product, quantity = 1 }: { product: Product; quantity?: number }) {
-  const isBuiltIn = product.id === "p-001" || product.slug === "blazer-lilac-dream";
-  const dynamicColorChoices = !isBuiltIn && product.variantImages && product.variantImages.length > 0
-    ? product.variantImages.map((v, idx) => ({ id: v.name, label: v.name, hex: idx % 2 === 0 ? "#111" : "#f4ecdf", image: v.image || product.image }))
-    : !isBuiltIn && product.colors && product.colors.length > 0
-      ? product.colors.map((c, idx) => ({ id: c, label: c, hex: idx % 2 === 0 ? "#111" : "#f4ecdf", image: product.gallery?.[idx] || product.image }))
-      : colorChoices.map(c => ({ ...c, image: "" }));
+  const isBuiltIn =
+    (product.id === "p-001" || product.slug === "blazer-lilac-dream") &&
+    (!product.image || product.image === coatImages.black.hero);
+  const dynamicColorChoices =
+    !isBuiltIn && product.variantImages && product.variantImages.length > 0
+      ? product.variantImages.map((v, idx) => ({
+          id: v.name || `اللون ${idx + 1}`,
+          label: v.name || `اللون ${idx + 1}`,
+          hex: idx % 2 === 0 ? "#111" : "#f4ecdf",
+          image: v.image || product.gallery?.[idx] || product.image,
+        }))
+      : !isBuiltIn && product.colors && product.colors.length > 0
+        ? product.colors.map((c, idx) => ({
+            id: c,
+            label: c,
+            hex: idx % 2 === 0 ? "#111" : "#f4ecdf",
+            image: product.gallery?.[idx] || product.image,
+          }))
+        : !isBuiltIn && product.gallery && product.gallery.length > 0
+          ? product.gallery.map((img, idx) => ({
+              id: `الموديل ${idx + 1}`,
+              label: `الموديل ${idx + 1}`,
+              hex: idx % 2 === 0 ? "#111" : "#f4ecdf",
+              image: img,
+            }))
+          : colorChoices.map(c => ({ ...c, image: "" }));
 
   const [color, setColor] = useState<string | null>(null);
   const [wilaya, setWilaya] = useState("");

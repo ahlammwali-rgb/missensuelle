@@ -7,7 +7,7 @@ import { trpc } from "@/lib/trpc";
 import type { CheckoutOrder } from "@shared/checkout";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
 import { shippingFeeFor } from "@shared/shipping";
-import { categories, getCatalogProducts, saveCatalogProducts, formatDZD, wilayas, type LandingTemplateId, type Order, type OrderStatus, type Product, type ProductVariantImage } from "@/lib/store-data";
+import { categories, getCatalogProducts, getProductVariantOptions, saveCatalogProducts, formatDZD, wilayas, type LandingTemplateId, type Order, type OrderStatus, type Product, type ProductVariantImage } from "@/lib/store-data";
 import { StatusPill } from "@/components/StoreLayout";
 import { useTheme } from "@/contexts/ThemeContext";
 import { getPixelConfig, savePixelConfig, trackPixelEvent, hasGlobalTikTokPixel, hasGlobalFacebookPixel, type PixelConfig } from "@/lib/tracking";
@@ -1120,16 +1120,16 @@ const LANDING_TEMPLATES: {
   },
   {
     id: "extensions",
-    title: "Template 2 · Style Extensions Pink (1+1 Offerte)",
-    subtitle: "Bannières Verticales + Slider Variantes + 1 Achetée = 1 Offerte",
+    title: "Template 2 · Style Extensions Luxe (1+1 Offerte)",
+    subtitle: "Hero Plein Écran + Slider Variantes + 1 Achetée = 1 Offerte",
     inspiredBy: "Inspiré de : Extensions Cheveux Naturel (p-005)",
-    previewImage: "/manus-storage/ext-pink-1.jpg",
-    accentColor: "#c0307f",
-    bgGradient: "linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)",
+    previewImage: "/manus-storage/ext-m2-hero.jpg",
+    accentColor: "#d49b27",
+    bgGradient: "linear-gradient(135deg, #fdf8f0 0%, #f9ebd2 100%)",
     features: [
-      "Affiches verticales plein écran empilées sans marge",
+      "Hero plein écran avec dégradé fondu continu entre les sections",
       "Slider horizontal de grandes cartes variantes cliquables",
-      "Formulaire 1 Achetée + 1 Offerte (sélection de 2 variantes) + Barre sticky",
+      "Formulaire Espresso & Or Champagne (sélection de 2 variantes 1+1)",
     ],
     hasPackOffer: true,
   },
@@ -1193,6 +1193,12 @@ function CatalogPanel({ notify }: { notify: (message: string) => void }) {
   const [catalog, setCatalog] = useState<Product[]>(() => getCatalogProducts());
   const [editing, setEditing] = useState<Product | null>(null);
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setCatalog(getCatalogProducts());
+    window.addEventListener("miss-sensuelle-catalog-updated", sync);
+    return () => window.removeEventListener("miss-sensuelle-catalog-updated", sync);
+  }, []);
 
   const refresh = (next: Product[]) => {
     try {
@@ -1452,8 +1458,10 @@ function ProductForm({
     Array.isArray(initial.details) ? initial.details.join("\n") : String(initial.details ?? "")
   );
   const [newGalleryUrl, setNewGalleryUrl] = useState("");
+  const [isCompressing, setIsCompressing] = useState(false);
   const imageRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
+  const bulkVariantsRef = useRef<HTMLInputElement>(null);
 
   const selectedTemplateMeta =
     LANDING_TEMPLATES.find(t => t.id === (form.landingTemplate ?? "doudoune")) ?? LANDING_TEMPLATES[0];
@@ -1461,29 +1469,98 @@ function ProductForm({
   const set = <K extends keyof Product>(key: K, value: Product[K]) =>
     setForm(current => ({ ...current, [key]: value }));
 
-  const readFileAsDataUrl = (file: File): Promise<string> =>
+  const compressImageFile = (file: File, maxDim = 1150, quality = 0.82): Promise<string> =>
     new Promise(resolve => {
       const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
+      reader.onload = () => {
+        const rawDataUrl = String(reader.result || "");
+        const img = new Image();
+        img.onload = () => {
+          try {
+            let { width, height } = img;
+            if (width > maxDim || height > maxDim) {
+              const ratio = Math.min(maxDim / width, maxDim / height);
+              width = Math.max(1, Math.round(width * ratio));
+              height = Math.max(1, Math.round(height * ratio));
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              resolve(rawDataUrl);
+              return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            const webp = canvas.toDataURL("image/webp", quality);
+            if (webp && webp.startsWith("data:image/webp") && webp.length < rawDataUrl.length) {
+              resolve(webp);
+              return;
+            }
+            const jpeg = canvas.toDataURL("image/jpeg", quality);
+            resolve(jpeg.length < rawDataUrl.length ? jpeg : rawDataUrl);
+          } catch {
+            resolve(rawDataUrl);
+          }
+        };
+        img.onerror = () => resolve(rawDataUrl);
+        img.src = rawDataUrl;
+      };
       reader.readAsDataURL(file);
     });
 
   const handleMainImageUpload = async (files: FileList | null) => {
     if (!files?.length) return;
-    const dataUrl = await readFileAsDataUrl(files[0]);
+    setIsCompressing(true);
+    const dataUrl = await compressImageFile(files[0], 1280, 0.84);
     set("image", dataUrl);
+    setIsCompressing(false);
   };
 
   const handleGalleryUpload = async (files: FileList | null) => {
     if (!files?.length) return;
-    const urls = await Promise.all(Array.from(files).map(readFileAsDataUrl));
+    setIsCompressing(true);
+    const urls = await Promise.all(Array.from(files).map(f => compressImageFile(f, 1200, 0.82)));
     setGalleryList(prev => [...prev, ...urls]);
+    if (!form.image && urls[0]) {
+      set("image", urls[0]);
+    }
+    setIsCompressing(false);
   };
 
   const handleVariantImageUpload = async (index: number, files: FileList | null) => {
     if (!files?.length) return;
-    const dataUrl = await readFileAsDataUrl(files[0]);
-    setVariants(prev => prev.map((v, i) => (i === index ? { ...v, image: dataUrl } : v)));
+    setIsCompressing(true);
+    const dataUrl = await compressImageFile(files[0], 900, 0.82);
+    setVariants(prev =>
+      prev.map((v, i) =>
+        i === index
+          ? { ...v, name: v.name.trim() || `اللون ${i + 1}`, image: dataUrl }
+          : v
+      )
+    );
+    if (!form.image && dataUrl) {
+      set("image", dataUrl);
+    }
+    setIsCompressing(false);
+  };
+
+  const handleBulkVariantsUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setIsCompressing(true);
+    const urls = await Promise.all(Array.from(files).map(f => compressImageFile(f, 900, 0.82)));
+    setVariants(prev => {
+      const existingNonEmpty = prev.filter(v => v.image.trim() || v.name.trim());
+      const added = urls.map((imgUrl, idx) => ({
+        name: `اللون ${existingNonEmpty.length + idx + 1}`,
+        image: imgUrl,
+      }));
+      return [...existingNonEmpty, ...added];
+    });
+    if (!form.image && urls[0]) {
+      set("image", urls[0]);
+    }
+    setIsCompressing(false);
   };
 
   const prefillFromExistingProduct = (templateId: LandingTemplateId) => {
@@ -1512,33 +1589,26 @@ function ProductForm({
       arName: found.arName,
       arCategoryLabel: found.arCategoryLabel,
       arDescription: found.arDescription,
-      image: found.image,
+      image: templateId === "extensions" ? "/manus-storage/ext-m2-hero.jpg" : found.image,
       accent: found.accent,
     }));
     setDetailsText((found.details ?? []).join("\n"));
     setGalleryList(found.gallery ?? []);
     if (templateId === "extensions") {
       setVariants([
-        { name: "أسود طبيعي", image: "/manus-storage/ext-pink-v1.jpg" },
-        { name: "بني غامق", image: "/manus-storage/ext-pink-v2.jpg" },
-        { name: "بني عسلي", image: "/manus-storage/ext-pink-v3.jpg" },
-        { name: "شاتين روكس", image: "/manus-storage/ext-pink-v4.jpg" },
-        { name: "أشقر فاتح", image: "/manus-storage/ext-pink-v5.jpg" },
-        { name: "نور بليلي غري", image: "/manus-storage/ext-pink-v6.jpg" },
+        { name: "أسود طبيعي", image: "/manus-storage/ext-m2-v1.jpg" },
+        { name: "بني غامق", image: "/manus-storage/ext-m2-v2.jpg" },
+        { name: "بني عسلي", image: "/manus-storage/ext-m2-v3.jpg" },
+        { name: "شاتين روكس", image: "/manus-storage/ext-m2-v4.jpg" },
+        { name: "أشقر فاتح", image: "/manus-storage/ext-m2-v5.jpg" },
+        { name: "نور بليلج غري", image: "/manus-storage/ext-m2-v6.jpg" },
       ]);
       setGalleryList([
-        "/manus-storage/ext-pink-3.jpg",
-        "/manus-storage/ext-pink-4.jpg",
-        "/manus-storage/ext-pink-5.jpg",
-        "/manus-storage/ext-pink-6.jpg",
+        "/manus-storage/ext-m2-s1.jpg",
+        "/manus-storage/ext-m2-s2.jpg",
       ]);
     } else {
-      setVariants(
-        (found.colors ?? []).map((c, idx) => ({
-          name: c,
-          image: found.gallery?.[idx] || found.image,
-        }))
-      );
+      setVariants(getProductVariantOptions(found));
     }
   };
 
@@ -1554,14 +1624,42 @@ function ProductForm({
         .replace(/^-|-$/g, "") ||
       `produit-${Date.now()}`;
 
+    const mergedGallery = [
+      ...galleryList,
+      ...(newGalleryUrl.trim() ? [newGalleryUrl.trim()] : []),
+    ].filter(Boolean);
+
+    // Conserve toutes les variantes qui ont soit un nom soit une photo !
     const cleanVariants = variants
-      .map(v => ({ name: v.name.trim(), image: v.image.trim() }))
-      .filter(v => v.name.length > 0);
+      .map((v, idx) => ({
+        name: v.name.trim() || (v.image.trim() ? `اللون ${idx + 1}` : ""),
+        image: v.image.trim(),
+      }))
+      .filter(v => v.name.length > 0 || v.image.length > 0);
+
+    // Si l'utilisateur a ajouté des photos dans la galerie mais pas de photos sur les variantes, associer automatiquement
+    const enrichedVariants =
+      cleanVariants.length > 0
+        ? cleanVariants.map((v, idx) => ({
+            name: v.name || `اللون ${idx + 1}`,
+            image: v.image || mergedGallery[idx] || form.image || "",
+          }))
+        : mergedGallery.map((img, idx) => ({
+            name: `اللون ${idx + 1}`,
+            image: img,
+          }));
+
+    const effectiveMainImage =
+      form.image.trim() ||
+      mergedGallery[0] ||
+      enrichedVariants.find(v => v.image)?.image ||
+      "/manus-storage/doudoune-bg.jpg";
 
     const product: Product = {
       ...form,
       id: form.id || `p-${Date.now()}`,
       slug,
+      image: effectiveMainImage,
       landingTemplate: form.landingTemplate ?? "doudoune",
       price: Number(form.price) || 0,
       oldPrice: form.oldPrice ? Number(form.oldPrice) : undefined,
@@ -1571,9 +1669,12 @@ function ProductForm({
         .split("\n")
         .map(v => v.trim())
         .filter(Boolean),
-      colors: cleanVariants.map(v => v.name),
-      variantImages: cleanVariants,
-      gallery: galleryList.filter(Boolean),
+      colors: enrichedVariants.map(v => v.name),
+      variantImages: enrichedVariants,
+      gallery:
+        mergedGallery.length > 0
+          ? mergedGallery
+          : enrichedVariants.map(v => v.image).filter(Boolean),
     };
     onSave(product);
   };
@@ -1847,14 +1948,31 @@ function ProductForm({
           ))}
         </div>
 
-        <button
-          type="button"
-          className="button button-light"
-          style={{ marginTop: 10 }}
-          onClick={() => setVariants(prev => [...prev, { name: "", image: "" }])}
-        >
-          <Plus size={15} /> Ajouter une variante / couleur
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="button button-light"
+            onClick={() => setVariants(prev => [...prev, { name: `اللون ${prev.length + 1}`, image: "" }])}
+          >
+            <Plus size={15} /> Ajouter une variante / couleur
+          </button>
+          <button
+            type="button"
+            className="upload-inline"
+            onClick={() => bulkVariantsRef.current?.click()}
+            style={{ cursor: "pointer" }}
+          >
+            <Upload size={14} /> 📸 Importer plusieurs photos de variantes d'un coup
+          </button>
+          <input
+            ref={bulkVariantsRef}
+            className="visually-hidden"
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={e => void handleBulkVariantsUpload(e.target.files)}
+          />
+        </div>
       </div>
 
       {/* ÉTAPE 4 : PHOTO PRINCIPALE (HERO) & GALERIE / BANNIÈRES VERTICALES */}
@@ -1865,8 +1983,8 @@ function ProductForm({
             <h4>Photo Principale (Hero) & Galerie / Bannières de la Landing Page</h4>
             <p>
               {form.landingTemplate === "extensions"
-                ? "Pour le template Extensions Pink : la Photo Principale s'affiche tout en haut, et les photos de la Galerie s'empilent en grandes bannières verticales sous le slider !"
-                : "Importe la photo principale (Hero) ainsi que les photos de détails ou du lookbook."}
+                ? "Pour le template Extensions : la Photo Principale s'affiche en grand Hero tout en haut, et les photos de la Galerie s'empilent en grandes bannières sous le slider !"
+                : "Importe la photo principale (Hero) ainsi que les photos de détails ou du lookbook (toutes les photos sont compressées automatiquement en HD)."}
             </p>
           </div>
         </div>
@@ -1874,9 +1992,8 @@ function ProductForm({
         <div className="product-admin-grid">
           <div className="studio-media-block">
             <label>
-              Photo principale (Hero Banner) *
+              Photo principale (Hero Banner)
               <input
-                required
                 placeholder="URL de l'image principale ou importe depuis ton appareil"
                 value={form.image}
                 onChange={e => set("image", e.target.value)}
@@ -1893,12 +2010,17 @@ function ProductForm({
                 accept="image/*"
                 onChange={e => void handleMainImageUpload(e.target.files)}
               />
-              {form.image && (
-                <img
-                  src={form.image}
-                  alt="Aperçu Hero"
-                  style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 10, border: "1px solid var(--line)" }}
-                />
+              {(form.image || galleryList[0] || variants[0]?.image) && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <img
+                    src={form.image || galleryList[0] || variants[0]?.image}
+                    alt="Aperçu Hero"
+                    style={{ width: 68, height: 68, objectFit: "cover", borderRadius: 12, border: "2px solid #10b981" }}
+                  />
+                  <small style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>
+                    ✓ Photo Hero prise en compte
+                  </small>
+                </div>
               )}
             </div>
           </div>
@@ -1917,7 +2039,7 @@ function ProductForm({
 
           <div className="wide-field studio-media-block">
             <label>
-              Galerie photos / Bannières verticales ({galleryList.length} photos)
+              Galerie photos / Bannières verticales ({galleryList.length} photo{galleryList.length > 1 ? "s" : ""})
             </label>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
               <input
@@ -1933,13 +2055,14 @@ function ProductForm({
                 onClick={() => {
                   if (!newGalleryUrl.trim()) return;
                   setGalleryList(prev => [...prev, newGalleryUrl.trim()]);
+                  if (!form.image) set("image", newGalleryUrl.trim());
                   setNewGalleryUrl("");
                 }}
               >
                 <Plus size={14} /> Ajouter URL
               </button>
               <button type="button" className="upload-inline" onClick={() => galleryRef.current?.click()}>
-                <Upload size={14} /> Importer plusieurs photos
+                <Upload size={14} /> 📸 Importer plusieurs photos
               </button>
               <input
                 ref={galleryRef}
@@ -1954,8 +2077,23 @@ function ProductForm({
             {galleryList.length > 0 && (
               <div className="studio-gallery-thumbs">
                 {galleryList.map((imgUrl, idx) => (
-                  <div key={`${imgUrl}-${idx}`} className="studio-gallery-thumb-item">
+                  <div key={`${imgUrl.slice(0, 40)}-${idx}`} className="studio-gallery-thumb-item">
                     <img src={imgUrl} alt={`Galerie ${idx + 1}`} />
+                    <span
+                      style={{
+                        position: "absolute",
+                        bottom: 4,
+                        right: 4,
+                        background: "rgba(15,23,42,0.8)",
+                        color: "#fff",
+                        fontSize: 10,
+                        fontWeight: 800,
+                        padding: "1px 6px",
+                        borderRadius: 999,
+                      }}
+                    >
+                      #{idx + 1}
+                    </span>
                     <button
                       type="button"
                       onClick={() => setGalleryList(prev => prev.filter((_, i) => i !== idx))}
@@ -1969,14 +2107,47 @@ function ProductForm({
             )}
           </div>
         </div>
+
+        {/* Bilan en direct des photos prises en compte */}
+        <div
+          style={{
+            marginTop: 14,
+            padding: "12px 14px",
+            borderRadius: 14,
+            background: "linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.06))",
+            border: "1.5px solid rgba(16, 185, 129, 0.35)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 10,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, fontWeight: 900, color: "#065f46" }}>
+              {isCompressing
+                ? "⏳ Optimisation et compression HD des photos en cours…"
+                : "✅ Bilan des photos prises en compte :"}
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 800, background: "#fff", color: "#0f172a", padding: "3px 10px", borderRadius: 999, border: "1px solid rgba(16,185,129,0.4)" }}>
+              🖼️ Hero : {form.image || galleryList[0] || variants.some(v => v.image) ? "1 photo prête" : "Auto"}
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 800, background: "#fff", color: "#0f172a", padding: "3px 10px", borderRadius: 999, border: "1px solid rgba(16,185,129,0.4)" }}>
+              🎨 Variantes avec photo : {variants.filter(v => v.image.trim()).length} / {variants.length}
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 800, background: "#fff", color: "#0f172a", padding: "3px 10px", borderRadius: 999, border: "1px solid rgba(16,185,129,0.4)" }}>
+              📸 Galerie / Bannières : {galleryList.length + (newGalleryUrl.trim() ? 1 : 0)} photo(s)
+            </span>
+          </div>
+        </div>
       </div>
 
       <div className="form-panel-actions">
         <button type="button" className="button button-light" onClick={onCancel}>
           Annuler
         </button>
-        <button type="submit" className="button button-gradient">
-          <Save size={16} /> Enregistrer le produit & publier la Landing Page
+        <button type="submit" className="button button-gradient" disabled={isCompressing}>
+          <Save size={16} /> {isCompressing ? "Compression des photos…" : "Enregistrer le produit & publier la Landing Page"}
         </button>
       </div>
     </form>
@@ -2141,11 +2312,15 @@ function findMatchingCatalogProduct(catalog: Product[], orderProductId?: string,
 
 function getColorsForProduct(product: Product | undefined): string[] {
   if (!product) return ["Noir"];
+  const variantOpts = getProductVariantOptions(product);
+  if (variantOpts.length > 0) {
+    return variantOpts.map(v => v.name);
+  }
   const isDoudoune = product.id === "p-008" || product.slug.includes("doudoune") || product.name.toLowerCase().includes("doudoune");
   if (isDoudoune) return ["أزرق سماوي", "أبيض", "أسود"];
   const isExtensions = product.id === "p-005" || product.slug.includes("extensions") || product.category === "extensions";
   if (isExtensions) {
-    return ["أسود طبيعي", "بني غامق", "بني عسلي", "شاتين روكس", "أشقر فاتح", "نور بليلي غري", "شاتان فونس", "أسود"];
+    return ["أسود طبيعي", "بني غامق", "بني عسلي", "شاتين روكس", "أشقر فاتح", "نور بليلج غري"];
   }
   return product.colors?.length ? product.colors : ["Emerald", "Noir"];
 }
@@ -2686,29 +2861,65 @@ function OrderModal({
           </div>
 
           {quantity === 1 ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-              <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
-                Variante · Couleur
-                <select
-                  value={variants[0]?.color || availableColors[0]}
-                  onChange={e => updatePieceVariant(0, "color", e.target.value)}
-                >
-                  {Array.from(new Set([variants[0]?.color, ...availableColors].filter(Boolean))).map(c => (
-                    <option key={c} value={c}>{c === "Emerald" ? "Emerald (أخضر)" : c === "Noir" ? "Noir (أسود)" : c}</option>
-                  ))}
-                </select>
-              </label>
-              <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
-                Variante · Taille
-                <select
-                  value={variants[0]?.size || "M"}
-                  onChange={e => updatePieceVariant(0, "size", e.target.value)}
-                >
-                  {["S", "M", "L", "XL", "XXL", "Standard"].map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </label>
+            <div style={{ display: "grid", gap: "10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+                <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+                  Variante · Couleur
+                  <select
+                    value={variants[0]?.color || availableColors[0]}
+                    onChange={e => updatePieceVariant(0, "color", e.target.value)}
+                  >
+                    {Array.from(new Set([variants[0]?.color, ...availableColors].filter(Boolean))).map(c => (
+                      <option key={c} value={c}>{c === "Emerald" ? "Emerald (أخضر)" : c === "Noir" ? "Noir (أسود)" : c}</option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+                  Variante · Taille
+                  <select
+                    value={variants[0]?.size || "M"}
+                    onChange={e => updatePieceVariant(0, "size", e.target.value)}
+                  >
+                    {["S", "M", "L", "XL", "XXL", "Standard"].map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              {getProductVariantOptions(selectedCatalogProduct).some(vo => vo.image) && (
+                <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "4px" }}>
+                  {getProductVariantOptions(selectedCatalogProduct).map((vo, vIdx) => {
+                    const isPicked = (variants[0]?.color || availableColors[0]) === vo.name;
+                    return (
+                      <button
+                        key={`${vo.name}-${vIdx}`}
+                        type="button"
+                        onClick={() => updatePieceVariant(0, "color", vo.name)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "7px",
+                          padding: "4px 10px 4px 5px",
+                          borderRadius: "10px",
+                          border: isPicked ? "2px solid #10b981" : "1px solid var(--line, #cbd5e1)",
+                          background: isPicked ? "rgba(16, 185, 129, 0.12)" : "var(--input-bg, #fff)",
+                          cursor: "pointer",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {vo.image && (
+                          <img
+                            src={vo.image}
+                            alt={vo.name}
+                            style={{ width: 32, height: 32, borderRadius: 7, objectFit: "cover" }}
+                          />
+                        )}
+                        <span style={{ fontSize: 12, fontWeight: 800 }}>{vo.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ) : (
             <div style={{
@@ -3326,7 +3537,13 @@ function CreateOrderModal({
     status?: OrderStatus;
   }) => void;
 }) {
-  const catalog = useMemo(() => getCatalogProducts(), []);
+  const [catalog, setCatalog] = useState<Product[]>(() => getCatalogProducts());
+  useEffect(() => {
+    const sync = () => setCatalog(getCatalogProducts());
+    window.addEventListener("miss-sensuelle-catalog-updated", sync);
+    return () => window.removeEventListener("miss-sensuelle-catalog-updated", sync);
+  }, []);
+
   const defaultProduct = catalog.find(p => p.id === "p-005") || catalog[0];
 
   const [customer, setCustomer] = useState("");
@@ -3334,9 +3551,13 @@ function CreateOrderModal({
   const [status, setStatus] = useState<OrderStatus>("confirmee");
   const [productId, setProductId] = useState(defaultProduct?.id || "p-005");
   const [productName, setProductName] = useState(defaultProduct?.name || "Extensions Cheveux Naturels");
-  const [quantity, setQuantity] = useState<number>(defaultProduct?.id === "p-005" ? 2 : 1);
+  const [quantity, setQuantity] = useState<number>(defaultProduct?.id === "p-005" || defaultProduct?.packPrice ? 2 : 1);
 
   const selectedCatalogProduct = catalog.find(p => p.id === productId) || defaultProduct;
+  const variantOptions1 = useMemo(
+    () => getProductVariantOptions(selectedCatalogProduct),
+    [selectedCatalogProduct]
+  );
   const availableColors = useMemo(() => getColorsForProduct(selectedCatalogProduct), [selectedCatalogProduct]);
 
   const [variants, setVariants] = useState<PieceVariant[]>(() => [
@@ -3351,6 +3572,10 @@ function CreateOrderModal({
   const [secondProductName, setSecondProductName] = useState<string>(secondDefault?.name || "");
   const [secondQuantity, setSecondQuantity] = useState<number>(1);
   const secondCatalogProduct = catalog.find(p => p.id === secondProductId) || secondDefault;
+  const variantOptions2 = useMemo(
+    () => getProductVariantOptions(secondCatalogProduct),
+    [secondCatalogProduct]
+  );
   const secondAvailableColors = useMemo(() => getColorsForProduct(secondCatalogProduct), [secondCatalogProduct]);
   const [secondVariants, setSecondVariants] = useState<PieceVariant[]>(() => [
     { color: secondAvailableColors[0] || "Noir", size: getDefaultSizeForProduct(secondDefault) },
@@ -3391,7 +3616,7 @@ function CreateOrderModal({
       setProductName(found.name);
       const nextColors = getColorsForProduct(found);
       const nextDefSize = getDefaultSizeForProduct(found);
-      const nextQty = found.id === "p-005" ? 2 : 1;
+      const nextQty = found.id === "p-005" || found.landingTemplate === "extensions" ? 2 : 1;
       setQuantity(nextQty);
       setVariants([
         { color: nextColors[0] || "Noir", size: nextDefSize },
@@ -3492,30 +3717,41 @@ function CreateOrderModal({
   return (
     <div className="modal-layer">
       <button className="modal-backdrop" onClick={onClose} />
-      <div className="order-modal" style={{ maxHeight: "90vh", overflowY: "auto" }}>
-        <div className="modal-head">
+      <div className="order-modal" style={{ maxHeight: "92vh", overflowY: "auto", maxWidth: "720px" }}>
+        <div
+          className="modal-head"
+          style={{
+            background: "linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(59, 130, 246, 0.08))",
+            padding: "14px 16px",
+            borderRadius: "16px",
+            border: "1px solid rgba(16, 185, 129, 0.28)",
+          }}
+        >
           <div>
-            <span className="eyebrow" style={{ color: "#10b981" }}>➕ Création manuelle</span>
-            <h2>Nouvelle commande</h2>
+            <span className="eyebrow" style={{ color: "#10b981", fontWeight: 900 }}>
+              ✨ Studio Commande Directe (Téléphone / WhatsApp / Instagram)
+            </span>
+            <h2 style={{ margin: "2px 0 0" }}>Créer une nouvelle commande</h2>
           </div>
           <button className="icon-button" onClick={onClose} aria-label="Fermer">
             <X size={19} />
           </button>
         </div>
 
-        <form className="order-edit-form" onSubmit={handleSubmitCreate} style={{ display: "grid", gap: "14px", marginTop: "10px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
-              Client(e) *
+        <form className="order-edit-form" onSubmit={handleSubmitCreate} style={{ display: "grid", gap: "14px", marginTop: "12px" }}>
+          {/* 1. INFOS CLIENTE */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "12px" }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 800 }}>
+              👤 Nom & Prénom de la cliente *
               <input
                 value={customer}
                 onChange={e => setCustomer(e.target.value)}
-                placeholder="Nom et prénom de la cliente"
+                placeholder="Ex: Sara Benali"
                 required
               />
             </label>
-            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
-              Téléphone *
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 800 }}>
+              📞 Numéro de téléphone *
               <input
                 type="tel"
                 value={phone}
@@ -3526,105 +3762,312 @@ function CreateOrderModal({
             </label>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
-              Produit *
-              <select value={productId} onChange={e => handleProductChange(e.target.value)}>
-                {catalog.map(item => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} ({formatDZD(item.price)})
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
-              Quantité / Offre
-              <select
-                value={quantity}
-                onChange={e => handleQuantityChange(Number(e.target.value))}
-                style={{
-                  height: "44px",
-                  borderRadius: "10px",
-                  border: "1px solid #cbd5e1",
-                  padding: "0 12px",
-                  fontWeight: 700,
-                  fontSize: "14px",
-                  backgroundColor: "var(--input-bg, #fff)",
-                }}
-              >
-                {[1, 2, 3, 4, 5, 6].map(qty => {
-                  const goods = computeProductGoodsPrice(selectedCatalogProduct, qty);
-                  let label = `${qty} pièce${qty > 1 ? "s" : ""} — ${formatDZD(goods)}`;
-                  if (productId === "p-005" && qty === 2) {
-                    label = `2 pièces (Offre 1+1 Gratuite = 4 500 DA 🎁)`;
-                  } else if (productId === "p-008" && qty === 2) {
-                    label = `2 pièces (Pack Duo = 12 900 DA 🔥)`;
-                  }
-                  return (
-                    <option key={qty} value={qty}>
-                      {label}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
-          </div>
-
-          {/* Variantes du produit principal */}
+          {/* 2. SÉLECTION VISUELLE DU PRODUIT AVEC PHOTOS */}
           <div
             style={{
               padding: "12px 14px",
-              borderRadius: "14px",
-              background: "rgba(16, 185, 129, 0.06)",
-              border: "1px solid rgba(16, 185, 129, 0.25)",
+              borderRadius: "16px",
+              background: "var(--bg-elev, rgba(148, 163, 184, 0.08))",
+              border: "1.5px solid var(--line, rgba(148, 163, 184, 0.25))",
               display: "grid",
-              gap: "8px",
+              gap: "10px",
             }}
           >
-            <span style={{ fontSize: "12.5px", fontWeight: 800, color: "#065f46" }}>
-              🎨 Choix des variantes ({quantity} pièce{quantity > 1 ? "s" : ""}) :
-            </span>
-            {variants.slice(0, quantity).map((v, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "auto 1fr 1fr",
-                  gap: "8px",
-                  alignItems: "center",
-                  background: "var(--input-bg, #fff)",
-                  padding: "8px 10px",
-                  borderRadius: "10px",
-                  border: "1px solid rgba(0,0,0,0.08)",
-                }}
-              >
-                <span style={{ fontWeight: 800, fontSize: "12px", minWidth: "65px" }}>
-                  Pièce {idx + 1} :
-                </span>
-                <select
-                  value={v.color}
-                  onChange={e => updatePieceVariant(idx, "color", e.target.value)}
-                  style={{ height: "36px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}
-                >
-                  {availableColors.map(c => (
-                    <option key={c} value={c}>{c}</option>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+              <span style={{ fontSize: "13px", fontWeight: 900 }}>
+                🛍️ 1. Choisis le produit (clique sur la photo ou dans la liste) :
+              </span>
+              <span style={{ fontSize: "11.5px", fontWeight: 800, color: "#10b981" }}>
+                {catalog.length} produits disponibles
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                overflowX: "auto",
+                padding: "4px 2px 8px",
+                scrollbarWidth: "thin",
+              }}
+            >
+              {catalog.map(item => {
+                const isSelected = item.id === productId;
+                const heroThumb = item.image || item.gallery?.[0] || item.variantImages?.[0]?.image || "/manus-storage/doudoune-bg.jpg";
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleProductChange(item.id)}
+                    style={{
+                      flex: "0 0 132px",
+                      borderRadius: "14px",
+                      border: isSelected ? "2.5px solid #10b981" : "1.5px solid var(--line, #cbd5e1)",
+                      background: isSelected
+                        ? "linear-gradient(180deg, rgba(16, 185, 129, 0.14), rgba(16, 185, 129, 0.04))"
+                        : "var(--input-bg, #fff)",
+                      padding: "6px",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      position: "relative",
+                      boxShadow: isSelected ? "0 6px 16px rgba(16, 185, 129, 0.22)" : "none",
+                      transition: "all 0.16s ease",
+                    }}
+                  >
+                    <div style={{ position: "relative", width: "100%", height: "86px", borderRadius: "10px", overflow: "hidden", background: "#0f172a" }}>
+                      <img
+                        src={heroThumb}
+                        alt={item.name}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      />
+                      {isSelected && (
+                        <span
+                          style={{
+                            position: "absolute",
+                            top: 5,
+                            right: 5,
+                            background: "#10b981",
+                            color: "#fff",
+                            fontSize: "10px",
+                            fontWeight: 900,
+                            padding: "2px 7px",
+                            borderRadius: "999px",
+                          }}
+                        >
+                          ✓ Choisi
+                        </span>
+                      )}
+                      {item.packPrice ? (
+                        <span
+                          style={{
+                            position: "absolute",
+                            bottom: 4,
+                            left: 4,
+                            background: "rgba(15, 23, 42, 0.85)",
+                            color: "#fde047",
+                            fontSize: "9.5px",
+                            fontWeight: 800,
+                            padding: "1px 6px",
+                            borderRadius: "999px",
+                          }}
+                        >
+                          🎁 Pack {formatDZD(item.packPrice)}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div style={{ marginTop: "6px" }}>
+                      <div
+                        style={{
+                          fontSize: "11.5px",
+                          fontWeight: 800,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          color: "var(--text, #0f172a)",
+                        }}
+                      >
+                        {item.name}
+                      </div>
+                      <div style={{ fontSize: "11.5px", fontWeight: 900, color: "#10b981", marginTop: "1px" }}>
+                        {formatDZD(item.price)}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
+              <label style={{ display: "grid", gap: "5px", fontSize: "12.5px", fontWeight: 700 }}>
+                Produit sélectionné
+                <select value={productId} onChange={e => handleProductChange(e.target.value)}>
+                  {catalog.map(item => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} ({formatDZD(item.price)})
+                    </option>
                   ))}
                 </select>
+              </label>
+
+              <label style={{ display: "grid", gap: "5px", fontSize: "12.5px", fontWeight: 700 }}>
+                Quantité / Offre Promo
                 <select
-                  value={v.size}
-                  onChange={e => updatePieceVariant(idx, "size", e.target.value)}
-                  style={{ height: "36px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}
+                  value={quantity}
+                  onChange={e => handleQuantityChange(Number(e.target.value))}
+                  style={{
+                    height: "44px",
+                    borderRadius: "10px",
+                    border: "1px solid #cbd5e1",
+                    padding: "0 12px",
+                    fontWeight: 800,
+                    fontSize: "13.5px",
+                    backgroundColor: "var(--input-bg, #fff)",
+                  }}
                 >
-                  {["Standard", "S", "M", "L", "XL", "XXL"].map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
+                  {[1, 2, 3, 4, 5, 6].map(qty => {
+                    const goods = computeProductGoodsPrice(selectedCatalogProduct, qty);
+                    let label = `${qty} pièce${qty > 1 ? "s" : ""} — ${formatDZD(goods)}`;
+                    if ((productId === "p-005" || selectedCatalogProduct?.landingTemplate === "extensions") && qty === 2) {
+                      label = `2 pièces (Offre 1+1 Gratuite = ${formatDZD(goods)} 🎁)`;
+                    } else if ((productId === "p-008" || selectedCatalogProduct?.packPrice) && qty === 2) {
+                      label = `2 pièces (Pack Duo = ${formatDZD(goods)} 🔥)`;
+                    }
+                    return (
+                      <option key={qty} value={qty}>
+                        {label}
+                      </option>
+                    );
+                  })}
                 </select>
-              </div>
-            ))}
+              </label>
+            </div>
           </div>
 
-          {/* Option 2ème produit Cross-Sell */}
+          {/* 3. VARIANTES DU PRODUIT PRINCIPAL AVEC PHOTOS CLIQUABLES */}
+          <div
+            style={{
+              padding: "12px 14px",
+              borderRadius: "16px",
+              background: "rgba(16, 185, 129, 0.06)",
+              border: "1.5px solid rgba(16, 185, 129, 0.28)",
+              display: "grid",
+              gap: "10px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "6px" }}>
+              <span style={{ fontSize: "13px", fontWeight: 900, color: "#065f46" }}>
+                🎨 2. Choix des variantes & photos ({quantity} pièce{quantity > 1 ? "s" : ""}) :
+              </span>
+              <small style={{ fontSize: "11.5px", fontWeight: 700, color: "#047857" }}>
+                Clique sur la photo de la couleur/modèle pour chaque pièce
+              </small>
+            </div>
+
+            {variants.slice(0, quantity).map((v, idx) => {
+              const matchedOpt = variantOptions1.find(vo => vo.name === v.color) || variantOptions1[0];
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    display: "grid",
+                    gap: "8px",
+                    background: "var(--input-bg, #fff)",
+                    padding: "10px 12px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(16, 185, 129, 0.22)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "auto 1fr auto",
+                      gap: "10px",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      {matchedOpt?.image ? (
+                        <img
+                          src={matchedOpt.image}
+                          alt={v.color}
+                          style={{
+                            width: 42,
+                            height: 42,
+                            borderRadius: 10,
+                            objectFit: "cover",
+                            border: "2px solid #10b981",
+                          }}
+                        />
+                      ) : null}
+                      <div>
+                        <span style={{ fontWeight: 900, fontSize: "12.5px", display: "block" }}>
+                          Pièce {idx + 1} {idx === 1 && quantity === 2 && (productId === "p-005" || selectedCatalogProduct?.landingTemplate === "extensions") ? "(🎁 Gratuite)" : ""}
+                        </span>
+                        <small style={{ fontSize: "11px", color: "#10b981", fontWeight: 800 }}>
+                          {v.color} · {v.size}
+                        </small>
+                      </div>
+                    </div>
+
+                    <select
+                      value={v.color}
+                      onChange={e => updatePieceVariant(idx, "color", e.target.value)}
+                      style={{ height: "38px", borderRadius: "9px", fontSize: "12.5px", fontWeight: 700 }}
+                    >
+                      {Array.from(new Set([v.color, ...availableColors].filter(Boolean))).map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={v.size}
+                      onChange={e => updatePieceVariant(idx, "size", e.target.value)}
+                      style={{ height: "38px", borderRadius: "9px", fontSize: "12.5px", fontWeight: 700, minWidth: "90px" }}
+                    >
+                      {["Standard", "S", "M", "L", "XL", "XXL"].map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Mini galerie de photos de variantes cliquables */}
+                  {variantOptions1.some(vo => vo.image) && (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "7px",
+                        overflowX: "auto",
+                        paddingTop: "4px",
+                        paddingBottom: "2px",
+                      }}
+                    >
+                      {variantOptions1.map((vo, vIdx) => {
+                        const active = v.color === vo.name;
+                        return (
+                          <button
+                            key={`${idx}-${vo.name}-${vIdx}`}
+                            type="button"
+                            onClick={() => updatePieceVariant(idx, "color", vo.name)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              padding: "4px 9px 4px 4px",
+                              borderRadius: "10px",
+                              border: active ? "2px solid #10b981" : "1px solid rgba(148, 163, 184, 0.35)",
+                              background: active ? "rgba(16, 185, 129, 0.14)" : "transparent",
+                              cursor: "pointer",
+                              flexShrink: 0,
+                              transition: "all 0.15s ease",
+                            }}
+                          >
+                            {vo.image ? (
+                              <img
+                                src={vo.image}
+                                alt={vo.name}
+                                style={{
+                                  width: 30,
+                                  height: 30,
+                                  borderRadius: "50%",
+                                  objectFit: "cover",
+                                  border: active ? "1.5px solid #10b981" : "1px solid #cbd5e1",
+                                }}
+                              />
+                            ) : null}
+                            <span style={{ fontSize: "11.5px", fontWeight: active ? 900 : 700 }}>
+                              {vo.name}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 4. OPTION 2ÈME PRODUIT CROSS-SELL AVEC PHOTOS */}
           {!hasSecondProduct ? (
             <button
               type="button"
@@ -3652,7 +4095,7 @@ function CreateOrderModal({
                 padding: "12px 14px",
                 borderRadius: "14px",
                 background: "rgba(59, 130, 246, 0.06)",
-                border: "1px solid rgba(59, 130, 246, 0.3)",
+                border: "1.5px solid rgba(59, 130, 246, 0.3)",
                 display: "grid",
                 gap: "10px",
               }}
@@ -3701,13 +4144,54 @@ function CreateOrderModal({
                   ))}
                 </select>
               </div>
+              {variantOptions2.some(vo => vo.image) && (
+                <div style={{ display: "flex", gap: "7px", overflowX: "auto", paddingBottom: "2px" }}>
+                  {variantOptions2.map((vo, vIdx) => {
+                    const active = (secondVariants[0]?.color || secondAvailableColors[0]) === vo.name;
+                    return (
+                      <button
+                        key={`sec-${vo.name}-${vIdx}`}
+                        type="button"
+                        onClick={() =>
+                          setSecondVariants([
+                            {
+                              color: vo.name,
+                              size: secondVariants[0]?.size || getDefaultSizeForProduct(secondCatalogProduct),
+                            },
+                          ])
+                        }
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          padding: "4px 9px 4px 4px",
+                          borderRadius: "10px",
+                          border: active ? "2px solid #2563eb" : "1px solid rgba(148, 163, 184, 0.35)",
+                          background: active ? "rgba(37, 99, 235, 0.12)" : "var(--input-bg, #fff)",
+                          cursor: "pointer",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {vo.image && (
+                          <img
+                            src={vo.image}
+                            alt={vo.name}
+                            style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }}
+                          />
+                        )}
+                        <span style={{ fontSize: "11.5px", fontWeight: 800 }}>{vo.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Wilaya & Commune */}
+          {/* 5. WILAYA & COMMUNE */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
             <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
-              Wilaya *
+              📍 Wilaya *
               <select
                 value={wilaya}
                 onChange={e => {
@@ -3725,7 +4209,7 @@ function CreateOrderModal({
               </select>
             </label>
             <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
-              Commune *
+              🏘️ Commune *
               {arabicCommunes.length > 0 ? (
                 <select value={commune} onChange={e => setCommune(e.target.value)} required>
                   {arabicCommunes.map(c => (
@@ -3738,7 +4222,7 @@ function CreateOrderModal({
             </label>
           </div>
 
-          {/* Livraison, Statut initial & Total */}
+          {/* 6. LIVRAISON, STATUT INITIAL & TOTAL */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px" }}>
             <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Type de livraison
@@ -3789,7 +4273,7 @@ function CreateOrderModal({
                 min={0}
                 value={effectiveTotal}
                 onChange={e => setCustomTotal(Number(e.target.value))}
-                style={{ fontWeight: 800, color: "#10b981", fontSize: "15px" }}
+                style={{ fontWeight: 900, color: "#10b981", fontSize: "15px" }}
                 required
               />
             </label>
@@ -3814,13 +4298,54 @@ function CreateOrderModal({
             </label>
           </div>
 
+          {/* RÉCAPITULATIF VISUEL DE LA COMMANDE */}
+          <div
+            style={{
+              padding: "12px 14px",
+              borderRadius: "14px",
+              background: "linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(15, 23, 42, 0.04))",
+              border: "1.5px dashed rgba(16, 185, 129, 0.45)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "10px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {selectedCatalogProduct?.image && (
+                <img
+                  src={selectedCatalogProduct.image}
+                  alt={selectedCatalogProduct.name}
+                  style={{ width: 46, height: 46, borderRadius: 10, objectFit: "cover", border: "1.5px solid #10b981" }}
+                />
+              )}
+              <div>
+                <strong style={{ fontSize: "13px", display: "block" }}>
+                  {productName} × {quantity} {hasSecondProduct ? `+ ${secondProductName} × ${secondQuantity}` : ""}
+                </strong>
+                <small style={{ fontSize: "11.5px", color: "var(--muted, #64748b)", fontWeight: 700 }}>
+                  Articles : {formatDZD(firstGoods + secondGoods)} · Livraison : {computedShippingFee === 0 ? "Gratuite 🎉" : formatDZD(computedShippingFee)}
+                </small>
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <small style={{ fontSize: "11px", fontWeight: 700, display: "block", color: "var(--muted, #64748b)" }}>
+                Total à encaisser
+              </small>
+              <strong style={{ fontSize: "18px", fontWeight: 900, color: "#10b981" }}>
+                {formatDZD(effectiveTotal)}
+              </strong>
+            </div>
+          </div>
+
           <button
             type="submit"
             className="button button-gradient full"
             disabled={isSaving}
-            style={{ marginTop: "6px", height: "48px", borderRadius: "14px", fontSize: "15px" }}
+            style={{ marginTop: "2px", height: "50px", borderRadius: "14px", fontSize: "15.5px", fontWeight: 900 }}
           >
-            <Plus size={17} /> {isSaving ? "Création en cours…" : "Créer la commande"}
+            <Plus size={18} /> {isSaving ? "Création en cours…" : "Créer et enregistrer la commande"}
           </button>
         </form>
       </div>
