@@ -1,19 +1,13 @@
-@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&display=swap");
 
 .ext-pink-root {
-  --ext-bg: #fde4ef;
-  --ext-bg-soft: #fff4f9;
-  --ext-tx: #1a1a1a;
-  --ext-pink-main: #e6197f;
-  --ext-pink-light: #ff5fb0;
-  --ext-pink-dark: #a80f5c;
-  --ext-border: #f3a9cb;
-  --ext-gold: #f5c65d;
-  --ext-black-pill: #150e12;
+  --bg: #fde4ef;
+  --tx: #1a1a1a;
   min-height: 100vh;
   width: 100%;
-  background: linear-gradient(180deg, #f9d2e4 0%, #fde4ef 50%, #f9d2e4 100%);
-  color: var(--ext-tx);
+  margin: 0;
+  background: var(--bg);
+  color: var(--tx);
   font-family: "Cairo", Tahoma, sans-serif;
   display: flex;
   justify-content: center;
@@ -31,607 +25,196 @@
 .ext-pink-w {
   width: 100%;
   max-width: 480px;
-  background: var(--ext-bg);
-  box-shadow: 0 0 36px rgba(168, 15, 92, 0.16);
-  position: relative;
-  overflow-x: hidden;
+  background: var(--bg);
 }
 
-.ext-pink-slice {
+.ext-pink-w > img {
   display: block;
   width: 100%;
   height: auto;
-  user-select: none;
-  -webkit-user-drag: none;
-}
-
-.ext-pink-slice-clickable {
-  cursor: pointer;
-  transition: transform 0.18s ease, filter 0.18s ease;
-}
-
-.ext-pink-slice-clickable:active {
-  transform: scale(0.99);
 }
 
 /* =========================================================
-   VARIANT SLIDER SECTION (varient slyde)
-   Homogeneous with ext-pink-1 & ext-pink-2 design
+   VARIANT SLIDER (ext-pink-2.jpg cards slightly larger)
+   Same original design, just larger cards in a horizontal slide
    ========================================================= */
-.ext-vslide-section {
-  background: radial-gradient(circle at 50% 0%, #fff0f7 0%, #fde4ef 70%, #fbd3e5 100%);
-  padding: 12px 12px 16px;
-  border-top: 2px solid #f7bdd8;
-  border-bottom: 2px solid #f7bdd8;
+.ext-variants-slider-wrap {
   position: relative;
-}
-
-.ext-vslide-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.ext-vslide-title-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: linear-gradient(90deg, #e6197f, #ff5fb0);
-  color: #fff;
-  font-weight: 900;
-  font-size: 15px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  box-shadow: 0 3px 0 #a80f5c, 0 6px 14px rgba(230, 25, 127, 0.25);
-}
-
-.ext-vslide-counter {
-  background: #150e12;
-  color: #f7d27a;
-  border: 1.5px solid #d9a441;
-  font-weight: 900;
-  font-size: 12.5px;
-  padding: 4px 11px;
-  border-radius: 999px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
-}
-
-/* Main featured variant showcase card */
-.ext-vslide-stage {
-  position: relative;
-  background: linear-gradient(145deg, #fff9fc 0%, #fde4ef 100%);
-  border: 2.5px solid #ec4699;
-  border-radius: 20px;
-  padding: 10px;
-  box-shadow:
-    0 10px 24px rgba(230, 25, 127, 0.18),
-    inset 0 0 0 1.5px rgba(255, 255, 255, 0.85);
-  overflow: hidden;
-}
-
-.ext-vslide-dual {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 9px;
-  align-items: stretch;
-}
-
-.ext-vslide-photo-card {
-  position: relative;
-  border-radius: 15px;
-  overflow: hidden;
-  border: 2px solid #f062a8;
-  background: #1b1116;
-  aspect-ratio: 3 / 4.35;
-  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.16);
-}
-
-.ext-vslide-photo-card img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center top;
-  display: block;
-  transition: transform 0.35s ease;
+  background: linear-gradient(180deg, #f8d4c4 0%, #fde4ef 55%, #fcdce9 100%);
+  padding: 6px 0;
 }
 
-.ext-vslide-photo-tag {
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  background: rgba(21, 14, 18, 0.84);
-  color: #f8d47c;
-  border: 1px solid rgba(245, 198, 93, 0.75);
-  font-size: 11px;
-  font-weight: 800;
-  padding: 2px 8px;
-  border-radius: 999px;
-  backdrop-filter: blur(4px);
-}
-
-/* Prev / Next navigation arrows */
-.ext-vslide-arrow {
-  position: absolute;
-  top: 44%;
-  transform: translateY(-50%);
-  z-index: 5;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  background: linear-gradient(135deg, #e6197f, #ff5fb0);
-  color: #fff;
+.ext-variants-track {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 3px 0 #a80f5c, 0 5px 14px rgba(0, 0, 0, 0.25);
-  transition: transform 0.15s ease;
-  padding: 0;
-}
-
-.ext-vslide-arrow:active {
-  transform: translateY(-50%) scale(0.93);
-}
-
-.ext-vslide-arrow-prev {
-  right: 4px;
-}
-
-.ext-vslide-arrow-next {
-  left: 4px;
-}
-
-/* Info bar under the dual slide photos */
-.ext-vslide-caption {
-  margin-top: 9px;
-  background: linear-gradient(180deg, #22141c 0%, #120a0f 100%);
-  border: 1.5px solid #d9a441;
-  border-radius: 14px;
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.ext-vslide-caption-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.ext-vslide-swatch-dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid #f7d27a;
-  flex-shrink: 0;
-  box-shadow: 0 0 0 2px rgba(230, 25, 127, 0.4);
-}
-
-.ext-vslide-shade-name {
-  font-size: 16.5px;
-  font-weight: 900;
-  color: #fff;
-  line-height: 1.2;
-}
-
-.ext-vslide-shade-sub {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #f8cfe3;
-  line-height: 1.25;
-}
-
-.ext-vslide-pick-btn {
-  flex-shrink: 0;
-  width: auto;
-  border: 0;
-  background: linear-gradient(90deg, #e6197f, #ff5fb0);
-  color: #fff;
-  font-family: inherit;
-  font-weight: 900;
-  font-size: 12.5px;
-  padding: 7px 13px;
-  border-radius: 999px;
-  box-shadow: 0 3px 0 #a80f5c;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.ext-vslide-pick-btn:active {
-  transform: translateY(1px);
-}
-
-/* Horizontal swipeable strip of all 6 cards from ext-pink-2 */
-.ext-vslide-strip-title {
-  margin: 10px 0 6px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12.5px;
-  font-weight: 800;
-  color: #9e1159;
-  padding: 0 2px;
-}
-
-.ext-vslide-strip {
-  display: flex;
+  direction: ltr;
   gap: 8px;
   overflow-x: auto;
-  padding: 4px 2px 8px;
+  padding: 4px 10px;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
 
-.ext-vslide-strip::-webkit-scrollbar {
+.ext-variants-track::-webkit-scrollbar {
   display: none;
 }
 
-.ext-vslide-thumb {
-  flex: 0 0 112px;
+.ext-variant-card {
+  flex: 0 0 38%;
+  max-width: 180px;
+  min-width: 142px;
   scroll-snap-align: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
   border-radius: 14px;
   overflow: hidden;
-  border: 2.5px solid #f3a9cb;
-  background: #fff;
-  padding: 0;
   cursor: pointer;
   position: relative;
-  transition: all 0.2s ease;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
-.ext-vslide-thumb img {
+.ext-variant-card img {
+  display: block;
   width: 100%;
   height: auto;
-  display: block;
+  border-radius: 14px;
 }
 
-.ext-vslide-thumb.is-active {
-  border-color: #e6197f;
-  transform: translateY(-3px) scale(1.03);
-  box-shadow:
-    0 0 0 2px #fff,
-    0 0 0 4px #e6197f,
-    0 8px 16px rgba(230, 25, 127, 0.32);
+.ext-variant-card.is-selected {
+  transform: scale(1.03);
+  box-shadow: 0 0 0 3px #e6197f, 0 6px 16px rgba(230, 25, 127, 0.35);
 }
 
-.ext-vslide-thumb-check {
+.ext-variant-nav {
   position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 22px;
-  height: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #e6197f, #ff5fb0);
+  border: 2px solid #fff;
+  background: linear-gradient(90deg, #e6197f, #ff5fb0);
   color: #fff;
-  font-size: 12px;
-  font-weight: 900;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-}
-
-/* Dots indicator */
-.ext-vslide-dots {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.ext-vslide-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  border: 0;
-  padding: 0;
-  background: #f3a9cb;
   cursor: pointer;
-  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  padding: 0;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
 }
 
-.ext-vslide-dot.is-active {
-  width: 24px;
-  background: linear-gradient(90deg, #e6197f, #ff5fb0);
+.ext-variant-nav-left {
+  left: 6px;
+}
+
+.ext-variant-nav-right {
+  right: 6px;
 }
 
 /* =========================================================
-   HOMOGENEOUS ORDER FORM (#f)
-   Matches exex.html colors, borders, pills & typography 100%
+   BOTTOM ORDER FORM (#f) — Homogeneous with original page
    ========================================================= */
-.ext-pink-form-wrap {
+.ext-pink-form {
   margin: 0;
-  padding: 14px 12px 22px;
-  background: linear-gradient(180deg, #fde4ef 0%, #fbd5e6 100%);
+  padding: 16px 14px 22px;
+  background: linear-gradient(180deg, #fde4ef 0%, #fbd2e5 100%);
+  border-top: 2px solid #f3a9cb;
 }
 
-.ext-pink-form-card {
-  background: linear-gradient(180deg, #fffafd 0%, #fde9f2 100%);
-  border: 2.5px solid #ee67a9;
-  border-radius: 22px;
-  padding: 14px 13px 18px;
-  box-shadow:
-    0 12px 28px rgba(168, 15, 92, 0.16),
-    inset 0 0 0 1.5px #ffffff;
-  position: relative;
+.ext-pink-form-inner {
+  background: rgba(255, 255, 255, 0.72);
+  border: 2px solid #f3a9cb;
+  border-radius: 20px;
+  padding: 14px 12px 16px;
+  box-shadow: 0 8px 22px rgba(230, 25, 127, 0.12);
 }
 
-.ext-pink-form-ribbon {
-  background: linear-gradient(90deg, #e6197f, #ff5fb0);
-  color: #fff;
+.ext-pink-form h3 {
+  margin: 0 0 12px;
   text-align: center;
-  padding: 10px 14px;
-  border-radius: 16px;
-  box-shadow: 0 4px 0 #a80f5c;
-  margin-bottom: 12px;
-}
-
-.ext-pink-form-ribbon h3 {
-  margin: 0;
+  color: #fff;
+  background: linear-gradient(90deg, #e6197f, #ff5fb0);
   font-size: 19px;
   font-weight: 900;
-  color: #fff;
-  letter-spacing: 0.2px;
+  padding: 9px 12px;
+  border-radius: 30px;
+  box-shadow: 0 3px 0 #a80f5c;
 }
 
-.ext-pink-form-ribbon p {
-  margin: 2px 0 0;
-  font-size: 12px;
-  font-weight: 700;
-  color: #ffe6f2;
-}
-
-/* Offer Selector (1 piece vs 2 pieces promo matching ext-pink-5.jpg) */
-.ext-pink-field-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13.5px;
-  font-weight: 900;
-  color: #b80f64;
-  margin: 8px 2px 6px;
-}
-
-.ext-pink-offers {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 11px;
-}
-
-.ext-pink-offer-btn {
-  position: relative;
-  border: 2px solid #f3a9cb;
-  border-radius: 15px;
-  background: #fff;
-  padding: 10px 8px 9px;
-  text-align: center;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.18s ease;
-  color: #1a1a1a;
-  box-shadow: 0 2px 6px rgba(230, 25, 127, 0.08);
-}
-
-.ext-pink-offer-btn.is-active {
-  border-color: #e6197f;
-  background: linear-gradient(180deg, #fff0f7 0%, #ffd9ec 100%);
-  box-shadow:
-    0 0 0 2px #e6197f,
-    0 6px 14px rgba(230, 25, 127, 0.2);
-}
-
-.ext-pink-offer-badge {
-  position: absolute;
-  top: -9px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(90deg, #150e12, #2b1a23);
-  color: #f7d27a;
-  border: 1px solid #d9a441;
-  font-size: 10.5px;
-  font-weight: 900;
-  padding: 1px 9px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.ext-pink-offer-title {
-  font-size: 13.5px;
-  font-weight: 900;
-  color: #1a1a1a;
-  margin-top: 2px;
-}
-
-.ext-pink-offer-sub {
-  font-size: 11px;
-  font-weight: 700;
-  color: #a80f5c;
-  margin: 1px 0 3px;
-}
-
-.ext-pink-offer-price {
-  display: inline-block;
-  background: linear-gradient(90deg, #e6197f, #ff5fb0);
-  color: #fff;
-  font-weight: 900;
-  font-size: 14.5px;
-  padding: 2px 10px;
-  border-radius: 999px;
-}
-
-/* Color selector inside the form */
-.ext-pink-color-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 7px;
-  margin-bottom: 10px;
-}
-
-.ext-pink-color-chip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 7px;
-  border-radius: 12px;
-  border: 2px solid #f3a9cb;
-  background: #fff;
-  cursor: pointer;
-  font-family: inherit;
-  text-align: right;
-  transition: all 0.16s ease;
-  color: #1a1a1a;
-  box-shadow: none;
+.ext-pink-form input,
+.ext-pink-form select {
   width: 100%;
-}
-
-.ext-pink-color-chip.is-active {
-  border-color: #e6197f;
-  background: linear-gradient(90deg, #ffe3f1, #fff5fa);
-  box-shadow: 0 0 0 1.5px #e6197f, 0 4px 10px rgba(230, 25, 127, 0.18);
-}
-
-.ext-pink-color-chip-thumb {
-  width: 28px;
-  height: 36px;
-  border-radius: 7px;
-  object-fit: cover;
-  flex-shrink: 0;
-  border: 1px solid #f3a9cb;
-}
-
-.ext-pink-color-chip-name {
-  font-size: 11.5px;
-  font-weight: 900;
-  color: #1a1a1a;
-  line-height: 1.2;
-}
-
-/* Form inputs & selects matching exex.html */
-.ext-pink-input-group {
-  margin-bottom: 9px;
-}
-
-.ext-pink-input,
-.ext-pink-select {
-  width: 100%;
-  font-family: "Cairo", Tahoma, sans-serif;
+  font: inherit;
   font-size: 15px;
   font-weight: 700;
   padding: 12px 14px;
   border: 2px solid #f3a9cb;
   border-radius: 14px;
-  background: #ffffff;
+  margin-bottom: 9px;
+  background: #fff;
   color: #1a1a1a;
   outline: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
-.ext-pink-input::placeholder {
-  color: #9e6b85;
+.ext-pink-form input::placeholder {
+  color: #8c5b73;
   font-weight: 700;
 }
 
-.ext-pink-input:focus,
-.ext-pink-select:focus {
+.ext-pink-form input:focus,
+.ext-pink-form select:focus {
   border-color: #e6197f;
-  box-shadow: 0 0 0 3px rgba(230, 25, 127, 0.16);
+  box-shadow: 0 0 0 3px rgba(230, 25, 127, 0.15);
 }
 
-.ext-pink-input-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 9px;
-}
-
-/* Order total summary card in matching pink & gold-black style */
-.ext-pink-summary {
-  background: #fff;
-  border: 2px dashed #ec57a0;
-  border-radius: 14px;
-  padding: 10px 12px;
-  margin: 10px 0 12px;
-}
-
-.ext-pink-summary-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 13.5px;
-  font-weight: 800;
-  color: #4a2036;
-  padding: 3px 0;
-}
-
-.ext-pink-summary-total {
-  margin-top: 5px;
-  padding-top: 6px;
-  border-top: 1.5px solid #f7cbe0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 16.5px;
-  font-weight: 900;
-  color: #e6197f;
-}
-
-/* Submit button matching exex.html */
-.ext-pink-submit-btn {
+.ext-pink-form button[type="submit"] {
   width: 100%;
   border: 0;
   background: linear-gradient(90deg, #e6197f, #ff5fb0);
   color: #fff;
-  font-family: "Cairo", Tahoma, sans-serif;
+  font: inherit;
   font-weight: 900;
   font-size: 21px;
-  padding: 13px 16px;
+  padding: 13px;
   border-radius: 40px;
-  box-shadow: 0 4px 0 #a80f5c, 0 8px 20px rgba(230, 25, 127, 0.32);
+  box-shadow: 0 4px 0 #a80f5c;
   cursor: pointer;
-  transition: transform 0.15s ease, filter 0.15s ease;
+  margin-top: 2px;
 }
 
-.ext-pink-submit-btn:active {
+.ext-pink-form button[type="submit"]:active {
   transform: translateY(2px);
   box-shadow: 0 2px 0 #a80f5c;
 }
 
-.ext-pink-submit-btn:disabled {
-  opacity: 0.72;
+.ext-pink-form button[type="submit"]:disabled {
+  opacity: 0.7;
   cursor: not-allowed;
 }
 
-.ext-pink-ok-box {
-  margin-top: 10px;
-  background: #e8fff0;
-  border: 2px solid #17a34a;
-  border-radius: 14px;
+.ext-pink-ok {
   text-align: center;
   font-weight: 900;
   color: #0a8a3a;
-  padding: 10px 12px;
-  font-size: 14.5px;
+  background: #e9fff1;
+  border: 2px solid #22c55e;
+  border-radius: 12px;
+  padding: 10px;
+  margin-top: 10px;
 }
 
-/* Sticky bottom bar from exex.html */
 .ext-pink-bar {
   position: sticky;
   bottom: 0;
   display: block;
-  z-index: 40;
-  text-decoration: none;
+  z-index: 30;
 }
 
 .ext-pink-bar img {
@@ -640,30 +223,4 @@
   height: auto;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   background: #000;
-}
-
-/* Floating toast */
-.ext-pink-toast {
-  position: fixed;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%) translateY(-20px);
-  background: linear-gradient(90deg, #180e14, #2d1623);
-  color: #fff;
-  border: 1.5px solid #f5c65d;
-  padding: 8px 16px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 800;
-  z-index: 999;
-  opacity: 0;
-  pointer-events: none;
-  transition: all 0.22s ease;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-  white-space: nowrap;
-}
-
-.ext-pink-toast.is-visible {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
 }
