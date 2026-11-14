@@ -3,6 +3,13 @@ import { replaceAnnotatedAbayaPhotos } from "./abaya-gallery";
 
 export type CategoryId = "mode" | "vestes" | "beaute" | "lentilles" | "extensions";
 
+export type LandingTemplateId = "doudoune" | "extensions" | "abaya" | "coat" | "standard";
+
+export type ProductVariantImage = {
+  name: string;
+  image: string;
+};
+
 export type Product = {
   id: string;
   slug: string;
@@ -11,6 +18,9 @@ export type Product = {
   categoryLabel: string;
   price: number;
   oldPrice?: number;
+  packPrice?: number;
+  landingTemplate?: LandingTemplateId;
+  variantImages?: ProductVariantImage[];
   badge?: string;
   description: string;
   details: string[];
@@ -112,6 +122,7 @@ export const products: Product[] = [
     categoryLabel: "Vestes & ensembles",
     price: 9700,
     oldPrice: 12900,
+    landingTemplate: "coat",
     badge: "Best-seller",
     description: "Un manteau hivernal élégant avec col et poignets en fausse fourrure, boutons dorés et une coupe féminine évasée.",
     details: ["Col et poignets en fausse fourrure", "Boutons dorés", "Coupe féminine évasée", "Tailles S à XXL"],
@@ -181,6 +192,8 @@ export const products: Product[] = [
     categoryLabel: "Extensions cheveux",
     price: 2700,
     oldPrice: 3500,
+    packPrice: 4500,
+    landingTemplate: "extensions",
     badge: "Offre 2 700 DA",
     description: "Extensions cheveux naturel 50%, longueur et volume instantanés, pose facile et tenue longue durée.",
     details: ["Cheveux naturels 50%", "Pose facile et rapide", "Volume et longueur immédiats", "Longue durée de vie"],
@@ -217,6 +230,7 @@ export const products: Product[] = [
     categoryLabel: "Mode femme",
     price: 7500,
     oldPrice: 14000,
+    landingTemplate: "abaya",
     badge: "Livraison Gratuite",
     description: "Une silhouette emerald majestueuse, fluide et confortable, avec une broderie signature qui attire tous les regards.",
     details: ["Velours emerald doux", "Broderie décorative premium", "Coupe ample et confortable", "Tailles S à XL"],
@@ -237,6 +251,8 @@ export const products: Product[] = [
     categoryLabel: "Vestes & Manteaux",
     price: 7600,
     oldPrice: 9000,
+    packPrice: 12900,
+    landingTemplate: "doudoune",
     badge: "Offre spéciale",
     description: "Doudoune d'hiver luxueuse avec col en fourrure douce, isolation thermique optimale et coupe moderne.",
     details: ["Fourrure luxueuse douce", "Excellente isolation contre le froid", "Coupe moderne et légère", "Tailles S à XXL"],

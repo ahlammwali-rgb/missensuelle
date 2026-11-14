@@ -463,3 +463,12 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
   background: #000;
 }
+
+@media (max-width: 390px) {
+  .ext-variant-mini-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ext-variant-card {
+    flex: 0 0 68%;
+  }
+}

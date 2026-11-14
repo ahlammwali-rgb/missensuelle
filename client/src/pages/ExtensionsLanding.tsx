@@ -10,7 +10,7 @@ import "./extensions-template.css";
 
 type OfferMode = "pack2" | "single";
 
-const VARIANT_CARDS = [
+const DEFAULT_VARIANT_CARDS = [
   { id: "v1", name: "أسود طبيعي", image: "/manus-storage/ext-pink-v1.jpg" },
   { id: "v2", name: "بني غامق", image: "/manus-storage/ext-pink-v2.jpg" },
   { id: "v3", name: "بني عسلي", image: "/manus-storage/ext-pink-v3.jpg" },
@@ -19,7 +19,7 @@ const VARIANT_CARDS = [
   { id: "v6", name: "نور بليلي غري", image: "/manus-storage/ext-pink-v6.jpg" },
 ] as const;
 
-const PACK_2_PRICE = 4500;
+const DEFAULT_PACK_2_PRICE = 4500;
 
 export default function ExtensionsLanding({
   product,
@@ -28,9 +28,25 @@ export default function ExtensionsLanding({
   product: Product;
   quantity: number;
 }) {
+  const isBuiltIn = product.id === "p-005" || product.slug === "extensions-silk-wave" || product.slug === "extensions-cheveux";
+  const VARIANT_CARDS = !isBuiltIn && product.variantImages && product.variantImages.length > 0
+    ? product.variantImages.map((v, idx) => ({
+        id: `v${idx + 1}`,
+        name: v.name || `اللون ${idx + 1}`,
+        image: v.image || product.image,
+      }))
+    : !isBuiltIn && product.colors && product.colors.length > 0
+      ? product.colors.map((c, idx) => ({
+          id: `v${idx + 1}`,
+          name: c,
+          image: product.gallery?.[idx] || product.image,
+        }))
+      : DEFAULT_VARIANT_CARDS;
+  const PACK_2_PRICE = product.packPrice || (isBuiltIn ? DEFAULT_PACK_2_PRICE : Math.round((product.price || 2700) * 1.65));
+
   const [offerMode, setOfferMode] = useState<OfferMode>("pack2");
-  const [color1, setColor1] = useState<string>(VARIANT_CARDS[0].name);
-  const [color2, setColor2] = useState<string>(VARIANT_CARDS[1].name);
+  const [color1, setColor1] = useState<string>(VARIANT_CARDS[0]?.name ?? "أسود طبيعي");
+  const [color2, setColor2] = useState<string>((VARIANT_CARDS[1] ?? VARIANT_CARDS[0])?.name ?? "بني غامق");
   const [nextSlotToFill, setNextSlotToFill] = useState<1 | 2>(1);
   const [selectedWilaya, setSelectedWilaya] = useState<string>("");
   const [selectedCommune, setSelectedCommune] = useState<string>("");
@@ -257,7 +273,7 @@ export default function ExtensionsLanding({
   return (
     <div className="ext-pink-root" dir="rtl" lang="ar">
       <div className="ext-pink-w">
-        <img src="/manus-storage/ext-pink-1.jpg" alt="" />
+        <img src={isBuiltIn ? "/manus-storage/ext-pink-1.jpg" : (product.image || "/manus-storage/ext-pink-1.jpg")} alt={product.arName || product.name} />
 
         {/* Variant images slightly larger in a horizontal slide */}
         <div className="ext-variants-slider-wrap">
@@ -305,10 +321,18 @@ export default function ExtensionsLanding({
           </button>
         </div>
 
-        <img src="/manus-storage/ext-pink-3.jpg" alt="" />
-        <img src="/manus-storage/ext-pink-4.jpg" alt="" />
-        <img src="/manus-storage/ext-pink-5.jpg" alt="" />
-        <img src="/manus-storage/ext-pink-6.jpg" alt="" />
+        {isBuiltIn ? (
+          <>
+            <img src="/manus-storage/ext-pink-3.jpg" alt="" />
+            <img src="/manus-storage/ext-pink-4.jpg" alt="" />
+            <img src="/manus-storage/ext-pink-5.jpg" alt="" />
+            <img src="/manus-storage/ext-pink-6.jpg" alt="" />
+          </>
+        ) : (
+          (product.gallery ?? []).map((sliceUrl, idx) => (
+            <img key={`${sliceUrl}-${idx}`} src={sliceUrl} alt="" />
+          ))
+        )}
 
         {/* Beautiful Order Form at the bottom with 2-Variant Selection */}
         <form

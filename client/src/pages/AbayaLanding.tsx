@@ -33,7 +33,26 @@ const SIZES = ["S", "M", "L", "XL", "XXL"];
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export default function AbayaLanding({ product, quantity = 1 }: { product: Product; quantity?: number }) {
-  const [color, setColor] = useState<AbayaColor>("green");
+  const isBuiltIn = product.id === "p-007" || product.slug === "abaya-royal-emerald";
+  const dynamicColorChoices = !isBuiltIn && product.variantImages && product.variantImages.length > 0
+    ? product.variantImages.map((v, idx) => ({
+        id: `c-${idx}`,
+        label: v.name,
+        storeValue: v.name,
+        hex: idx % 2 === 0 ? "#0d4b37" : "#111111",
+        thumb: v.image || product.image,
+      }))
+    : !isBuiltIn && product.colors && product.colors.length > 0
+      ? product.colors.map((c, idx) => ({
+          id: `c-${idx}`,
+          label: c,
+          storeValue: c,
+          hex: idx % 2 === 0 ? "#0d4b37" : "#111111",
+          thumb: product.gallery?.[idx] || product.image,
+        }))
+      : colorChoices;
+
+  const [color, setColor] = useState<string>(dynamicColorChoices[0]?.id ?? "green");
   const [wilaya, setWilaya] = useState("");
   const [commune, setCommune] = useState("");
   const [size, setSize] = useState("L");
@@ -50,7 +69,7 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
       content_id: product.id,
       content_ids: [product.id],
       content_name: product.name,
-      value: 7500,
+      value: product.price || 7500,
       currency: "DZD",
     });
   }, [product.id]);
@@ -62,13 +81,16 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
     return () => window.clearInterval(timer);
   }, []);
 
+  const selectedColorChoice = dynamicColorChoices.find(c => c.id === color) ?? dynamicColorChoices[0];
   const current: AbayaColor = color === "black" ? "black" : "green";
-  const activeColorPreview = abayaImages.colorPreviews[current];
+  const activeColorPreview = isBuiltIn
+    ? abayaImages.colorPreviews[current]
+    : { thumb: selectedColorChoice.thumb, caption: selectedColorChoice.label };
   const doudoune = getProduct("doudoune-hiver-luxe");
   const communes = abayaCommunesByWilaya[wilaya] ?? [];
-  const unitPrice = 7500;
+  const unitPrice = isBuiltIn ? 7500 : (product.price || 7500);
+  const oldPriceVal = isBuiltIn ? 14000 : (product.oldPrice || Math.round(unitPrice * 1.4));
   const total = unitPrice * quantity;
-  const selectedColorChoice = colorChoices.find(c => c.id === color) ?? colorChoices[0];
 
   const checkout = useCheckoutDraft({
     formRef,
@@ -155,19 +177,19 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
           </div>
         </header>
 
-        <section className="hx hx-poster" aria-label="عباية رويال + Jump suit">
+        <section className="hx hx-poster" aria-label={product.arName || product.name}>
           <div className="hero-poster-wrap">
             <img
               id="hero"
-              src={abayaImages.mainHero}
-              alt="عباية رويال + Jump suit — عرض خاص 7500 دج + توصيل مجاني"
+              src={isBuiltIn ? abayaImages.mainHero : (selectedColorChoice.thumb || product.image || abayaImages.mainHero)}
+              alt={product.arName || product.name}
               width="1024"
               height="840"
               fetchPriority="high"
             />
             <div className="hero-price-badge-7500">
-              <strong>7500 دج</strong>
-              <del>14000 دج</del>
+              <strong>{unitPrice} دج</strong>
+              <del>{oldPriceVal} دج</del>
               <span>🚚 التوصيل مجاني</span>
             </div>
           </div>
@@ -175,12 +197,12 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
           <div className="hero-conversion-box">
             <div className="hero-conv-top">
               <div className="hero-conv-title">
-                <h1>👑 طقم عباية رويال + جمبسوت أسود</h1>
+                <h1>👑 {isBuiltIn ? "طقم عباية رويال + جمبسوت أسود" : (product.arName || product.name)}</h1>
                 <small>✅ توصيل مجاني لباب المنزل (0 دج) · الدفع عند الاستلام</small>
               </div>
               <div className="hero-conv-price">
-                <b>7,500 دج</b>
-                <del>14,000 دج</del>
+                <b>{unitPrice.toLocaleString("en-US")} دج</b>
+                <del>{oldPriceVal.toLocaleString("en-US")} دج</del>
               </div>
             </div>
 
@@ -200,13 +222,13 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
           <div className="vx-adv-bar">
             <div><i>🚚</i><b>توصيل مجاني</b><small>لجميع 58 ولاية</small></div>
             <div><i>🛡️</i><b>دفع عند الاستلام</b><small>افحصي قبل الدفع</small></div>
-            <div><i>✅</i><b>قطيفة ملكية</b><small>تطريز حر متقن</small></div>
+            <div><i>✅</i><b>جودة ملكية</b><small>تفاصيل متقنة</small></div>
             <div><i>🔄</i><b>تبديل المقاس</b><small>مضمون 100%</small></div>
           </div>
         </section>
 
         <div className="g5">
-          {abayaImages.thumbs.map(item => (
+          {(isBuiltIn ? abayaImages.thumbs : (product.gallery ?? [product.image]).slice(0, 5).map((src, i) => ({ key: `g-${i}`, src, label: product.details?.[i] || `${product.arName || product.name} ${i + 1}` }))).map(item => (
             <div key={item.key}>
               <img src={item.src} alt={item.label} loading="lazy" />
               <p>{item.label}</p>
@@ -217,7 +239,11 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
         <div className="pair">
           <div className="card">
             <b>لماذا تعشقها زبوناتنا ؟</b><br />
-            عباية من القطيفة الملكية الفاخرة بتطريز راقٍ، مرفقة بجمبسوت أسود أنيق يبرز القوام، بسعر استثنائي <b>7,500 دج فقط + توصيل مجاني</b> !
+            {isBuiltIn ? (
+              <>عباية من القطيفة الملكية الفاخرة بتطريز راقٍ، مرفقة بجمبسوت أسود أنيق يبرز القوام، بسعر استثنائي <b>7,500 دج فقط + توصيل مجاني</b> !</>
+            ) : (
+              <>{product.arDescription || product.description} — بسعر استثنائي <b>{unitPrice.toLocaleString("en-US")} دج فقط</b> !</>
+            )}
           </div>
           <div className="pk"><div><span>🎁</span><br />التوصيل مجاني<br />0 دج</div></div>
         </div>
@@ -316,9 +342,9 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
                 </div>
                 <div className="err" id="e_cm" role={errors.commune ? "alert" : undefined}>{errors.commune}</div>
 
-                <label>2️⃣ اختاري لون العباية (مع الجمبسوت الأسود) :</label>
+                <label>2️⃣ {isBuiltIn ? "اختاري لون العباية (مع الجمبسوت الأسود) :" : "اختاري اللون المفضل لديك :"}</label>
                 <div className="sw sw-thumbs" id="cb">
-                  {colorChoices.map(item => (
+                  {dynamicColorChoices.map(item => (
                     <button
                       type="button"
                       key={item.id}

@@ -57,10 +57,17 @@ function ProductPage({ onAdd, slugOverride }: { onAdd: (product: typeof products
   const [, paramsEn] = useRoute("/product/:slug");
   const slug = slugOverride ?? params?.slug ?? paramsAlt?.slug ?? paramsEn?.slug ?? "";
   const product = getProduct(slug);
-  const isVest = product?.id === "p-001";
-  const isEmerald = product?.id === "p-007";
-  const isDoudoune = product?.id === "p-008" || product?.slug === "doudoune-hiver-luxe";
-  const isExtensions = product?.id === "p-005" || product?.slug === "extensions-silk-wave" || product?.slug === "extensions-cheveux";
+  const effectiveTemplate = product?.landingTemplate ?? (
+    product?.id === "p-001" ? "coat" :
+    product?.id === "p-007" ? "abaya" :
+    (product?.id === "p-008" || product?.slug === "doudoune-hiver-luxe") ? "doudoune" :
+    (product?.id === "p-005" || product?.slug === "extensions-silk-wave" || product?.slug === "extensions-cheveux") ? "extensions" :
+    "standard"
+  );
+  const isVest = effectiveTemplate === "coat";
+  const isEmerald = effectiveTemplate === "abaya";
+  const isDoudoune = effectiveTemplate === "doudoune";
+  const isExtensions = effectiveTemplate === "extensions";
   const [quantity, setQuantity] = useState(1);
   const [selectedColor, setSelectedColor] = useState(product?.colors[0] ?? "");
   const gallery = product?.gallery ?? (product ? [product.image] : []);

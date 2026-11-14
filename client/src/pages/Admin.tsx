@@ -7,7 +7,7 @@ import { trpc } from "@/lib/trpc";
 import type { CheckoutOrder } from "@shared/checkout";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
 import { shippingFeeFor } from "@shared/shipping";
-import { categories, getCatalogProducts, saveCatalogProducts, formatDZD, wilayas, type Order, type OrderStatus, type Product } from "@/lib/store-data";
+import { categories, getCatalogProducts, saveCatalogProducts, formatDZD, wilayas, type LandingTemplateId, type Order, type OrderStatus, type Product, type ProductVariantImage } from "@/lib/store-data";
 import { StatusPill } from "@/components/StoreLayout";
 import { useTheme } from "@/contexts/ThemeContext";
 import { getPixelConfig, savePixelConfig, trackPixelEvent, hasGlobalTikTokPixel, hasGlobalFacebookPixel, type PixelConfig } from "@/lib/tracking";
@@ -35,7 +35,7 @@ type AdminSection = "dashboard" | "abandoned" | "catalogue" | "settings" | "ecom
 
 type DashboardOrder = Order;
 
-const emptyProduct: Product = { id: "", slug: "", name: "", category: "mode", categoryLabel: "Mode femme", price: 0, oldPrice: 0, badge: "Nouveau", description: "", details: [], colors: [], image: "", gallery: [], arName: "", arCategoryLabel: "", arDescription: "", accent: "#9B82F6", stock: 0 };
+const emptyProduct: Product = { id: "", slug: "", name: "", category: "mode", categoryLabel: "Mode femme", price: 0, oldPrice: 0, packPrice: 0, landingTemplate: "doudoune", variantImages: [], badge: "Nouveau", description: "", details: [], colors: [], image: "", gallery: [], arName: "", arCategoryLabel: "", arDescription: "", accent: "#9B82F6", stock: 20 };
 
 function toDashboardOrder(order: CheckoutOrder): DashboardOrder {
   return {
@@ -688,7 +688,21 @@ function AdminPageContent() {
   const activePostponeOrder = postponeOrderId ? orderById.get(postponeOrderId) ?? null : null;
   const activeCancelOrder = cancelOrderId ? orderById.get(cancelOrderId) ?? null : null;
 
-  return <div className="admin-shell"><aside className="admin-sidebar"><Link href="/" className="wordmark admin-wordmark"><span className="wordmark-star">✦</span><span>miss</span><em>sensuelle</em></Link><nav className="admin-mobile-nav" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={17} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={17} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge">{transferredCount}</span>}</button><button type="button" className={section === "staff" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "staff" ? "page" : undefined} onClick={() => { go("staff"); setIsMoreMenuOpen(false); }}><Users size={17} /><span>Équipe</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={17} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><MoreHorizontal size={17} /><span>Menu</span></button></nav><div className="admin-user"><div className="admin-avatar">{currentActorName.slice(0, 2).toUpperCase()}</div><div><strong>{currentActorName}</strong><span>{isOwner ? "Administratrice" : "Confirmateur"}</span></div></div><nav className="admin-nav"><span className="admin-nav-label">Workspace</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{orders.filter(order => order.status !== "transferee" && order.status === "nouvelle").length}</b></button><button className={section === "staff" ? "active" : ""} onClick={() => go("staff")}><Users size={18} />Confirmateurs & Salaires</button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com Delivery <b>{orders.filter(order => order.status === "confirmee").length}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue <b>{getCatalogProducts().length}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button onClick={() => go("staff")}><BarChart3 size={18} />Rapports & Performances</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "staff" ? "Confirmateurs, Salaires & Journal d'Activité" : section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Catalogue produits" : section === "ecom" ? "E-com Delivery" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : `Bonjour, ${currentActorName}`} <span>✦</span></h1></div><div className="admin-top-actions">
+  return <div className="admin-shell"><aside className="admin-sidebar"><div className="admin-brand-mobile-row"><Link href="/" className="wordmark admin-wordmark"><span className="wordmark-star">✦</span><span>miss</span><em>sensuelle</em></Link><div className="admin-mobile-quick-top"><button type="button" className="neo-darkmode-btn mobile-top-theme-btn" onClick={toggleTheme} title={theme === "dark" ? "Passer en Mode Clair" : "Passer en Mode Sombre"} aria-label="Basculer Mode Clair / Sombre">{theme === "dark" ? (<><Sun size={15} className="neo-sun-glow" /><span>Clair</span></>) : (<><Moon size={15} className="neo-moon-glow" /><span>Dark</span></>)}</button><button type="button" className="neo-darkmode-btn mobile-top-create-btn" onClick={() => setIsCreatingOrder(true)} title="Créer une nouvelle commande"><Plus size={15} /><span>Commande</span></button></div></div><nav className="admin-mobile-nav" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={17} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={17} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge">{transferredCount}</span>}</button><button type="button" className={section === "catalogue" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => { go("catalogue"); setIsMoreMenuOpen(false); }}><Package size={17} /><span>Produits</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={17} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><MoreHorizontal size={17} /><span>Menu</span></button></nav><div className="admin-user"><div className="admin-avatar">{currentActorName.slice(0, 2).toUpperCase()}</div><div><strong>{currentActorName}</strong><span>{isOwner ? "Administratrice" : "Confirmateur"}</span></div></div><nav className="admin-nav"><span className="admin-nav-label">Workspace</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{orders.filter(order => order.status !== "transferee" && order.status === "nouvelle").length}</b></button><button className={section === "staff" ? "active" : ""} onClick={() => go("staff")}><Users size={18} />Confirmateurs & Salaires</button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com Delivery <b>{orders.filter(order => order.status === "confirmee").length}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue & Landing <b>{getCatalogProducts().length}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button onClick={() => go("staff")}><BarChart3 size={18} />Rapports & Performances</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "staff" ? "Confirmateurs, Salaires & Journal d'Activité" : section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Studio Produits & Landing Pages" : section === "ecom" ? "E-com Delivery" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : `Bonjour, ${currentActorName}`} <span>✦</span></h1></div><div className="admin-top-actions">
+  <button type="button" className="neo-darkmode-btn" onClick={toggleTheme} title={theme === "dark" ? "Mode Clair" : "Mode Sombre Neo Waw"} aria-label="Basculer Mode Sombre Neo">
+  {theme === "dark" ? (
+    <>
+      <Sun size={15} className="neo-sun-glow" />
+      <span className="neo-btn-label">Mode Clair</span>
+    </>
+  ) : (
+    <>
+      <Moon size={15} className="neo-moon-glow" />
+      <span className="neo-btn-label">Mode Dark</span>
+      <span className="neo-glow-badge">NEO</span>
+    </>
+  )}
+  </button>
   <button
     type="button"
     className="neo-darkmode-btn"
@@ -698,6 +712,16 @@ function AdminPageContent() {
   >
     <Plus size={14} style={{ color: "#fff" }} />
     <span className="neo-btn-label" style={{ color: "#fff", fontWeight: 800 }}>Nouvelle commande</span>
+  </button>
+  <button
+    type="button"
+    className="neo-darkmode-btn"
+    onClick={() => go("catalogue")}
+    title="Créer un produit ou choisir un template de Landing Page"
+    style={{ background: "rgba(236, 72, 153, 0.14)", border: "1px solid rgba(236, 72, 153, 0.35)", cursor: "pointer" }}
+  >
+    <Package size={14} style={{ color: "#ec4899" }} />
+    <span className="neo-btn-label" style={{ color: "#ec4899", fontWeight: 700 }}>Créer produit</span>
   </button>
   <button
     type="button"
@@ -719,20 +743,7 @@ function AdminPageContent() {
     <Smartphone size={14} style={{ color: "#a855f7" }} />
     <span className="neo-btn-label" style={{ color: "#a855f7", fontWeight: 600 }}>App Mobile</span>
   </button>
-  <button type="button" className="neo-darkmode-btn" onClick={toggleTheme} title={theme === "dark" ? "Mode Clair" : "Mode Sombre Neo Waw"} aria-label="Basculer Mode Sombre Neo">
-  {theme === "dark" ? (
-    <>
-      <Sun size={15} className="neo-sun-glow" />
-      <span className="neo-btn-label">Clair</span>
-    </>
-  ) : (
-    <>
-      <Moon size={15} className="neo-moon-glow" />
-      <span className="neo-btn-label">Dark</span>
-      <span className="neo-glow-badge">NEO</span>
-    </>
-  )}
-</button><button className="icon-button" aria-label="Notifications"><Bell size={19} />{orders.some(order => order.status === "nouvelle") && <i />}</button><div className="admin-profile"><div className="admin-avatar small">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></div></div></header><div className="admin-content">{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} stockPanel={<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} />} />}</div></main>{isSearchOpen && (
+  <button className="icon-button" aria-label="Notifications"><Bell size={19} />{orders.some(order => order.status === "nouvelle") && <i />}</button><div className="admin-profile"><div className="admin-avatar small">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></div></div></header><div className="admin-content">{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} stockPanel={<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} />} />}</div></main>{isSearchOpen && (
   <div className="admin-search-modal-overlay" onClick={() => setIsSearchOpen(false)}>
     <div className="admin-search-modal" onClick={e => e.stopPropagation()}>
       <div className="admin-search-modal-head">
@@ -842,6 +853,34 @@ function AdminPageContent() {
       </div>
 
       <div className="admin-more-sheet-grid">
+        <button
+          type="button"
+          className="more-sheet-item"
+          onClick={() => { toggleTheme?.(); setIsMoreMenuOpen(false); }}
+        >
+          <div className="more-item-icon icon-purple">
+            {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+          </div>
+          <div className="more-item-text">
+            <strong>{theme === "dark" ? "Passer en Mode Clair ☀️" : "Activer le Mode Sombre (Dark) 🌙"}</strong>
+            <small>Basculer l'affichage clair ou sombre Neo</small>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          className="more-sheet-item"
+          onClick={() => { setIsCreatingOrder(true); setIsMoreMenuOpen(false); }}
+        >
+          <div className="more-item-icon icon-emerald">
+            <Plus size={20} />
+          </div>
+          <div className="more-item-text">
+            <strong>Nouvelle commande manuelle</strong>
+            <small>Ajouter une commande téléphone / WhatsApp</small>
+          </div>
+        </button>
+
         <button
           type="button"
           className={`more-sheet-item ${section === "staff" ? "active" : ""}`}
@@ -1053,21 +1092,895 @@ function StockPanel({ onManageCatalog, onOpenSheet }: { onManageCatalog: () => v
   );
 }
 
+const LANDING_TEMPLATES: {
+  id: LandingTemplateId;
+  title: string;
+  subtitle: string;
+  inspiredBy: string;
+  previewImage: string;
+  accentColor: string;
+  bgGradient: string;
+  features: string[];
+  hasPackOffer: boolean;
+}[] = [
+  {
+    id: "doudoune",
+    title: "Template 1 · Style Doudoune Luxe",
+    subtitle: "Hero Interactif + Compte à rebours + Offre Pack 2 pièces",
+    inspiredBy: "Inspiré de : Doudoune Hiver de Luxe (p-008)",
+    previewImage: "/manus-storage/doudoune-bg.jpg",
+    accentColor: "#17307e",
+    bgGradient: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+    features: [
+      "Grande affiche Hero avec changement de couleur en direct",
+      "Compte à rebours d'urgence + Offre Duo (2 pièces à prix réduit)",
+      "Formulaire COD Arabe haute conversion avec choix de la 2ème pièce",
+    ],
+    hasPackOffer: true,
+  },
+  {
+    id: "extensions",
+    title: "Template 2 · Style Extensions Pink (1+1 Offerte)",
+    subtitle: "Bannières Verticales + Slider Variantes + 1 Achetée = 1 Offerte",
+    inspiredBy: "Inspiré de : Extensions Cheveux Naturel (p-005)",
+    previewImage: "/manus-storage/ext-pink-1.jpg",
+    accentColor: "#c0307f",
+    bgGradient: "linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)",
+    features: [
+      "Affiches verticales plein écran empilées sans marge",
+      "Slider horizontal de grandes cartes variantes cliquables",
+      "Formulaire 1 Achetée + 1 Offerte (sélection de 2 variantes) + Barre sticky",
+    ],
+    hasPackOffer: true,
+  },
+  {
+    id: "abaya",
+    title: "Template 3 · Style Abaya Royal Emerald",
+    subtitle: "Lookbook Émeraude & Or + Grille 5 Détails + Avis Clientes",
+    inspiredBy: "Inspiré de : Abaya Royal Emerald (p-007)",
+    previewImage: "/manus-storage/v-hero_de8d807e.jpg",
+    accentColor: "#0c6b4b",
+    bgGradient: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)",
+    features: [
+      "Bannière livraison + Poster Hero avec badge prix doré",
+      "Grille de 5 photos détails + Section Avis Clientes vérifiés (4.9★)",
+      "Formulaire COD Royal avec vignettes photos par couleur & tailles",
+    ],
+    hasPackOffer: false,
+  },
+  {
+    id: "coat",
+    title: "Template 4 · Style Manteau / Trench Iconique",
+    subtitle: "Éditorial Chic + Grille 4 Détails + Vue 360°",
+    inspiredBy: "Inspiré de : Manteau Icon (p-001)",
+    previewImage: "/manus-storage/1000012735_a03c5d58.jpg",
+    accentColor: "#7c3aed",
+    bgGradient: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)",
+    features: [
+      "Mise en page éditoriale luxe avec arguments clés sous le Hero",
+      "Grille de 4 zooms détails + Carte focus 360°",
+      "Formulaire COD direct avec pastilles couleurs et tailles S à XXL",
+    ],
+    hasPackOffer: false,
+  },
+  {
+    id: "standard",
+    title: "Template 5 · Fiche Boutique Classique",
+    subtitle: "Page produit e-commerce standard bilingue FR / AR",
+    inspiredBy: "Modèle catalogue classique",
+    previewImage: "/manus-storage/async-images/uM7lQJWYdXHIVBYkKtIu8c/image-1.webp",
+    accentColor: "#64748b",
+    bgGradient: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+    features: [
+      "Galerie vignettes + sélecteur de quantité classique",
+      "Accordéons détails & livraison bilingues FR / AR",
+      "Formulaire de commande COD en bas de page",
+    ],
+    hasPackOffer: false,
+  },
+];
+
+function resolveProductTemplate(product: Product): LandingTemplateId {
+  if (product.landingTemplate) return product.landingTemplate;
+  if (product.id === "p-008" || product.slug === "doudoune-hiver-luxe") return "doudoune";
+  if (product.id === "p-005" || product.slug === "extensions-silk-wave" || product.slug === "extensions-cheveux") return "extensions";
+  if (product.id === "p-007" || product.slug === "abaya-royal-emerald") return "abaya";
+  if (product.id === "p-001" || product.slug === "blazer-lilac-dream") return "coat";
+  return "standard";
+}
+
 function CatalogPanel({ notify }: { notify: (message: string) => void }) {
   const [catalog, setCatalog] = useState<Product[]>(() => getCatalogProducts());
   const [editing, setEditing] = useState<Product | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const refresh = (next: Product[]) => { try { saveCatalogProducts(next); } catch { notify("Sauvegarde impossible : stockage bloqué ou plein"); return false; } setCatalog(next); return true; };
-  const remove = (id: string) => { if (!window.confirm("Supprimer définitivement ce produit du catalogue ?")) return; if (refresh(catalog.filter(product => product.id !== id))) notify("Produit supprimé du catalogue"); };
-  return <section className="catalog-admin"><div className="catalog-admin-head"><div><span className="eyebrow">Gestion complète</span><h2>Catalogue <span className="count-bubble">{catalog.length}</span></h2><p>Ajoute, modifie ou supprime les produits visibles sur la boutique.</p></div><button className="button button-gradient" onClick={() => { setEditing(null); setShowForm(true); }}><Plus size={17} />Ajouter un produit</button></div>{showForm && <ProductForm initial={editing ?? emptyProduct} onCancel={() => setShowForm(false)} onSave={product => { const next = editing ? catalog.map(item => item.id === product.id ? product : item) : [...catalog, product]; if (refresh(next)) { setShowForm(false); notify(editing ? "Produit modifié" : "Produit ajouté au catalogue"); } }} /> }<div className="catalog-admin-grid">{catalog.map(product => <article className="catalog-admin-card" key={product.id}><div className="catalog-admin-image"><img src={product.image} alt={product.name} /><span>{product.stock} en stock</span></div><div className="catalog-admin-info"><span className="product-category">{product.categoryLabel}</span><h3>{product.name}</h3><strong>{formatDZD(product.price)}</strong><p>{product.description}</p><div className="catalog-admin-actions"><button className="button button-light" onClick={() => { setEditing(product); setShowForm(true); }}><Pencil size={15} />Modifier</button><button className="icon-button danger-icon" onClick={() => remove(product.id)} title="Supprimer" aria-label={`Supprimer ${product.name}`}><Trash2 size={16} /></button></div></div></article>)}</div></section>;
+
+  const refresh = (next: Product[]) => {
+    try {
+      saveCatalogProducts(next);
+    } catch {
+      notify("Sauvegarde impossible : stockage bloqué ou plein");
+      return false;
+    }
+    setCatalog(next);
+    return true;
+  };
+
+  const remove = (id: string) => {
+    if (!window.confirm("Supprimer définitivement ce produit du catalogue ?")) return;
+    if (refresh(catalog.filter(product => product.id !== id))) {
+      notify("Produit supprimé du catalogue");
+    }
+  };
+
+  const startCreateWithTemplate = (templateId: LandingTemplateId) => {
+    const tpl = LANDING_TEMPLATES.find(t => t.id === templateId) ?? LANDING_TEMPLATES[0];
+    setEditing({
+      ...emptyProduct,
+      landingTemplate: templateId,
+      accent: tpl.accentColor,
+      category: templateId === "extensions" ? "extensions" : templateId === "doudoune" || templateId === "coat" ? "vestes" : "mode",
+      categoryLabel: templateId === "extensions" ? "Extensions cheveux" : templateId === "doudoune" || templateId === "coat" ? "Vestes & ensembles" : "Mode femme",
+      price: templateId === "extensions" ? 2700 : templateId === "doudoune" ? 7600 : templateId === "abaya" ? 7500 : 8500,
+      oldPrice: templateId === "extensions" ? 3500 : templateId === "doudoune" ? 9000 : templateId === "abaya" ? 14000 : 11000,
+      packPrice: templateId === "extensions" ? 4500 : templateId === "doudoune" ? 12900 : undefined,
+    });
+    setShowForm(true);
+  };
+
+  const duplicateProduct = (source: Product) => {
+    const copy: Product = {
+      ...source,
+      id: "",
+      slug: `${source.slug}-copie-${Math.floor(100 + Math.random() * 900)}`,
+      name: `${source.name} (Copie)`,
+      landingTemplate: resolveProductTemplate(source),
+    };
+    setEditing(copy);
+    setShowForm(true);
+    notify(`Modèle pré-rempli à partir de "${source.name}" ✨`);
+  };
+
+  return (
+    <section className="catalog-admin">
+      <div className="catalog-admin-head">
+        <div>
+          <span className="eyebrow">Studio Produits & Landing Pages COD</span>
+          <h2>
+            Catalogue & Templates <span className="count-bubble">{catalog.length}</span>
+          </h2>
+          <p>
+            Crée un nouveau produit en choisissant l'un des 4 designs de Landing Page à forte conversion (Doudoune, Extensions Pink 1+1, Abaya Royal, Manteau Icon) avec suivi Pixel automatique.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="button button-gradient"
+          onClick={() => {
+            setEditing(null);
+            setShowForm(true);
+          }}
+        >
+          <Plus size={17} /> Créer un nouveau produit
+        </button>
+      </div>
+
+      {/* Barre de création rapide par Template inspirée des 4 Landing Pages */}
+      {!showForm && (
+        <div className="template-showcase-strip">
+          <div className="template-showcase-head">
+            <div>
+              <strong>✨ Démarrer un produit avec un Template de Landing Page</strong>
+              <small>Choisis le style visuel de ta page de vente — les 4 designs ci-dessous sont prêts à convertir avec Pixel & Formulaire COD</small>
+            </div>
+          </div>
+          <div className="template-showcase-grid">
+            {LANDING_TEMPLATES.slice(0, 4).map(tpl => (
+              <div key={tpl.id} className="template-showcase-card" style={{ borderColor: `${tpl.accentColor}40` }}>
+                <div className="template-showcase-img">
+                  <img src={tpl.previewImage} alt={tpl.title} />
+                  <span className="template-showcase-badge" style={{ background: tpl.accentColor }}>
+                    {tpl.hasPackOffer ? "🔥 Offre Duo / 1+1" : "👑 Haute Conversion"}
+                  </span>
+                </div>
+                <div className="template-showcase-body">
+                  <h4>{tpl.title}</h4>
+                  <p>{tpl.subtitle}</p>
+                  <button
+                    type="button"
+                    className="button button-light template-use-btn"
+                    style={{ borderColor: tpl.accentColor, color: tpl.accentColor }}
+                    onClick={() => startCreateWithTemplate(tpl.id)}
+                  >
+                    <Plus size={14} /> Créer avec ce template
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showForm && (
+        <ProductForm
+          initial={editing && editing.id ? editing : (editing ?? emptyProduct)}
+          catalog={catalog}
+          onCancel={() => {
+            setShowForm(false);
+            setEditing(null);
+          }}
+          onSave={product => {
+            const exists = catalog.some(item => item.id === product.id);
+            const next = exists
+              ? catalog.map(item => (item.id === product.id ? product : item))
+              : [product, ...catalog];
+            if (refresh(next)) {
+              setShowForm(false);
+              setEditing(null);
+              notify(exists ? "Produit & Landing Page mis à jour ✨" : "Nouveau produit créé avec sa Landing Page 🚀");
+            }
+          }}
+        />
+      )}
+
+      <div className="catalog-admin-grid">
+        {catalog.map(product => {
+          const tplId = resolveProductTemplate(product);
+          const tplMeta = LANDING_TEMPLATES.find(t => t.id === tplId) ?? LANDING_TEMPLATES[4];
+          return (
+            <article className="catalog-admin-card" key={product.id}>
+              <div className="catalog-admin-image">
+                <img src={product.image} alt={product.name} />
+                <span>{product.stock} en stock</span>
+                <b
+                  className="catalog-template-pill"
+                  style={{ background: tplMeta.accentColor }}
+                >
+                  {tplMeta.title.replace(/^Template \d+ · /, "")}
+                </b>
+              </div>
+              <div className="catalog-admin-info">
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                  <span className="product-category">{product.categoryLabel}</span>
+                  {product.packPrice ? (
+                    <span style={{ fontSize: 11, fontWeight: 800, color: "#be185d", background: "#fce7f3", padding: "3px 8px", borderRadius: 999 }}>
+                      Pack 2 : {formatDZD(product.packPrice)}
+                    </span>
+                  ) : null}
+                </div>
+                <h3>{product.name}</h3>
+                {product.arName && (
+                  <small style={{ display: "block", color: "var(--muted)", fontSize: 12, marginBottom: 4 }} dir="rtl">
+                    {product.arName}
+                  </small>
+                )}
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <strong>{formatDZD(product.price)}</strong>
+                  {product.oldPrice ? (
+                    <del style={{ fontSize: 12, color: "#94a3b8" }}>{formatDZD(product.oldPrice)}</del>
+                  ) : null}
+                </div>
+                <p>{product.description}</p>
+                {product.colors?.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
+                    {product.colors.slice(0, 6).map(c => (
+                      <span key={c} style={{ fontSize: 10, padding: "2px 7px", borderRadius: 999, background: "var(--bg-elev)", border: "1px solid var(--line)", fontWeight: 700 }}>
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="catalog-admin-actions" style={{ flexWrap: "wrap", gap: 6 }}>
+                  <button
+                    type="button"
+                    className="button button-light"
+                    onClick={() => {
+                      setEditing({ ...product, landingTemplate: tplId });
+                      setShowForm(true);
+                    }}
+                  >
+                    <Pencil size={14} /> Modifier
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-light"
+                    onClick={() => duplicateProduct(product)}
+                    title="Dupliquer ce produit et son template"
+                  >
+                    <Copy size={14} /> Dupliquer
+                  </button>
+                  <Link
+                    href={`/produit/${product.slug}`}
+                    className="button button-light"
+                    style={{ textDecoration: "none" }}
+                  >
+                    <ExternalLink size={14} /> Voir Page
+                  </Link>
+                  <button
+                    type="button"
+                    className="icon-button danger-icon"
+                    onClick={() => remove(product.id)}
+                    title="Supprimer"
+                    aria-label={`Supprimer ${product.name}`}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
-function ProductForm({ initial, onCancel, onSave }: { initial: Product; onCancel: () => void; onSave: (product: Product) => void }) {
-  const [form, setForm] = useState<Product>(initial); const [galleryText, setGalleryText] = useState((initial.gallery ?? []).join("\n")); const imageRef = useRef<HTMLInputElement>(null); const galleryRef = useRef<HTMLInputElement>(null);
-  const set = (key: keyof Product, value: Product[keyof Product]) => setForm(current => ({ ...current, [key]: value }));
-  const readImages = (files: FileList | null, multiple: boolean) => { if (!files?.length) return; const readers = Array.from(files).map(file => new Promise<string>(resolve => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.readAsDataURL(file); })); Promise.all(readers).then(values => { if (multiple) setGalleryText(current => [...current.split("\n").filter(Boolean), ...values].join("\n")); else set("image", values[0]); }); };
-  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const slug = form.slug || form.name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); const product = { ...form, id: form.id || `p-${Date.now()}`, slug, price: Number(form.price), oldPrice: form.oldPrice ? Number(form.oldPrice) : undefined, stock: Number(form.stock), details: typeof form.details === "string" ? String(form.details).split("\n").filter(Boolean) : [], colors: typeof form.colors === "string" ? String(form.colors).split(",").map(value => value.trim()).filter(Boolean) : [], gallery: galleryText.split("\n").map(value => value.trim()).filter(Boolean) }; onSave(product); };
-  return <form className="product-admin-form" onSubmit={submit}><div className="form-panel-head"><div><span className="eyebrow">{initial.id ? "Modifier" : "Nouveau produit"}</span><h3>{initial.id ? initial.name : "Créer une fiche complète"}</h3></div><button type="button" className="icon-button" onClick={onCancel} aria-label="Fermer le formulaire"><X size={18} /></button></div><div className="product-admin-grid"><label>Nom du produit<input required value={form.name} onChange={e => set("name", e.target.value)} /></label><label>Slug URL<input value={form.slug} onChange={e => set("slug", e.target.value)} placeholder="auto-generé si vide" /></label><label>Catégorie<select value={form.category} onChange={e => { const category = categories.find(item => item.id === e.target.value); set("category", e.target.value as Product["category"]); set("categoryLabel", category?.label ?? "Mode femme"); }}>{categories.map(category => <option key={category.id} value={category.id}>{category.label}</option>)}</select></label><label>Badge<input value={form.badge ?? ""} onChange={e => set("badge", e.target.value)} placeholder="Nouveau, Best-seller…" /></label><label>Prix DA<input required type="number" min="0" value={form.price} onChange={e => set("price", Number(e.target.value))} /></label><label>Ancien prix DA<input type="number" min="0" value={form.oldPrice ?? ""} onChange={e => set("oldPrice", e.target.value ? Number(e.target.value) : undefined)} /></label><label>Stock<input required type="number" min="0" value={form.stock} onChange={e => set("stock", Number(e.target.value))} /></label><label>Couleur accent<input type="color" value={form.accent} onChange={e => set("accent", e.target.value)} /></label><label className="wide-field">Description<textarea required value={form.description} onChange={e => set("description", e.target.value)} /></label><label>Détails (une ligne par détail)<textarea value={Array.isArray(form.details) ? form.details.join("\n") : String(form.details)} onChange={e => set("details", e.target.value as never)} /></label><label>Couleurs séparées par virgule<textarea value={Array.isArray(form.colors) ? form.colors.join(", ") : String(form.colors)} onChange={e => set("colors", e.target.value as never)} /></label><label>Photo principale (URL)<input required value={form.image} onChange={e => set("image", e.target.value)} /><button type="button" className="upload-inline" onClick={() => imageRef.current?.click()}><ImagePlus size={14} />Importer une photo</button><input ref={imageRef} className="visually-hidden" type="file" accept="image/*" onChange={e => readImages(e.target.files, false)} /></label><label>Galerie (une URL par ligne)<textarea value={galleryText} onChange={e => setGalleryText(e.target.value)} /><button type="button" className="upload-inline" onClick={() => galleryRef.current?.click()}><Upload size={14} />Ajouter des photos</button><input ref={galleryRef} className="visually-hidden" type="file" accept="image/*" multiple onChange={e => readImages(e.target.files, true)} /></label><label>Nom arabe<input value={form.arName ?? ""} onChange={e => set("arName", e.target.value)} /></label><label>Catégorie arabe<input value={form.arCategoryLabel ?? ""} onChange={e => set("arCategoryLabel", e.target.value)} /></label><label className="wide-field">Description arabe<textarea value={form.arDescription ?? ""} onChange={e => set("arDescription", e.target.value)} /></label></div><div className="form-panel-actions"><button type="button" className="button button-light" onClick={onCancel}>Annuler</button><button type="submit" className="button button-gradient"><Save size={16} />Enregistrer le produit</button></div></form>;
+function ProductForm({
+  initial,
+  catalog,
+  onCancel,
+  onSave,
+}: {
+  initial: Product;
+  catalog: Product[];
+  onCancel: () => void;
+  onSave: (product: Product) => void;
+}) {
+  const initialTemplate = resolveProductTemplate(initial);
+  const [form, setForm] = useState<Product>(() => ({
+    ...initial,
+    landingTemplate: initialTemplate,
+  }));
+  const [galleryList, setGalleryList] = useState<string[]>(() =>
+    (initial.gallery ?? []).filter(Boolean)
+  );
+  const [variants, setVariants] = useState<ProductVariantImage[]>(() => {
+    if (initial.variantImages && initial.variantImages.length > 0) {
+      return initial.variantImages;
+    }
+    if (initial.colors && initial.colors.length > 0) {
+      return initial.colors.map((c, idx) => ({
+        name: c,
+        image: initial.gallery?.[idx] || "",
+      }));
+    }
+    return [
+      { name: "أسود", image: "" },
+      { name: "أبيض", image: "" },
+    ];
+  });
+  const [detailsText, setDetailsText] = useState(() =>
+    Array.isArray(initial.details) ? initial.details.join("\n") : String(initial.details ?? "")
+  );
+  const [newGalleryUrl, setNewGalleryUrl] = useState("");
+  const imageRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+
+  const selectedTemplateMeta =
+    LANDING_TEMPLATES.find(t => t.id === (form.landingTemplate ?? "doudoune")) ?? LANDING_TEMPLATES[0];
+
+  const set = <K extends keyof Product>(key: K, value: Product[K]) =>
+    setForm(current => ({ ...current, [key]: value }));
+
+  const readFileAsDataUrl = (file: File): Promise<string> =>
+    new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.readAsDataURL(file);
+    });
+
+  const handleMainImageUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const dataUrl = await readFileAsDataUrl(files[0]);
+    set("image", dataUrl);
+  };
+
+  const handleGalleryUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const urls = await Promise.all(Array.from(files).map(readFileAsDataUrl));
+    setGalleryList(prev => [...prev, ...urls]);
+  };
+
+  const handleVariantImageUpload = async (index: number, files: FileList | null) => {
+    if (!files?.length) return;
+    const dataUrl = await readFileAsDataUrl(files[0]);
+    setVariants(prev => prev.map((v, i) => (i === index ? { ...v, image: dataUrl } : v)));
+  };
+
+  const prefillFromExistingProduct = (templateId: LandingTemplateId) => {
+    const sourceId =
+      templateId === "doudoune"
+        ? "p-008"
+        : templateId === "extensions"
+          ? "p-005"
+          : templateId === "abaya"
+            ? "p-007"
+            : templateId === "coat"
+              ? "p-001"
+              : "";
+    const found = catalog.find(p => p.id === sourceId);
+    if (!found) return;
+    setForm(curr => ({
+      ...curr,
+      landingTemplate: templateId,
+      category: found.category,
+      categoryLabel: found.categoryLabel,
+      price: found.price,
+      oldPrice: found.oldPrice,
+      packPrice: found.packPrice,
+      badge: found.badge,
+      description: found.description,
+      arName: found.arName,
+      arCategoryLabel: found.arCategoryLabel,
+      arDescription: found.arDescription,
+      image: found.image,
+      accent: found.accent,
+    }));
+    setDetailsText((found.details ?? []).join("\n"));
+    setGalleryList(found.gallery ?? []);
+    if (templateId === "extensions") {
+      setVariants([
+        { name: "أسود طبيعي", image: "/manus-storage/ext-pink-v1.jpg" },
+        { name: "بني غامق", image: "/manus-storage/ext-pink-v2.jpg" },
+        { name: "بني عسلي", image: "/manus-storage/ext-pink-v3.jpg" },
+        { name: "شاتين روكس", image: "/manus-storage/ext-pink-v4.jpg" },
+        { name: "أشقر فاتح", image: "/manus-storage/ext-pink-v5.jpg" },
+        { name: "نور بليلي غري", image: "/manus-storage/ext-pink-v6.jpg" },
+      ]);
+      setGalleryList([
+        "/manus-storage/ext-pink-3.jpg",
+        "/manus-storage/ext-pink-4.jpg",
+        "/manus-storage/ext-pink-5.jpg",
+        "/manus-storage/ext-pink-6.jpg",
+      ]);
+    } else {
+      setVariants(
+        (found.colors ?? []).map((c, idx) => ({
+          name: c,
+          image: found.gallery?.[idx] || found.image,
+        }))
+      );
+    }
+  };
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const slug =
+      form.slug.trim() ||
+      form.name
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "") ||
+      `produit-${Date.now()}`;
+
+    const cleanVariants = variants
+      .map(v => ({ name: v.name.trim(), image: v.image.trim() }))
+      .filter(v => v.name.length > 0);
+
+    const product: Product = {
+      ...form,
+      id: form.id || `p-${Date.now()}`,
+      slug,
+      landingTemplate: form.landingTemplate ?? "doudoune",
+      price: Number(form.price) || 0,
+      oldPrice: form.oldPrice ? Number(form.oldPrice) : undefined,
+      packPrice: form.packPrice ? Number(form.packPrice) : undefined,
+      stock: Number(form.stock) || 0,
+      details: detailsText
+        .split("\n")
+        .map(v => v.trim())
+        .filter(Boolean),
+      colors: cleanVariants.map(v => v.name),
+      variantImages: cleanVariants,
+      gallery: galleryList.filter(Boolean),
+    };
+    onSave(product);
+  };
+
+  return (
+    <form className="product-admin-form product-studio-form" onSubmit={submit}>
+      <div className="form-panel-head">
+        <div>
+          <span className="eyebrow">{initial.id ? "Modifier le produit & sa Landing Page" : "Studio de Création Produit"}</span>
+          <h3>{initial.id ? initial.name : "Créer un nouveau produit & choisir son Template"}</h3>
+        </div>
+        <button type="button" className="icon-button" onClick={onCancel} aria-label="Fermer le formulaire">
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* ÉTAPE 1 : CHOIX DU TEMPLATE DE LANDING PAGE */}
+      <div className="studio-step-box">
+        <div className="studio-step-header">
+          <span className="studio-step-num">1</span>
+          <div>
+            <h4>Choisis le Template de ta Landing Page (inspiré des 4 produits phares)</h4>
+            <p>Le produit utilisera automatiquement le design, l'animation et le formulaire COD du modèle sélectionné.</p>
+          </div>
+        </div>
+
+        <div className="studio-template-grid">
+          {LANDING_TEMPLATES.map(tpl => {
+            const isSelected = (form.landingTemplate ?? "doudoune") === tpl.id;
+            return (
+              <div
+                key={tpl.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => set("landingTemplate", tpl.id)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" || e.key === " ") set("landingTemplate", tpl.id);
+                }}
+                className={`studio-tpl-card ${isSelected ? "is-selected" : ""}`}
+                style={{
+                  borderColor: isSelected ? tpl.accentColor : undefined,
+                  background: isSelected ? tpl.bgGradient : undefined,
+                }}
+              >
+                <div className="studio-tpl-thumb">
+                  <img src={tpl.previewImage} alt={tpl.title} />
+                  {isSelected && (
+                    <span className="studio-tpl-selected-pill" style={{ background: tpl.accentColor }}>
+                      ✓ Sélectionné
+                    </span>
+                  )}
+                </div>
+                <div className="studio-tpl-content">
+                  <small style={{ color: tpl.accentColor, fontWeight: 800 }}>{tpl.inspiredBy}</small>
+                  <h5>{tpl.title}</h5>
+                  <p>{tpl.subtitle}</p>
+                  <ul className="studio-tpl-features">
+                    {tpl.features.map((f, i) => (
+                      <li key={i}>• {f}</li>
+                    ))}
+                  </ul>
+                  {tpl.id !== "standard" && (
+                    <button
+                      type="button"
+                      className="studio-prefill-btn"
+                      onClick={e => {
+                        e.stopPropagation();
+                        prefillFromExistingProduct(tpl.id);
+                      }}
+                    >
+                      ✨ Charger les photos/textes d'exemple de ce modèle
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ÉTAPE 2 : INFORMATIONS & PRIX COD */}
+      <div className="studio-step-box">
+        <div className="studio-step-header">
+          <span className="studio-step-num">2</span>
+          <div>
+            <h4>Informations du produit & Prix de l'offre COD</h4>
+            <p>Configure les titres (Français & Arabe) ainsi que le prix unitaire et le prix Pack Duo / 1+1.</p>
+          </div>
+        </div>
+
+        <div className="product-admin-grid">
+          <label>
+            Nom du produit (Français) *
+            <input
+              required
+              placeholder="Ex: Doudoune Hiver Luxe, Extensions..."
+              value={form.name}
+              onChange={e => set("name", e.target.value)}
+            />
+          </label>
+          <label>
+            Titre affiché en Arabe sur la Landing Page
+            <input
+              dir="rtl"
+              placeholder="مثال: دواقون شتوية فاخرة / إكستنشن الشعر"
+              value={form.arName ?? ""}
+              onChange={e => set("arName", e.target.value)}
+            />
+          </label>
+          <label>
+            Catégorie
+            <select
+              value={form.category}
+              onChange={e => {
+                const category = categories.find(item => item.id === e.target.value);
+                set("category", e.target.value as Product["category"]);
+                set("categoryLabel", category?.label ?? "Mode femme");
+              }}
+            >
+              {categories.map(category => (
+                <option key={category.id} value={category.id}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Lien URL (Slug)
+            <input
+              value={form.slug}
+              onChange={e => set("slug", e.target.value)}
+              placeholder="Généré automatiquement si vide"
+            />
+          </label>
+          <label>
+            Prix 1 Pièce (DA) *
+            <input
+              required
+              type="number"
+              min="0"
+              value={form.price}
+              onChange={e => set("price", Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Ancien prix barré (DA)
+            <input
+              type="number"
+              min="0"
+              placeholder="Ex: 9000"
+              value={form.oldPrice ?? ""}
+              onChange={e => set("oldPrice", e.target.value ? Number(e.target.value) : undefined)}
+            />
+          </label>
+          <label style={{ background: selectedTemplateMeta.hasPackOffer ? "rgba(236, 72, 153, 0.08)" : undefined, padding: selectedTemplateMeta.hasPackOffer ? "8px 10px" : undefined, borderRadius: 12, border: selectedTemplateMeta.hasPackOffer ? "1.5px dashed #ec4899" : undefined }}>
+            🎁 Prix Offre 2 Pièces / 1+1 Offerte (DA)
+            <input
+              type="number"
+              min="0"
+              placeholder={form.landingTemplate === "extensions" ? "Ex: 4500 (1 achetée + 1 offerte)" : "Ex: 12900 (Pack 2 pièces)"}
+              value={form.packPrice ?? ""}
+              onChange={e => set("packPrice", e.target.value ? Number(e.target.value) : undefined)}
+            />
+          </label>
+          <label>
+            Stock disponible *
+            <input
+              required
+              type="number"
+              min="0"
+              value={form.stock}
+              onChange={e => set("stock", Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Badge Promo
+            <input
+              value={form.badge ?? ""}
+              onChange={e => set("badge", e.target.value)}
+              placeholder="Ex: Offre 1+1, Livraison Gratuite, Best-seller…"
+            />
+          </label>
+          <label>
+            Couleur thème (Accent)
+            <input type="color" value={form.accent} onChange={e => set("accent", e.target.value)} />
+          </label>
+          <label className="wide-field">
+            Description (Français) *
+            <textarea
+              required
+              rows={2}
+              value={form.description}
+              onChange={e => set("description", e.target.value)}
+            />
+          </label>
+          <label className="wide-field">
+            Description Arabe (affichée sur la Landing Page)
+            <textarea
+              dir="rtl"
+              rows={2}
+              placeholder="وصف المنتج باللغة العربية..."
+              value={form.arDescription ?? ""}
+              onChange={e => set("arDescription", e.target.value)}
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* ÉTAPE 3 : VARIANTES / COULEURS AVEC LEURS PHOTOS */}
+      <div className="studio-step-box">
+        <div className="studio-step-header">
+          <span className="studio-step-num">3</span>
+          <div>
+            <h4>Variantes & Couleurs du produit (Slider & Sélecteur Formulaire)</h4>
+            <p>
+              Ajoute chaque couleur/variante avec son nom (ex: أسود طبيعي, أبيض, Emerald) et sa photo dédiée. Dans les templates Extensions et Doudoune, la cliente pourra sélectionner 2 variantes !
+            </p>
+          </div>
+        </div>
+
+        <div className="studio-variants-list">
+          {variants.map((variant, index) => (
+            <div key={index} className="studio-variant-row">
+              <div className="studio-variant-preview">
+                {variant.image ? (
+                  <img src={variant.image} alt={variant.name} />
+                ) : (
+                  <span>#{index + 1}</span>
+                )}
+              </div>
+              <div className="studio-variant-inputs">
+                <input
+                  type="text"
+                  placeholder={`Nom de la variante #${index + 1} (ex: أسود طبيعي ou Noir)`}
+                  value={variant.name}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setVariants(prev => prev.map((v, i) => (i === index ? { ...v, name: val } : v)));
+                  }}
+                />
+                <div className="studio-variant-url-row">
+                  <input
+                    type="text"
+                    placeholder="URL de la photo de cette variante (ou importer →)"
+                    value={variant.image}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setVariants(prev => prev.map((v, i) => (i === index ? { ...v, image: val } : v)));
+                    }}
+                  />
+                  <label className="upload-inline" style={{ margin: 0, cursor: "pointer" }}>
+                    <ImagePlus size={14} /> Photo
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="visually-hidden"
+                      onChange={e => void handleVariantImageUpload(index, e.target.files)}
+                    />
+                  </label>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="icon-button danger-icon"
+                onClick={() => setVariants(prev => prev.filter((_, i) => i !== index))}
+                title="Supprimer cette variante"
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className="button button-light"
+          style={{ marginTop: 10 }}
+          onClick={() => setVariants(prev => [...prev, { name: "", image: "" }])}
+        >
+          <Plus size={15} /> Ajouter une variante / couleur
+        </button>
+      </div>
+
+      {/* ÉTAPE 4 : PHOTO PRINCIPALE (HERO) & GALERIE / BANNIÈRES VERTICALES */}
+      <div className="studio-step-box">
+        <div className="studio-step-header">
+          <span className="studio-step-num">4</span>
+          <div>
+            <h4>Photo Principale (Hero) & Galerie / Bannières de la Landing Page</h4>
+            <p>
+              {form.landingTemplate === "extensions"
+                ? "Pour le template Extensions Pink : la Photo Principale s'affiche tout en haut, et les photos de la Galerie s'empilent en grandes bannières verticales sous le slider !"
+                : "Importe la photo principale (Hero) ainsi que les photos de détails ou du lookbook."}
+            </p>
+          </div>
+        </div>
+
+        <div className="product-admin-grid">
+          <div className="studio-media-block">
+            <label>
+              Photo principale (Hero Banner) *
+              <input
+                required
+                placeholder="URL de l'image principale ou importe depuis ton appareil"
+                value={form.image}
+                onChange={e => set("image", e.target.value)}
+              />
+            </label>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+              <button type="button" className="upload-inline" onClick={() => imageRef.current?.click()}>
+                <ImagePlus size={14} /> Importer la photo principale
+              </button>
+              <input
+                ref={imageRef}
+                className="visually-hidden"
+                type="file"
+                accept="image/*"
+                onChange={e => void handleMainImageUpload(e.target.files)}
+              />
+              {form.image && (
+                <img
+                  src={form.image}
+                  alt="Aperçu Hero"
+                  style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 10, border: "1px solid var(--line)" }}
+                />
+              )}
+            </div>
+          </div>
+
+          <div className="studio-media-block">
+            <label>
+              Arguments clés / Détails (une ligne par avantage)
+              <textarea
+                rows={4}
+                placeholder={"Ex:\nقماش عالي الجودة\nمناسب لجميع المناسبات\nتوصيل سريع 58 ولاية"}
+                value={detailsText}
+                onChange={e => setDetailsText(e.target.value)}
+              />
+            </label>
+          </div>
+
+          <div className="wide-field studio-media-block">
+            <label>
+              Galerie photos / Bannières verticales ({galleryList.length} photos)
+            </label>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <input
+                type="text"
+                style={{ flex: "1 1 220px", minHeight: 40, padding: "8px 12px", borderRadius: 10, border: "1px solid var(--line)" }}
+                placeholder="Coller une URL d'image et cliquer sur + Ajouter"
+                value={newGalleryUrl}
+                onChange={e => setNewGalleryUrl(e.target.value)}
+              />
+              <button
+                type="button"
+                className="button button-light"
+                onClick={() => {
+                  if (!newGalleryUrl.trim()) return;
+                  setGalleryList(prev => [...prev, newGalleryUrl.trim()]);
+                  setNewGalleryUrl("");
+                }}
+              >
+                <Plus size={14} /> Ajouter URL
+              </button>
+              <button type="button" className="upload-inline" onClick={() => galleryRef.current?.click()}>
+                <Upload size={14} /> Importer plusieurs photos
+              </button>
+              <input
+                ref={galleryRef}
+                className="visually-hidden"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={e => void handleGalleryUpload(e.target.files)}
+              />
+            </div>
+
+            {galleryList.length > 0 && (
+              <div className="studio-gallery-thumbs">
+                {galleryList.map((imgUrl, idx) => (
+                  <div key={`${imgUrl}-${idx}`} className="studio-gallery-thumb-item">
+                    <img src={imgUrl} alt={`Galerie ${idx + 1}`} />
+                    <button
+                      type="button"
+                      onClick={() => setGalleryList(prev => prev.filter((_, i) => i !== idx))}
+                      title="Retirer cette photo"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="form-panel-actions">
+        <button type="button" className="button button-light" onClick={onCancel}>
+          Annuler
+        </button>
+        <button type="submit" className="button button-gradient">
+          <Save size={16} /> Enregistrer le produit & publier la Landing Page
+        </button>
+      </div>
+    </form>
+  );
 }
 
 function TrackingSettings({ notify }: { notify: (message: string) => void }) {
@@ -1247,6 +2160,11 @@ function getDefaultSizeForProduct(product: Product | undefined): string {
 
 function computeProductGoodsPrice(product: Product | undefined, qty: number): number {
   if (!product) return 0;
+  if (product.packPrice && product.packPrice > 0) {
+    const pairs = Math.floor(qty / 2);
+    const singles = qty % 2;
+    return (pairs * product.packPrice) + (singles * product.price);
+  }
   const isDoudoune = product.id === "p-008" || product.slug.includes("doudoune") || product.name.toLowerCase().includes("doudoune");
   if (isDoudoune) {
     const pairs = Math.floor(qty / 2);
