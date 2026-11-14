@@ -11,12 +11,21 @@ import "./extensions-template.css";
 type OfferMode = "pack2" | "single";
 
 const DEFAULT_VARIANT_CARDS = [
-  { id: "v1", name: "أسود طبيعي", image: "/manus-storage/ext-pink-v1.jpg" },
-  { id: "v2", name: "بني غامق", image: "/manus-storage/ext-pink-v2.jpg" },
-  { id: "v3", name: "بني عسلي", image: "/manus-storage/ext-pink-v3.jpg" },
-  { id: "v4", name: "شاتين روكس", image: "/manus-storage/ext-pink-v4.jpg" },
-  { id: "v5", name: "أشقر فاتح", image: "/manus-storage/ext-pink-v5.jpg" },
-  { id: "v6", name: "نور بليلي غري", image: "/manus-storage/ext-pink-v6.jpg" },
+  { id: "v1", name: "أسود طبيعي", image: "/manus-storage/ext-m2-v1.jpg" },
+  { id: "v2", name: "بني غامق", image: "/manus-storage/ext-m2-v2.jpg" },
+  { id: "v3", name: "بني عسلي", image: "/manus-storage/ext-m2-v3.jpg" },
+  { id: "v4", name: "شاتين روكس", image: "/manus-storage/ext-m2-v4.jpg" },
+  { id: "v5", name: "أشقر فاتح", image: "/manus-storage/ext-m2-v5.jpg" },
+  { id: "v6", name: "نور بليلج غري", image: "/manus-storage/ext-m2-v6.jpg" },
+] as const;
+
+const HERO_FEATURES = [
+  { top: "39.66%", text: "شعر طبيعي 60%" },
+  { top: "46.67%", text: "يتليس ويتبوكل" },
+  { top: "53.68%", text: "سهل التركيب" },
+  { top: "60.68%", text: "مريح وخفيف" },
+  { top: "67.69%", text: "يدوم لفترة طويلة" },
+  { top: "74.70%", text: "مظهر طبيعي ولامع" },
 ] as const;
 
 const DEFAULT_PACK_2_PRICE = 4500;
@@ -28,36 +37,45 @@ export default function ExtensionsLanding({
   product: Product;
   quantity: number;
 }) {
-  const isBuiltIn = product.id === "p-005" || product.slug === "extensions-silk-wave" || product.slug === "extensions-cheveux";
-  const VARIANT_CARDS = !isBuiltIn && product.variantImages && product.variantImages.length > 0
-    ? product.variantImages.map((v, idx) => ({
-        id: `v${idx + 1}`,
-        name: v.name || `اللون ${idx + 1}`,
-        image: v.image || product.image,
-      }))
-    : !isBuiltIn && product.colors && product.colors.length > 0
-      ? product.colors.map((c, idx) => ({
+  const isBuiltIn =
+    product.id === "p-005" ||
+    product.slug === "extensions-silk-wave" ||
+    product.slug === "extensions-cheveux";
+
+  const VARIANT_CARDS =
+    !isBuiltIn && product.variantImages && product.variantImages.length > 0
+      ? product.variantImages.map((v, idx) => ({
           id: `v${idx + 1}`,
-          name: c,
-          image: product.gallery?.[idx] || product.image,
+          name: v.name || `اللون ${idx + 1}`,
+          image: v.image || product.image,
         }))
-      : DEFAULT_VARIANT_CARDS;
-  const PACK_2_PRICE = product.packPrice || (isBuiltIn ? DEFAULT_PACK_2_PRICE : Math.round((product.price || 2700) * 1.65));
+      : !isBuiltIn && product.colors && product.colors.length > 0
+        ? product.colors.map((c, idx) => ({
+            id: `v${idx + 1}`,
+            name: c,
+            image: product.gallery?.[idx] || product.image,
+          }))
+        : DEFAULT_VARIANT_CARDS;
+
+  const PACK_2_PRICE =
+    product.packPrice ||
+    (isBuiltIn ? DEFAULT_PACK_2_PRICE : Math.round((product.price || 2700) * 1.65));
 
   const [offerMode, setOfferMode] = useState<OfferMode>("pack2");
   const [color1, setColor1] = useState<string>(VARIANT_CARDS[0]?.name ?? "أسود طبيعي");
-  const [color2, setColor2] = useState<string>((VARIANT_CARDS[1] ?? VARIANT_CARDS[0])?.name ?? "بني غامق");
+  const [color2, setColor2] = useState<string>(
+    (VARIANT_CARDS[1] ?? VARIANT_CARDS[0])?.name ?? "بني غامق"
+  );
   const [nextSlotToFill, setNextSlotToFill] = useState<1 | 2>(1);
   const [selectedWilaya, setSelectedWilaya] = useState<string>("");
   const [selectedCommune, setSelectedCommune] = useState<string>("");
-  const [noteInput, setNoteInput] = useState<string>("");
+  const [formError, setFormError] = useState<string>("");
   const [orderSubmitted, setOrderSubmitted] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const isSubmittingRef = useRef<boolean>(false);
   const checkoutInitiatedRef = useRef<boolean>(false);
   const formRef = useRef<HTMLFormElement | null>(null);
-  const trackRef = useRef<HTMLDivElement | null>(null);
 
   const communes = selectedWilaya
     ? (abayaCommunesByWilaya[selectedWilaya] ?? [])
@@ -77,9 +95,7 @@ export default function ExtensionsLanding({
   const isPack2 = offerMode === "pack2";
   const billedQty = isPack2 ? 2 : Math.max(1, quantity || 1);
   const goodsTotal = isPack2 ? PACK_2_PRICE : singleUnitPrice * billedQty;
-  const combinedColorLabel = isPack2
-    ? `1: ${color1} | 2: ${color2}`
-    : color1;
+  const combinedColorLabel = isPack2 ? `1: ${color1} | 2: ${color2}` : color1;
 
   useCheckoutDraft({
     formRef,
@@ -93,7 +109,7 @@ export default function ExtensionsLanding({
         size: "",
       },
     ],
-    watchKey: `${offerMode}|${color1}|${color2}|${selectedWilaya}|${selectedCommune}|${noteInput}|${quantity}`,
+    watchKey: `${offerMode}|${color1}|${color2}|${selectedWilaya}|${selectedCommune}|${quantity}`,
   });
 
   useEffect(() => {
@@ -106,7 +122,7 @@ export default function ExtensionsLanding({
       value: PACK_2_PRICE,
       currency: "DZD",
     });
-  }, [product.id, product.name]);
+  }, [product.id, product.name, PACK_2_PRICE]);
 
   useEffect(() => {
     const prevTitle = document.title;
@@ -116,7 +132,7 @@ export default function ExtensionsLanding({
     };
   }, []);
 
-  const handleSelectTopVariant = (shadeName: string) => {
+  const handlePickFromSlider = (shadeName: string) => {
     if (!isPack2) {
       setColor1(shadeName);
     } else if (nextSlotToFill === 1) {
@@ -127,6 +143,7 @@ export default function ExtensionsLanding({
       setNextSlotToFill(1);
     }
 
+    setFormError("");
     trackPixelEvent("AddToCart", {
       content_type: "product",
       content_id: product.id,
@@ -135,15 +152,8 @@ export default function ExtensionsLanding({
       value: goodsTotal,
       currency: "DZD",
     });
-  };
 
-  const scrollVariants = (dir: "left" | "right") => {
-    if (!trackRef.current) return;
-    const step = 170;
-    trackRef.current.scrollBy({
-      left: dir === "left" ? -step : step,
-      behavior: "smooth",
-    });
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const handleFormFocus = () => {
@@ -162,6 +172,13 @@ export default function ExtensionsLanding({
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (isSubmittingRef.current || orderSubmitted) return;
+
+    if (!color1 || (isPack2 && !color2)) {
+      setFormError("اختاري اللونين من فضلك");
+      return;
+    }
+
+    setFormError("");
     isSubmittingRef.current = true;
     setIsSubmitting(true);
 
@@ -170,18 +187,14 @@ export default function ExtensionsLanding({
     const rawPhone = String(formData.get("phone") || "").trim();
     const phone = rawPhone.replace(/[\s\-\.]/g, "");
     const wilaya = String(formData.get("wilaya") || selectedWilaya).trim();
-    const commune = String(formData.get("commune") || selectedCommune || wilaya).trim();
-    const extraNote = String(formData.get("note") || noteInput).trim();
+    const commune = String(
+      formData.get("commune") || selectedCommune || wilaya
+    ).trim();
 
     const orderTotal = goodsTotal + shippingFee;
-    const offerNote = [
-      isPack2
-        ? `🎁 عرض 1 + 1 مجاناً (4500 دج) — [القطعة 1: ${color1} | القطعة 2: ${color2}]`
-        : `قطعة واحدة — [اللون: ${color1}]`,
-      extraNote,
-    ]
-      .filter(Boolean)
-      .join(" · ");
+    const offerNote = isPack2
+      ? `🎁 عرض 1 + 1 مجاناً (${PACK_2_PRICE} دج) — [القطعة 1: ${color1} | القطعة 2: ${color2}]`
+      : `قطعة واحدة — [اللون: ${color1}]`;
 
     let serverOrderNumber = `MS-${Math.floor(1000 + Math.random() * 8999)}`;
 
@@ -271,177 +284,147 @@ export default function ExtensionsLanding({
   };
 
   return (
-    <div className="ext-pink-root" dir="rtl" lang="ar">
-      <div className="ext-pink-w">
-        <img src={isBuiltIn ? "/manus-storage/ext-pink-1.jpg" : (product.image || "/manus-storage/ext-pink-1.jpg")} alt={product.arName || product.name} />
+    <div className="ext-m2-root" dir="rtl" lang="ar">
+      <div className="w">
+        {/* 1. BIGGER HERO WITH 6 FEATURE ROWS + SMOOTH BOTTOM GRADIENT */}
+        <div className="hero">
+          <img
+            src={
+              isBuiltIn
+                ? "/manus-storage/ext-m2-hero.jpg"
+                : product.image || "/manus-storage/ext-m2-hero.jpg"
+            }
+            alt={product.arName || product.name}
+          />
+          {HERO_FEATURES.map((feat, idx) => (
+            <div key={idx} className="rw" style={{ top: feat.top }}>
+              <span>{feat.text}</span>
+              <i>✔</i>
+            </div>
+          ))}
+        </div>
 
-        {/* Variant images slightly larger in a horizontal slide */}
-        <div className="ext-variants-slider-wrap">
-          <button
-            type="button"
-            className="ext-variant-nav ext-variant-nav-left"
-            onClick={() => scrollVariants("left")}
-            aria-label="السابق"
-          >
-            ‹
-          </button>
-
-          <div className="ext-variants-track" ref={trackRef}>
+        {/* 2. VARIANT CARDS SLIDER */}
+        <div className="ext-m2-slider-sec">
+          <span className="pill">متوفر بجميع الألوان</span>
+          <div className="sl" id="sl">
             {VARIANT_CARDS.map(card => {
               const isC1 = color1 === card.name;
               const isC2 = isPack2 && color2 === card.name;
-              const isSelected = isC1 || isC2;
+              const isPicked = isC1 || isC2;
               return (
-                <button
+                <div
                   key={card.id}
-                  type="button"
-                  className={`ext-variant-card ${isSelected ? "is-selected" : ""}`}
-                  onClick={() => handleSelectTopVariant(card.name)}
+                  className={`cd ${isPicked ? "is-picked" : ""}`}
                 >
-                  <img src={card.image} alt={card.name} />
                   {isC1 && isC2 ? (
-                    <span className="ext-variant-badge">1️⃣ + 2️⃣</span>
+                    <span className="ext-m2-cd-badge">① + ② 🎁</span>
                   ) : isC1 ? (
-                    <span className="ext-variant-badge">1️⃣</span>
+                    <span className="ext-m2-cd-badge">① المختار</span>
                   ) : isC2 ? (
-                    <span className="ext-variant-badge">2️⃣ 🎁</span>
+                    <span className="ext-m2-cd-badge">② مجانية 🎁</span>
                   ) : null}
-                </button>
+                  <img src={card.image} alt={card.name} />
+                  <button
+                    type="button"
+                    onClick={() => handlePickFromSlider(card.name)}
+                  >
+                    اختاري هذا اللون
+                  </button>
+                </div>
               );
             })}
           </div>
-
-          <button
-            type="button"
-            className="ext-variant-nav ext-variant-nav-right"
-            onClick={() => scrollVariants("right")}
-            aria-label="التالي"
-          >
-            ›
-          </button>
+          <div className="hint">‹ اسحبي لرؤية كل الألوان ›</div>
         </div>
 
-        {isBuiltIn ? (
-          <>
-            <img src="/manus-storage/ext-pink-3.jpg" alt="" />
-            <img src="/manus-storage/ext-pink-4.jpg" alt="" />
-            <img src="/manus-storage/ext-pink-5.jpg" alt="" />
-            <img src="/manus-storage/ext-pink-6.jpg" alt="" />
-          </>
-        ) : (
-          (product.gallery ?? []).map((sliceUrl, idx) => (
-            <img key={`${sliceUrl}-${idx}`} src={sliceUrl} alt="" />
-          ))
-        )}
+        {/* 3. STACKED PROMO SECTIONS + CTA IMAGE */}
+        <div className="ext-m2-banners">
+          {isBuiltIn ? (
+            <>
+              <img src="/manus-storage/ext-m2-s1.jpg" alt="" />
+              <img src="/manus-storage/ext-m2-s2.jpg" alt="" />
+            </>
+          ) : (
+            (product.gallery ?? []).map((sliceUrl, idx) => (
+              <img key={`${sliceUrl}-${idx}`} src={sliceUrl} alt="" />
+            ))
+          )}
 
-        {/* Beautiful Order Form at the bottom with 2-Variant Selection */}
-        <form
-          id="f"
-          ref={formRef}
-          className="ext-pink-form"
-          onFocus={handleFormFocus}
-          onSubmit={handleSubmit}
-        >
-          <div className="ext-pink-form-inner">
-            <div className="ext-form-header">
-              <span className="ext-form-promo-pill">
-                🎁 عرض خاص : اشتري واحدة والثانية مجاناً
+          <a
+            href="#f"
+            className="ext-m2-cta-link"
+            onClick={e => {
+              e.preventDefault();
+              formRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            }}
+          >
+            <img src="/manus-storage/ext-m2-cta.jpg" alt="أطلبي الآن" />
+          </a>
+        </div>
+
+        {/* 4. LUXURY DARK ESPRESSO & CHAMPAGNE GOLD FORM (LESS PINK) */}
+        <div className="fm">
+          <form
+            id="f"
+            ref={formRef}
+            className="fb"
+            onFocus={handleFormFocus}
+            onSubmit={handleSubmit}
+          >
+            <span className="ft">اطلبي الآن</span>
+
+            <div className="of">
+              <span className="ext-m2-of-badge">
+                {isPack2
+                  ? "اشتري واحدة والثانية مجاناً 🎁"
+                  : "عرض قطعة واحدة ✨"}
               </span>
-              <h3>اطلبي الآن • الدفع عند الاستلام</h3>
-              <p>اختاري لونين من اختياركِ واستفيدي من العرض 🚚</p>
+              <b>{goodsTotal.toLocaleString("fr-FR")} DA</b>
+              <span className="ext-m2-of-sub">
+                الدفع عند الاستلام • توصيل سريع لباب المنزل
+              </span>
             </div>
 
-            {/* Offer Mode Choice (Default: 1+1 = 4500 DA) */}
-            <div className="ext-offer-toggle">
+            {/* Option to pick 1+1 Free (4500 DA) or 1 piece (2700 DA) */}
+            <div className="ext-m2-mode-switch">
               <button
                 type="button"
-                className={`ext-offer-card ${offerMode === "pack2" ? "is-active" : ""}`}
+                className={`ext-m2-mode-btn ${isPack2 ? "is-active" : ""}`}
                 onClick={() => setOfferMode("pack2")}
               >
-                <span className="ext-offer-tag">🎁 1 + 1 مجاناً (الأكثر طلباً)</span>
-                <div className="ext-offer-name">قطعتين (1 + 1 مجاناً)</div>
-                <div className="ext-offer-desc">اختاري لونين من اختيارك</div>
-                <span className="ext-offer-price-pill">4 500 DA</span>
+                <strong>🎁 قطعتين (1 + 1 مجاناً)</strong>
+                <small>{PACK_2_PRICE.toLocaleString("fr-FR")} DA</small>
               </button>
-
               <button
                 type="button"
-                className={`ext-offer-card ${offerMode === "single" ? "is-active" : ""}`}
+                className={`ext-m2-mode-btn ${!isPack2 ? "is-active" : ""}`}
                 onClick={() => setOfferMode("single")}
               >
-                <div className="ext-offer-name">قطعة واحدة</div>
-                <div className="ext-offer-desc">لون واحد من اختيارك</div>
-                <span className="ext-offer-price-pill">
-                  {singleUnitPrice.toLocaleString("fr-FR")} DA
-                </span>
+                <strong>قطعة واحدة</strong>
+                <small>{singleUnitPrice.toLocaleString("fr-FR")} DA</small>
               </button>
             </div>
 
-            {/* Variant 1 Selector */}
-            <div className="ext-variant-picker-box">
-              <div className="ext-variant-picker-head">
-                <span>1️⃣ اختر لون القطعة الأولى :</span>
-                <span className="ext-variant-selected-pill">{color1}</span>
-              </div>
-              <div className="ext-variant-mini-grid">
-                {VARIANT_CARDS.map(card => (
-                  <button
-                    key={`c1-${card.id}`}
-                    type="button"
-                    className={`ext-variant-mini-item ${color1 === card.name ? "is-active" : ""}`}
-                    onClick={() => setColor1(card.name)}
-                  >
-                    <img src={card.image} alt={card.name} />
-                    <span>{card.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <input
+              name="name"
+              placeholder="الاسم الكامل"
+              required
+            />
 
-            {/* Variant 2 Selector (1 Achetée + 1 Offerte) */}
-            {isPack2 && (
-              <div className="ext-variant-picker-box is-second">
-                <div className="ext-variant-picker-head">
-                  <span>2️⃣ اختر لون القطعة الثانية (المجانية 🎁) :</span>
-                  <span className="ext-variant-selected-pill">{color2}</span>
-                </div>
-                <div className="ext-variant-mini-grid">
-                  {VARIANT_CARDS.map(card => (
-                    <button
-                      key={`c2-${card.id}`}
-                      type="button"
-                      className={`ext-variant-mini-item ${color2 === card.name ? "is-active" : ""}`}
-                      onClick={() => setColor2(card.name)}
-                    >
-                      <img src={card.image} alt={card.name} />
-                      <span>{card.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <input
+              type="tel"
+              inputMode="tel"
+              name="phone"
+              placeholder="رقم الهاتف (05 / 06 / 07)"
+              pattern="0[5-7][0-9]{8}"
+              required
+            />
 
-            {/* Customer Details */}
-            <div className="ext-field-group">
-              <input
-                name="name"
-                placeholder="👤 الاسم الكامل"
-                required
-              />
-            </div>
-
-            <div className="ext-field-group">
-              <input
-                type="tel"
-                inputMode="tel"
-                name="phone"
-                placeholder="📞 رقم الهاتف (05 / 06 / 07)"
-                pattern="0[5-7][0-9]{8}"
-                required
-              />
-            </div>
-
-            <div className="ext-field-row">
+            <div className="ext-m2-row-2">
               <select
                 id="w"
                 name="wilaya"
@@ -454,7 +437,7 @@ export default function ExtensionsLanding({
                 }}
                 required
               >
-                <option value="">📍 الولاية</option>
+                <option value="">الولاية</option>
                 {abayaWilayas.map(wName => (
                   <option key={wName} value={wName}>
                     {wName}
@@ -470,7 +453,7 @@ export default function ExtensionsLanding({
                 required
               >
                 <option value="">
-                  {selectedWilaya ? "🏘️ البلدية" : "اختر الولاية أولاً"}
+                  {selectedWilaya ? "البلدية" : "اختر الولاية أولاً"}
                 </option>
                 {communes.map(cName => (
                   <option key={cName} value={cName}>
@@ -480,27 +463,72 @@ export default function ExtensionsLanding({
               </select>
             </div>
 
-            <div className="ext-field-group">
-              <input
-                name="note"
-                value={noteInput}
-                onChange={e => setNoteInput(e.target.value)}
-                placeholder="📝 ملاحظة إضافية للتوصيل (اختياري)"
-              />
+            {/* ① First Shade Picker */}
+            <label>
+              <span>① اللون الأول (المشتراة)</span>
+              <span className="ext-m2-picked-pill">{color1}</span>
+            </label>
+            <div className="ch" id="g0">
+              {VARIANT_CARDS.map(card => {
+                const active = color1 === card.name;
+                return (
+                  <div
+                    key={`g0-${card.id}`}
+                    className={active ? "on" : ""}
+                    onClick={() => {
+                      setColor1(card.name);
+                      setFormError("");
+                    }}
+                  >
+                    {active && <span className="ext-m2-ch-check">✔</span>}
+                    <img src={card.image} alt={card.name} />
+                    {card.name}
+                  </div>
+                );
+              })}
             </div>
 
+            {/* ② Second Shade Picker (Free Gift) */}
+            {isPack2 && (
+              <>
+                <label className="gf">
+                  <span>② اللون الثاني (🎁 مجانية)</span>
+                  <span className="ext-m2-picked-pill">{color2}</span>
+                </label>
+                <div className="ch" id="g1">
+                  {VARIANT_CARDS.map(card => {
+                    const active = color2 === card.name;
+                    return (
+                      <div
+                        key={`g1-${card.id}`}
+                        className={active ? "on" : ""}
+                        onClick={() => {
+                          setColor2(card.name);
+                          setFormError("");
+                        }}
+                      >
+                        {active && <span className="ext-m2-ch-check">✔</span>}
+                        <img src={card.image} alt={card.name} />
+                        {card.name}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
             {/* Order Recap */}
-            <div className="ext-order-recap">
-              <div className="ext-order-recap-line">
+            <div className="ext-m2-recap">
+              <div className="ext-m2-recap-line">
                 <span>
                   {isPack2
-                    ? `🎁 عرض قطعتين (${color1} + ${color2})`
+                    ? `🎁 عرض 1+1 (${color1} + ${color2})`
                     : `✨ قطعة واحدة (${color1})`}
                 </span>
                 <span>{goodsTotal.toLocaleString("fr-FR")} DA</span>
               </div>
-              <div className="ext-order-recap-line">
-                <span>🚚 التوصيل للمنزل</span>
+              <div className="ext-m2-recap-line">
+                <span>🚚 التوصيل</span>
                 <span>
                   {selectedWilaya
                     ? shippingFee === 0
@@ -509,42 +537,43 @@ export default function ExtensionsLanding({
                     : "حسب الولاية"}
                 </span>
               </div>
-              <div className="ext-order-recap-total">
+              <div className="ext-m2-recap-total">
                 <span>المجموع الكلي :</span>
-                <span>{(goodsTotal + shippingFee).toLocaleString("fr-FR")} DA</span>
+                <span>
+                  {(goodsTotal + shippingFee).toLocaleString("fr-FR")} DA
+                </span>
               </div>
             </div>
 
+            {formError && (
+              <div className="er" id="er">
+                {formError}
+              </div>
+            )}
+
             <button
+              className="go"
               type="submit"
-              className="ext-submit-btn"
               disabled={isSubmitting || orderSubmitted}
             >
               {isSubmitting
                 ? "⏳ جاري تأكيد الطلب..."
                 : orderSubmitted
                   ? "✅ تم تسجيل طلبك بنجاح"
-                  : "🛒 تأكيد الطلب الآن"}
+                  : "🛒 تأكيد الطلب"}
             </button>
 
             {orderSubmitted && (
-              <div className="ext-pink-ok" id="ok">
-                ✅ تم استلام طلبك بنجاح، سنتصل بك قريباً لتأكيد الإرسال!
+              <div className="ok" id="ok">
+                ✅ تم استلام طلبك بنجاح
+                <br />
+                {isPack2 ? `${color1} + ${color2} 🎁` : color1}
+                <br />
+                سنتصل بك قريباً لتأكيد الإرسال
               </div>
             )}
-          </div>
-        </form>
-
-        <a
-          className="ext-pink-bar"
-          href="#f"
-          onClick={e => {
-            e.preventDefault();
-            formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }}
-        >
-          <img src="/manus-storage/ext-pink-bar.jpg" alt="الطلب الآن" />
-        </a>
+          </form>
+        </div>
       </div>
     </div>
   );
