@@ -6,6 +6,7 @@ import { AbandonedOrders } from "@/components/AbandonedOrders";
 import { trpc } from "@/lib/trpc";
 import type { CheckoutOrder } from "@shared/checkout";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
+import { shippingFeeFor } from "@shared/shipping";
 import { categories, getCatalogProducts, saveCatalogProducts, formatDZD, wilayas, type Order, type OrderStatus, type Product } from "@/lib/store-data";
 import { StatusPill } from "@/components/StoreLayout";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -85,6 +86,7 @@ function AdminPageContent() {
   const [query, setQuery] = useState("");
   const [period, setPeriod] = useState("Toutes les dates");
   const [selected, setSelected] = useState<CheckoutOrder | null>(null);
+  const [isCreatingOrder, setIsCreatingOrder] = useState<boolean>(false);
   const [historyOrderId, setHistoryOrderId] = useState<string | null>(null);
   const [postponeOrderId, setPostponeOrderId] = useState<string | null>(null);
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
@@ -104,6 +106,7 @@ function AdminPageContent() {
   const utils = trpc.useUtils();
   const updateOrderStatus = trpc.admin.updateOrderStatus.useMutation();
   const recordOrderInteraction = trpc.admin.recordOrderInteraction.useMutation();
+  const createOrderMutation = trpc.admin.createOrder.useMutation();
   const updateOrderDetails = trpc.admin.updateOrderDetails.useMutation();
   const deleteOrderMutation = trpc.admin.deleteOrder.useMutation();
   const restoreOrders = trpc.admin.restoreOrders.useMutation();
@@ -613,6 +616,18 @@ function AdminPageContent() {
       }
     );
   };
+  const handleCreateOrder = (payload: Parameters<typeof createOrderMutation.mutate>[0]) => {
+    createOrderMutation.mutate(payload, {
+      onSuccess: async created => {
+        await utils.admin.orders.invalidate();
+        await utils.admin.staffData.invalidate();
+        setIsCreatingOrder(false);
+        playChaChingSound();
+        notify(`➕ Nouvelle commande ${created.id} créée avec succès (${created.customer}) ✦`, "order");
+      },
+      onError: error => notify(error.message || "Impossible de créer la commande", "urgent"),
+    });
+  };
   const handleDeleteOrder = (dbId: number) => {
     deleteOrderMutation.mutate(
       { id: dbId },
@@ -677,6 +692,16 @@ function AdminPageContent() {
   <button
     type="button"
     className="neo-darkmode-btn"
+    onClick={() => setIsCreatingOrder(true)}
+    title="Créer manuellement une nouvelle commande"
+    style={{ background: "linear-gradient(135deg, #10b981, #059669)", border: "1px solid #10b981", cursor: "pointer", color: "#fff" }}
+  >
+    <Plus size={14} style={{ color: "#fff" }} />
+    <span className="neo-btn-label" style={{ color: "#fff", fontWeight: 800 }}>Nouvelle commande</span>
+  </button>
+  <button
+    type="button"
+    className="neo-darkmode-btn"
     onClick={() => go("staff")}
     title="Gérer les confirmateurs, salaires, commissions et appels"
     style={{ background: "rgba(16, 185, 129, 0.14)", border: "1px solid rgba(16, 185, 129, 0.35)", cursor: "pointer" }}
@@ -707,7 +732,7 @@ function AdminPageContent() {
       <span className="neo-glow-badge">NEO</span>
     </>
   )}
-</button><button className="icon-button" aria-label="Notifications"><Bell size={19} />{orders.some(order => order.status === "nouvelle") && <i />}</button><div className="admin-profile"><div className="admin-avatar small">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></div></div></header><div className="admin-content">{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onExport={exportOrders} onUpdateStatus={updateStatus} stockPanel={<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} />} />}</div></main>{isSearchOpen && (
+</button><button className="icon-button" aria-label="Notifications"><Bell size={19} />{orders.some(order => order.status === "nouvelle") && <i />}</button><div className="admin-profile"><div className="admin-avatar small">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></div></div></header><div className="admin-content">{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} stockPanel={<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} />} />}</div></main>{isSearchOpen && (
   <div className="admin-search-modal-overlay" onClick={() => setIsSearchOpen(false)}>
     <div className="admin-search-modal" onClick={e => e.stopPropagation()}>
       <div className="admin-search-modal-head">
@@ -934,6 +959,12 @@ function AdminPageContent() {
       </div>
     </div>
   </div>
+)}{isCreatingOrder && (
+  <CreateOrderModal
+    isSaving={createOrderMutation.isPending}
+    onClose={() => setIsCreatingOrder(false)}
+    onCreate={handleCreateOrder}
+  />
 )}{selected && <OrderModal order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={() => handleCallOrder(selected)} onWhatsApp={() => handleWhatsAppOrder(selected)} onOpenHistory={() => setHistoryOrderId(selected.id)} onOpenPostpone={() => setPostponeOrderId(selected.id)} onOpenCancel={() => setCancelOrderId(selected.id)} onSetNrpLevel={lvl => updateStatusWithMeta(selected.id, "ne_repond_pas", { nrpLevel: lvl })} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onDelete={handleDeleteOrder} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{activeHistoryOrder && (
   <OrderHistoryModal
     order={activeHistoryOrder}
@@ -1201,7 +1232,7 @@ function getColorsForProduct(product: Product | undefined): string[] {
   if (isDoudoune) return ["أزرق سماوي", "أبيض", "أسود"];
   const isExtensions = product.id === "p-005" || product.slug.includes("extensions") || product.category === "extensions";
   if (isExtensions) {
-    return ["شاتان فونس", "أسود", "بني غامق", "شاتان روكس", "أشقر فاتح", "نور بالياح غري"];
+    return ["أسود طبيعي", "بني غامق", "بني عسلي", "شاتين روكس", "أشقر فاتح", "نور بليلي غري", "شاتان فونس", "أسود"];
   }
   return product.colors?.length ? product.colors : ["Emerald", "Noir"];
 }
@@ -1221,6 +1252,12 @@ function computeProductGoodsPrice(product: Product | undefined, qty: number): nu
     const pairs = Math.floor(qty / 2);
     const singles = qty % 2;
     return (pairs * 12900) + (singles * 7600);
+  }
+  const isExtensions = product.id === "p-005" || product.slug.includes("extensions") || product.category === "extensions";
+  if (isExtensions) {
+    const pairs = Math.floor(qty / 2);
+    const singles = qty % 2;
+    return (pairs * 4500) + (singles * 2700);
   }
   return product.price * qty;
 }
@@ -2342,6 +2379,532 @@ function OrderModal({
         >
           <Trash2 size={16} /> Supprimer cette commande
         </button>
+      </div>
+    </div>
+  );
+}
+
+function CreateOrderModal({
+  isSaving,
+  onClose,
+  onCreate,
+}: {
+  isSaving: boolean;
+  onClose: () => void;
+  onCreate: (payload: {
+    customer: string;
+    phone: string;
+    productId?: string;
+    product: string;
+    quantity: number;
+    total: number;
+    color?: string;
+    size?: string;
+    delivery: "home" | "office";
+    wilaya: string;
+    commune: string;
+    address?: string;
+    note?: string;
+    status?: OrderStatus;
+  }) => void;
+}) {
+  const catalog = useMemo(() => getCatalogProducts(), []);
+  const defaultProduct = catalog.find(p => p.id === "p-005") || catalog[0];
+
+  const [customer, setCustomer] = useState("");
+  const [phone, setPhone] = useState("");
+  const [status, setStatus] = useState<OrderStatus>("confirmee");
+  const [productId, setProductId] = useState(defaultProduct?.id || "p-005");
+  const [productName, setProductName] = useState(defaultProduct?.name || "Extensions Cheveux Naturels");
+  const [quantity, setQuantity] = useState<number>(defaultProduct?.id === "p-005" ? 2 : 1);
+
+  const selectedCatalogProduct = catalog.find(p => p.id === productId) || defaultProduct;
+  const availableColors = useMemo(() => getColorsForProduct(selectedCatalogProduct), [selectedCatalogProduct]);
+
+  const [variants, setVariants] = useState<PieceVariant[]>(() => [
+    { color: availableColors[0] || "أسود طبيعي", size: getDefaultSizeForProduct(defaultProduct) },
+    { color: availableColors[1] || availableColors[0] || "بني غامق", size: getDefaultSizeForProduct(defaultProduct) },
+  ]);
+
+  // 2nd Product (Cross-Sell)
+  const secondDefault = catalog.find(p => p.id !== productId) || defaultProduct;
+  const [hasSecondProduct, setHasSecondProduct] = useState<boolean>(false);
+  const [secondProductId, setSecondProductId] = useState<string>(secondDefault?.id || "p-008");
+  const [secondProductName, setSecondProductName] = useState<string>(secondDefault?.name || "");
+  const [secondQuantity, setSecondQuantity] = useState<number>(1);
+  const secondCatalogProduct = catalog.find(p => p.id === secondProductId) || secondDefault;
+  const secondAvailableColors = useMemo(() => getColorsForProduct(secondCatalogProduct), [secondCatalogProduct]);
+  const [secondVariants, setSecondVariants] = useState<PieceVariant[]>(() => [
+    { color: secondAvailableColors[0] || "Noir", size: getDefaultSizeForProduct(secondDefault) },
+  ]);
+
+  const [wilaya, setWilaya] = useState<string>(abayaWilayas[15] || abayaWilayas[0] || "16 - الجزائر");
+  const [commune, setCommune] = useState<string>(() => {
+    const w = abayaWilayas[15] || abayaWilayas[0] || "";
+    return (abayaCommunesByWilaya[w] ?? [])[0] || w;
+  });
+  const [delivery, setDelivery] = useState<"home" | "office">("home");
+  const [address, setAddress] = useState<string>("");
+  const [note, setNote] = useState<string>("");
+
+  const ratesQuery = trpc.store.shippingRates.useQuery(undefined, {
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const computedShippingFee = useMemo(() => {
+    if (!wilaya) return 0;
+    const ids = hasSecondProduct ? [productId, secondProductId] : [productId];
+    return shippingFeeFor(ratesQuery.data?.rates, wilaya, delivery, ids);
+  }, [wilaya, delivery, productId, secondProductId, hasSecondProduct, ratesQuery.data?.rates]);
+
+  const firstGoods = computeProductGoodsPrice(selectedCatalogProduct, quantity);
+  const secondGoods = hasSecondProduct ? computeProductGoodsPrice(secondCatalogProduct, secondQuantity) : 0;
+  const autoTotal = firstGoods + secondGoods + computedShippingFee;
+  const [customTotal, setCustomTotal] = useState<number | null>(null);
+  const effectiveTotal = customTotal !== null ? customTotal : autoTotal;
+
+  const handleProductChange = (nextId: string) => {
+    setProductId(nextId);
+    setCustomTotal(null);
+    const found = catalog.find(p => p.id === nextId);
+    if (found) {
+      setProductName(found.name);
+      const nextColors = getColorsForProduct(found);
+      const nextDefSize = getDefaultSizeForProduct(found);
+      const nextQty = found.id === "p-005" ? 2 : 1;
+      setQuantity(nextQty);
+      setVariants([
+        { color: nextColors[0] || "Noir", size: nextDefSize },
+        { color: nextColors[1] || nextColors[0] || "Noir", size: nextDefSize },
+      ]);
+    }
+  };
+
+  const handleQuantityChange = (nextQty: number) => {
+    const safeQty = Math.max(1, Math.min(10, nextQty || 1));
+    setQuantity(safeQty);
+    setCustomTotal(null);
+    const defSize = getDefaultSizeForProduct(selectedCatalogProduct);
+    setVariants(prev => {
+      const next = [...prev];
+      while (next.length < safeQty) {
+        const fallbackColor = availableColors[next.length % availableColors.length] || availableColors[0] || "Noir";
+        next.push({ color: fallbackColor, size: defSize });
+      }
+      return next.slice(0, safeQty);
+    });
+  };
+
+  const updatePieceVariant = (index: number, field: "color" | "size", val: string) => {
+    setVariants(prev => {
+      const next = [...prev];
+      if (next[index]) next[index] = { ...next[index], [field]: val };
+      return next;
+    });
+  };
+
+  const handleSecondProductChange = (nextId: string) => {
+    setSecondProductId(nextId);
+    setCustomTotal(null);
+    const found = catalog.find(p => p.id === nextId);
+    if (found) {
+      setSecondProductName(found.name);
+      const cols = getColorsForProduct(found);
+      const defSize = getDefaultSizeForProduct(found);
+      setSecondVariants([{ color: cols[0] || "Noir", size: defSize }]);
+    }
+  };
+
+  const handleSubmitCreate = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const activeVariants1 = variants.slice(0, quantity);
+    const color1 =
+      quantity === 1
+        ? activeVariants1[0]?.color || availableColors[0] || ""
+        : activeVariants1.map((v, i) => `${i + 1}: ${v.color}`).join(" | ");
+    const size1 =
+      quantity === 1
+        ? activeVariants1[0]?.size || getDefaultSizeForProduct(selectedCatalogProduct)
+        : activeVariants1.map((v, i) => `${i + 1}: ${v.size}`).join(" | ");
+
+    let finalProduct = quantity > 1 || hasSecondProduct ? `${productName} × ${quantity}` : productName;
+    let finalQuantity = quantity;
+    let finalColor = color1;
+    let finalSize = size1;
+
+    if (hasSecondProduct && secondCatalogProduct) {
+      const activeVariants2 = secondVariants.slice(0, secondQuantity);
+      const color2 =
+        secondQuantity === 1
+          ? activeVariants2[0]?.color || secondAvailableColors[0] || ""
+          : activeVariants2.map((v, i) => `${i + 1}: ${v.color}`).join(" | ");
+      const size2 =
+        secondQuantity === 1
+          ? activeVariants2[0]?.size || getDefaultSizeForProduct(secondCatalogProduct)
+          : activeVariants2.map((v, i) => `${i + 1}: ${v.size}`).join(" | ");
+
+      finalProduct = `${productName} × ${quantity} + ${secondProductName} × ${secondQuantity}`;
+      finalQuantity = quantity + secondQuantity;
+      finalColor = `[Art.1] ${color1} + [Art.2] ${color2}`;
+      finalSize = `[Art.1] ${size1} + [Art.2] ${size2}`;
+    }
+
+    onCreate({
+      customer: customer.trim(),
+      phone: phone.trim(),
+      productId,
+      product: finalProduct,
+      quantity: finalQuantity,
+      total: Math.max(0, Math.round(Number(effectiveTotal) || 0)),
+      color: finalColor,
+      size: finalSize,
+      delivery,
+      wilaya: wilaya.trim(),
+      commune: (commune || wilaya).trim(),
+      address: (address || commune || wilaya).trim(),
+      note: note.trim(),
+      status,
+    });
+  };
+
+  const arabicCommunes = abayaCommunesByWilaya[wilaya] ?? [];
+
+  return (
+    <div className="modal-layer">
+      <button className="modal-backdrop" onClick={onClose} />
+      <div className="order-modal" style={{ maxHeight: "90vh", overflowY: "auto" }}>
+        <div className="modal-head">
+          <div>
+            <span className="eyebrow" style={{ color: "#10b981" }}>➕ Création manuelle</span>
+            <h2>Nouvelle commande</h2>
+          </div>
+          <button className="icon-button" onClick={onClose} aria-label="Fermer">
+            <X size={19} />
+          </button>
+        </div>
+
+        <form className="order-edit-form" onSubmit={handleSubmitCreate} style={{ display: "grid", gap: "14px", marginTop: "10px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+              Client(e) *
+              <input
+                value={customer}
+                onChange={e => setCustomer(e.target.value)}
+                placeholder="Nom et prénom de la cliente"
+                required
+              />
+            </label>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+              Téléphone *
+              <input
+                type="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="Ex: 0550123456"
+                required
+              />
+            </label>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+              Produit *
+              <select value={productId} onChange={e => handleProductChange(e.target.value)}>
+                {catalog.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.name} ({formatDZD(item.price)})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+              Quantité / Offre
+              <select
+                value={quantity}
+                onChange={e => handleQuantityChange(Number(e.target.value))}
+                style={{
+                  height: "44px",
+                  borderRadius: "10px",
+                  border: "1px solid #cbd5e1",
+                  padding: "0 12px",
+                  fontWeight: 700,
+                  fontSize: "14px",
+                  backgroundColor: "var(--input-bg, #fff)",
+                }}
+              >
+                {[1, 2, 3, 4, 5, 6].map(qty => {
+                  const goods = computeProductGoodsPrice(selectedCatalogProduct, qty);
+                  let label = `${qty} pièce${qty > 1 ? "s" : ""} — ${formatDZD(goods)}`;
+                  if (productId === "p-005" && qty === 2) {
+                    label = `2 pièces (Offre 1+1 Gratuite = 4 500 DA 🎁)`;
+                  } else if (productId === "p-008" && qty === 2) {
+                    label = `2 pièces (Pack Duo = 12 900 DA 🔥)`;
+                  }
+                  return (
+                    <option key={qty} value={qty}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+          </div>
+
+          {/* Variantes du produit principal */}
+          <div
+            style={{
+              padding: "12px 14px",
+              borderRadius: "14px",
+              background: "rgba(16, 185, 129, 0.06)",
+              border: "1px solid rgba(16, 185, 129, 0.25)",
+              display: "grid",
+              gap: "8px",
+            }}
+          >
+            <span style={{ fontSize: "12.5px", fontWeight: 800, color: "#065f46" }}>
+              🎨 Choix des variantes ({quantity} pièce{quantity > 1 ? "s" : ""}) :
+            </span>
+            {variants.slice(0, quantity).map((v, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "auto 1fr 1fr",
+                  gap: "8px",
+                  alignItems: "center",
+                  background: "var(--input-bg, #fff)",
+                  padding: "8px 10px",
+                  borderRadius: "10px",
+                  border: "1px solid rgba(0,0,0,0.08)",
+                }}
+              >
+                <span style={{ fontWeight: 800, fontSize: "12px", minWidth: "65px" }}>
+                  Pièce {idx + 1} :
+                </span>
+                <select
+                  value={v.color}
+                  onChange={e => updatePieceVariant(idx, "color", e.target.value)}
+                  style={{ height: "36px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}
+                >
+                  {availableColors.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <select
+                  value={v.size}
+                  onChange={e => updatePieceVariant(idx, "size", e.target.value)}
+                  style={{ height: "36px", borderRadius: "8px", fontSize: "12px", fontWeight: 600 }}
+                >
+                  {["Standard", "S", "M", "L", "XL", "XXL"].map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+
+          {/* Option 2ème produit Cross-Sell */}
+          {!hasSecondProduct ? (
+            <button
+              type="button"
+              onClick={() => setHasSecondProduct(true)}
+              style={{
+                padding: "10px 14px",
+                borderRadius: "12px",
+                border: "1.5px dashed rgba(16, 185, 129, 0.5)",
+                background: "rgba(16, 185, 129, 0.06)",
+                color: "#059669",
+                fontWeight: 800,
+                fontSize: "13px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "6px",
+              }}
+            >
+              <Plus size={15} /> Ajouter un 2ème produit au même colis (Cross-Sell)
+            </button>
+          ) : (
+            <div
+              style={{
+                padding: "12px 14px",
+                borderRadius: "14px",
+                background: "rgba(59, 130, 246, 0.06)",
+                border: "1px solid rgba(59, 130, 246, 0.3)",
+                display: "grid",
+                gap: "10px",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <strong style={{ fontSize: "12.5px", color: "#1d4ed8" }}>🛍️ 2ème Produit (Cross-Sell)</strong>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHasSecondProduct(false);
+                    setCustomTotal(null);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#dc2626",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  ✕ Retirer
+                </button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <select value={secondProductId} onChange={e => handleSecondProductChange(e.target.value)}>
+                  {catalog.map(item => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} ({formatDZD(item.price)})
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={secondVariants[0]?.color || secondAvailableColors[0]}
+                  onChange={e =>
+                    setSecondVariants([
+                      {
+                        color: e.target.value,
+                        size: secondVariants[0]?.size || getDefaultSizeForProduct(secondCatalogProduct),
+                      },
+                    ])
+                  }
+                >
+                  {secondAvailableColors.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Wilaya & Commune */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+              Wilaya *
+              <select
+                value={wilaya}
+                onChange={e => {
+                  const nextW = e.target.value;
+                  setWilaya(nextW);
+                  setCustomTotal(null);
+                  const nextList = abayaCommunesByWilaya[nextW];
+                  setCommune(nextList?.[0] || nextW);
+                }}
+                required
+              >
+                {abayaWilayas.map(w => (
+                  <option key={w} value={w}>{w}</option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+              Commune *
+              {arabicCommunes.length > 0 ? (
+                <select value={commune} onChange={e => setCommune(e.target.value)} required>
+                  {arabicCommunes.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              ) : (
+                <input value={commune} onChange={e => setCommune(e.target.value)} required />
+              )}
+            </label>
+          </div>
+
+          {/* Livraison, Statut initial & Total */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px" }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+              Type de livraison
+              <select
+                value={delivery}
+                onChange={e => {
+                  setDelivery(e.target.value as "home" | "office");
+                  setCustomTotal(null);
+                }}
+              >
+                <option value="home">🏠 À domicile</option>
+                <option value="office">🏢 Stop Desk / Bureau</option>
+              </select>
+            </label>
+
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+              Statut initial
+              <select value={status} onChange={e => setStatus(e.target.value as OrderStatus)}>
+                <option value="confirmee">🟢 Confirmée (Prête à expédier)</option>
+                <option value="nouvelle">🟡 Nouvelle (En attente d'appel)</option>
+                <option value="reportee">🔵 Reportée</option>
+              </select>
+            </label>
+
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+              <span style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Total (DA)</span>
+                {customTotal !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomTotal(null)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#2563eb",
+                      fontSize: "11px",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    Auto ({formatDZD(autoTotal)})
+                  </button>
+                )}
+              </span>
+              <input
+                type="number"
+                min={0}
+                value={effectiveTotal}
+                onChange={e => setCustomTotal(Number(e.target.value))}
+                style={{ fontWeight: 800, color: "#10b981", fontSize: "15px" }}
+                required
+              />
+            </label>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+              Adresse (optionnel)
+              <input
+                value={address}
+                onChange={e => setAddress(e.target.value)}
+                placeholder="Adresse / précision"
+              />
+            </label>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+              Note (optionnel)
+              <input
+                value={note}
+                onChange={e => setNote(e.target.value)}
+                placeholder="Ex: Commande WhatsApp / Instagram"
+              />
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            className="button button-gradient full"
+            disabled={isSaving}
+            style={{ marginTop: "6px", height: "48px", borderRadius: "14px", fontSize: "15px" }}
+          >
+            <Plus size={17} /> {isSaving ? "Création en cours…" : "Créer la commande"}
+          </button>
+        </form>
       </div>
     </div>
   );

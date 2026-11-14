@@ -1,12 +1,14 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { type Order, type Product } from "@/lib/store-data";
-import { abayaWilayas } from "@/lib/abaya-communes";
+import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
 import { trpc } from "@/lib/trpc";
 import { shippingFeeFor } from "@shared/shipping";
 import { useCheckoutDraft } from "@/components/useCheckoutDraft";
 import { submitCheckoutOrder } from "@/lib/checkout-api";
 import { initializePixels, trackPixelEvent } from "@/lib/tracking";
 import "./extensions-template.css";
+
+type OfferMode = "pack2" | "single";
 
 const VARIANT_CARDS = [
   { id: "v1", name: "أسود طبيعي", image: "/manus-storage/ext-pink-v1.jpg" },
@@ -17,66 +19,7 @@ const VARIANT_CARDS = [
   { id: "v6", name: "نور بليلي غري", image: "/manus-storage/ext-pink-v6.jpg" },
 ] as const;
 
-const WILAYAS_AR = [
-  "أدرار",
-  "الشلف",
-  "الأغواط",
-  "أم البواقي",
-  "باتنة",
-  "بجاية",
-  "بسكرة",
-  "بشار",
-  "البليدة",
-  "البويرة",
-  "تمنراست",
-  "تبسة",
-  "تلمسان",
-  "تيارت",
-  "تيزي وزو",
-  "الجزائر",
-  "الجلفة",
-  "جيجل",
-  "سطيف",
-  "سعيدة",
-  "سكيكدة",
-  "سيدي بلعباس",
-  "عنابة",
-  "قالمة",
-  "قسنطينة",
-  "المدية",
-  "مستغانم",
-  "المسيلة",
-  "معسكر",
-  "ورقلة",
-  "وهران",
-  "البيض",
-  "إليزي",
-  "برج بوعريريج",
-  "بومرداس",
-  "الطارف",
-  "تندوف",
-  "تيسمسيلت",
-  "الوادي",
-  "خنشلة",
-  "سوق أهراس",
-  "تيبازة",
-  "ميلة",
-  "عين الدفلى",
-  "النعامة",
-  "عين تموشنت",
-  "غرداية",
-  "غليزان",
-  "تيميمون",
-  "برج باجي مختار",
-  "أولاد جلال",
-  "بني عباس",
-  "عين صالح",
-  "عين قزام",
-  "تقرت",
-  "جانت",
-  "المغير",
-  "المنيعة",
-] as const;
+const PACK_2_PRICE = 4500;
 
 export default function ExtensionsLanding({
   product,
@@ -85,9 +28,13 @@ export default function ExtensionsLanding({
   product: Product;
   quantity: number;
 }) {
-  const [selectedColor, setSelectedColor] = useState<string>("");
+  const [offerMode, setOfferMode] = useState<OfferMode>("pack2");
+  const [color1, setColor1] = useState<string>(VARIANT_CARDS[0].name);
+  const [color2, setColor2] = useState<string>(VARIANT_CARDS[1].name);
+  const [nextSlotToFill, setNextSlotToFill] = useState<1 | 2>(1);
+  const [selectedWilaya, setSelectedWilaya] = useState<string>("");
+  const [selectedCommune, setSelectedCommune] = useState<string>("");
   const [noteInput, setNoteInput] = useState<string>("");
-  const [selectedWilayaIdx, setSelectedWilayaIdx] = useState<string>("");
   const [orderSubmitted, setOrderSubmitted] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
@@ -96,10 +43,9 @@ export default function ExtensionsLanding({
   const formRef = useRef<HTMLFormElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
 
-  const canonicalWilaya =
-    selectedWilayaIdx !== ""
-      ? (abayaWilayas[Number(selectedWilayaIdx)] ?? "")
-      : "";
+  const communes = selectedWilaya
+    ? (abayaCommunesByWilaya[selectedWilaya] ?? [])
+    : [];
 
   const ratesQuery = trpc.store.shippingRates.useQuery(undefined, {
     retry: false,
@@ -107,23 +53,31 @@ export default function ExtensionsLanding({
     refetchOnWindowFocus: false,
   });
 
-  const shippingFee = canonicalWilaya
-    ? shippingFeeFor(ratesQuery.data?.rates, canonicalWilaya, "home", [product.id])
+  const shippingFee = selectedWilaya
+    ? shippingFeeFor(ratesQuery.data?.rates, selectedWilaya, "home", [product.id])
     : 0;
+
+  const singleUnitPrice = product.price || 2700;
+  const isPack2 = offerMode === "pack2";
+  const billedQty = isPack2 ? 2 : Math.max(1, quantity || 1);
+  const goodsTotal = isPack2 ? PACK_2_PRICE : singleUnitPrice * billedQty;
+  const combinedColorLabel = isPack2
+    ? `1: ${color1} | 2: ${color2}`
+    : color1;
 
   useCheckoutDraft({
     formRef,
     source: "product",
-    aliases: { customer: ["name"], commune: ["wilaya"] },
+    aliases: { customer: ["name"] },
     getItems: () => [
       {
         productId: product.id,
-        quantity: Math.max(1, quantity || 1),
-        color: selectedColor || noteInput || VARIANT_CARDS[0].name,
+        quantity: billedQty,
+        color: combinedColorLabel,
         size: "",
       },
     ],
-    watchKey: `${selectedColor}|${noteInput}|${selectedWilayaIdx}|${quantity}`,
+    watchKey: `${offerMode}|${color1}|${color2}|${selectedWilaya}|${selectedCommune}|${noteInput}|${quantity}`,
   });
 
   useEffect(() => {
@@ -133,10 +87,10 @@ export default function ExtensionsLanding({
       content_id: product.id,
       content_ids: [product.id],
       content_name: product.name,
-      value: product.price,
+      value: PACK_2_PRICE,
       currency: "DZD",
     });
-  }, [product.id, product.name, product.price]);
+  }, [product.id, product.name]);
 
   useEffect(() => {
     const prevTitle = document.title;
@@ -146,15 +100,23 @@ export default function ExtensionsLanding({
     };
   }, []);
 
-  const handleSelectVariant = (shadeName: string) => {
-    setSelectedColor(shadeName);
-    setNoteInput(shadeName);
+  const handleSelectTopVariant = (shadeName: string) => {
+    if (!isPack2) {
+      setColor1(shadeName);
+    } else if (nextSlotToFill === 1) {
+      setColor1(shadeName);
+      setNextSlotToFill(2);
+    } else {
+      setColor2(shadeName);
+      setNextSlotToFill(1);
+    }
+
     trackPixelEvent("AddToCart", {
       content_type: "product",
       content_id: product.id,
       content_ids: [product.id],
       content_name: `${product.name} - ${shadeName}`,
-      value: product.price,
+      value: goodsTotal,
       currency: "DZD",
     });
   };
@@ -176,7 +138,7 @@ export default function ExtensionsLanding({
       content_id: product.id,
       content_ids: [product.id],
       content_name: product.name,
-      value: product.price,
+      value: goodsTotal,
       currency: "DZD",
     });
   };
@@ -191,13 +153,19 @@ export default function ExtensionsLanding({
     const customer = String(formData.get("name") || "زبونة Miss Sensuelle").trim();
     const rawPhone = String(formData.get("phone") || "").trim();
     const phone = rawPhone.replace(/[\s\-\.]/g, "");
-    const wilaya = canonicalWilaya || String(formData.get("wilaya") || "").trim();
-    const noteOrColor = String(formData.get("note") || noteInput || selectedColor || "").trim();
-    const finalColor = selectedColor || noteOrColor || VARIANT_CARDS[0].name;
+    const wilaya = String(formData.get("wilaya") || selectedWilaya).trim();
+    const commune = String(formData.get("commune") || selectedCommune || wilaya).trim();
+    const extraNote = String(formData.get("note") || noteInput).trim();
 
-    const billedQty = Math.max(1, quantity || 1);
-    const unitPrice = product.price || 2700;
-    const orderTotal = unitPrice * billedQty + shippingFee;
+    const orderTotal = goodsTotal + shippingFee;
+    const offerNote = [
+      isPack2
+        ? `🎁 عرض 1 + 1 مجاناً (4500 دج) — [القطعة 1: ${color1} | القطعة 2: ${color2}]`
+        : `قطعة واحدة — [اللون: ${color1}]`,
+      extraNote,
+    ]
+      .filter(Boolean)
+      .join(" · ");
 
     let serverOrderNumber = `MS-${Math.floor(1000 + Math.random() * 8999)}`;
 
@@ -215,15 +183,15 @@ export default function ExtensionsLanding({
         customer,
         phone,
         wilaya,
-        commune: wilaya,
-        address: wilaya || "Algérie",
+        commune,
+        address: commune || wilaya || "Algérie",
         delivery: "home",
-        note: noteOrColor,
+        note: offerNote,
         items: [
           {
             productId: product.id,
             quantity: billedQty,
-            color: finalColor,
+            color: combinedColorLabel,
             size: "",
           },
         ],
@@ -251,13 +219,13 @@ export default function ExtensionsLanding({
         product: `${product.name} × ${billedQty}`,
         quantity: billedQty,
         total: orderTotal,
-        color: finalColor,
+        color: combinedColorLabel,
         size: "",
         delivery: "home",
         wilaya,
-        commune: wilaya,
-        address: wilaya,
-        note: noteOrColor,
+        commune,
+        address: commune || wilaya,
+        note: offerNote,
         status: "nouvelle",
       };
       window.localStorage.setItem(
@@ -303,16 +271,28 @@ export default function ExtensionsLanding({
           </button>
 
           <div className="ext-variants-track" ref={trackRef}>
-            {VARIANT_CARDS.map(card => (
-              <button
-                key={card.id}
-                type="button"
-                className={`ext-variant-card ${selectedColor === card.name ? "is-selected" : ""}`}
-                onClick={() => handleSelectVariant(card.name)}
-              >
-                <img src={card.image} alt={card.name} />
-              </button>
-            ))}
+            {VARIANT_CARDS.map(card => {
+              const isC1 = color1 === card.name;
+              const isC2 = isPack2 && color2 === card.name;
+              const isSelected = isC1 || isC2;
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  className={`ext-variant-card ${isSelected ? "is-selected" : ""}`}
+                  onClick={() => handleSelectTopVariant(card.name)}
+                >
+                  <img src={card.image} alt={card.name} />
+                  {isC1 && isC2 ? (
+                    <span className="ext-variant-badge">1️⃣ + 2️⃣</span>
+                  ) : isC1 ? (
+                    <span className="ext-variant-badge">1️⃣</span>
+                  ) : isC2 ? (
+                    <span className="ext-variant-badge">2️⃣ 🎁</span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
 
           <button
@@ -330,6 +310,7 @@ export default function ExtensionsLanding({
         <img src="/manus-storage/ext-pink-5.jpg" alt="" />
         <img src="/manus-storage/ext-pink-6.jpg" alt="" />
 
+        {/* Beautiful Order Form at the bottom with 2-Variant Selection */}
         <form
           id="f"
           ref={formRef}
@@ -338,52 +319,193 @@ export default function ExtensionsLanding({
           onSubmit={handleSubmit}
         >
           <div className="ext-pink-form-inner">
-            <h3>اطلبي الآن • الدفع عند الاستلام</h3>
+            <div className="ext-form-header">
+              <span className="ext-form-promo-pill">
+                🎁 عرض خاص : اشتري واحدة والثانية مجاناً
+              </span>
+              <h3>اطلبي الآن • الدفع عند الاستلام</h3>
+              <p>اختاري لونين من اختياركِ واستفيدي من العرض 🚚</p>
+            </div>
 
-            <input
-              name="name"
-              placeholder="الاسم الكامل"
-              required
-            />
+            {/* Offer Mode Choice (Default: 1+1 = 4500 DA) */}
+            <div className="ext-offer-toggle">
+              <button
+                type="button"
+                className={`ext-offer-card ${offerMode === "pack2" ? "is-active" : ""}`}
+                onClick={() => setOfferMode("pack2")}
+              >
+                <span className="ext-offer-tag">🎁 1 + 1 مجاناً (الأكثر طلباً)</span>
+                <div className="ext-offer-name">قطعتين (1 + 1 مجاناً)</div>
+                <div className="ext-offer-desc">اختاري لونين من اختيارك</div>
+                <span className="ext-offer-price-pill">4 500 DA</span>
+              </button>
 
-            <input
-              type="tel"
-              inputMode="tel"
-              name="phone"
-              placeholder="رقم الهاتف"
-              pattern="0[5-7][0-9]{8}"
-              required
-            />
+              <button
+                type="button"
+                className={`ext-offer-card ${offerMode === "single" ? "is-active" : ""}`}
+                onClick={() => setOfferMode("single")}
+              >
+                <div className="ext-offer-name">قطعة واحدة</div>
+                <div className="ext-offer-desc">لون واحد من اختيارك</div>
+                <span className="ext-offer-price-pill">
+                  {singleUnitPrice.toLocaleString("fr-FR")} DA
+                </span>
+              </button>
+            </div>
 
-            <select
-              id="w"
-              name="wilaya"
-              value={selectedWilayaIdx}
-              onChange={e => setSelectedWilayaIdx(e.target.value)}
-              required
-            >
-              <option value="">الولاية</option>
-              {WILAYAS_AR.map((wName, idx) => (
-                <option key={wName} value={String(idx)}>
-                  {idx + 1} - {wName}
+            {/* Variant 1 Selector */}
+            <div className="ext-variant-picker-box">
+              <div className="ext-variant-picker-head">
+                <span>1️⃣ اختر لون القطعة الأولى :</span>
+                <span className="ext-variant-selected-pill">{color1}</span>
+              </div>
+              <div className="ext-variant-mini-grid">
+                {VARIANT_CARDS.map(card => (
+                  <button
+                    key={`c1-${card.id}`}
+                    type="button"
+                    className={`ext-variant-mini-item ${color1 === card.name ? "is-active" : ""}`}
+                    onClick={() => setColor1(card.name)}
+                  >
+                    <img src={card.image} alt={card.name} />
+                    <span>{card.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Variant 2 Selector (1 Achetée + 1 Offerte) */}
+            {isPack2 && (
+              <div className="ext-variant-picker-box is-second">
+                <div className="ext-variant-picker-head">
+                  <span>2️⃣ اختر لون القطعة الثانية (المجانية 🎁) :</span>
+                  <span className="ext-variant-selected-pill">{color2}</span>
+                </div>
+                <div className="ext-variant-mini-grid">
+                  {VARIANT_CARDS.map(card => (
+                    <button
+                      key={`c2-${card.id}`}
+                      type="button"
+                      className={`ext-variant-mini-item ${color2 === card.name ? "is-active" : ""}`}
+                      onClick={() => setColor2(card.name)}
+                    >
+                      <img src={card.image} alt={card.name} />
+                      <span>{card.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Customer Details */}
+            <div className="ext-field-group">
+              <input
+                name="name"
+                placeholder="👤 الاسم الكامل"
+                required
+              />
+            </div>
+
+            <div className="ext-field-group">
+              <input
+                type="tel"
+                inputMode="tel"
+                name="phone"
+                placeholder="📞 رقم الهاتف (05 / 06 / 07)"
+                pattern="0[5-7][0-9]{8}"
+                required
+              />
+            </div>
+
+            <div className="ext-field-row">
+              <select
+                id="w"
+                name="wilaya"
+                value={selectedWilaya}
+                onChange={e => {
+                  const nextW = e.target.value;
+                  setSelectedWilaya(nextW);
+                  const firstC = (abayaCommunesByWilaya[nextW] ?? [])[0] ?? "";
+                  setSelectedCommune(firstC);
+                }}
+                required
+              >
+                <option value="">📍 الولاية</option>
+                {abayaWilayas.map(wName => (
+                  <option key={wName} value={wName}>
+                    {wName}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                name="commune"
+                value={selectedCommune}
+                onChange={e => setSelectedCommune(e.target.value)}
+                disabled={!selectedWilaya}
+                required
+              >
+                <option value="">
+                  {selectedWilaya ? "🏘️ البلدية" : "اختر الولاية أولاً"}
                 </option>
-              ))}
-            </select>
+                {communes.map(cName => (
+                  <option key={cName} value={cName}>
+                    {cName}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            <input
-              name="note"
-              value={noteInput}
-              onChange={e => setNoteInput(e.target.value)}
-              placeholder="اللون المطلوب / ملاحظة (اختياري)"
-            />
+            <div className="ext-field-group">
+              <input
+                name="note"
+                value={noteInput}
+                onChange={e => setNoteInput(e.target.value)}
+                placeholder="📝 ملاحظة إضافية للتوصيل (اختياري)"
+              />
+            </div>
 
-            <button type="submit" disabled={isSubmitting || orderSubmitted}>
-              🛒 تأكيد الطلب
+            {/* Order Recap */}
+            <div className="ext-order-recap">
+              <div className="ext-order-recap-line">
+                <span>
+                  {isPack2
+                    ? `🎁 عرض قطعتين (${color1} + ${color2})`
+                    : `✨ قطعة واحدة (${color1})`}
+                </span>
+                <span>{goodsTotal.toLocaleString("fr-FR")} DA</span>
+              </div>
+              <div className="ext-order-recap-line">
+                <span>🚚 التوصيل للمنزل</span>
+                <span>
+                  {selectedWilaya
+                    ? shippingFee === 0
+                      ? "مجاني 🎉"
+                      : `${shippingFee.toLocaleString("fr-FR")} DA`
+                    : "حسب الولاية"}
+                </span>
+              </div>
+              <div className="ext-order-recap-total">
+                <span>المجموع الكلي :</span>
+                <span>{(goodsTotal + shippingFee).toLocaleString("fr-FR")} DA</span>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="ext-submit-btn"
+              disabled={isSubmitting || orderSubmitted}
+            >
+              {isSubmitting
+                ? "⏳ جاري تأكيد الطلب..."
+                : orderSubmitted
+                  ? "✅ تم تسجيل طلبك بنجاح"
+                  : "🛒 تأكيد الطلب الآن"}
             </button>
 
             {orderSubmitted && (
               <div className="ext-pink-ok" id="ok">
-                ✅ تم استلام طلبك، سنتصل بك قريباً
+                ✅ تم استلام طلبك بنجاح، سنتصل بك قريباً لتأكيد الإرسال!
               </div>
             )}
           </div>

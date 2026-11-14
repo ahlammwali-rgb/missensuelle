@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&display=swap");
 
 .ext-pink-root {
   --bg: #fde4ef;
@@ -36,7 +36,6 @@
 
 /* =========================================================
    VARIANT SLIDER (ext-pink-2.jpg cards slightly larger)
-   Same original design, just larger cards in a horizontal slide
    ========================================================= */
 .ext-variants-slider-wrap {
   position: relative;
@@ -87,6 +86,20 @@
   box-shadow: 0 0 0 3px #e6197f, 0 6px 16px rgba(230, 25, 127, 0.35);
 }
 
+.ext-variant-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: linear-gradient(90deg, #e6197f, #ff5fb0);
+  color: #fff;
+  border: 1.5px solid #fff;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 2px 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
 .ext-variant-nav {
   position: absolute;
   top: 50%;
@@ -118,33 +131,227 @@
 }
 
 /* =========================================================
-   BOTTOM ORDER FORM (#f) — Homogeneous with original page
+   LUXURY BOTTOM ORDER FORM (#f)
+   With 2-Variant Selection (1 Achetée + 1 Offerte)
    ========================================================= */
 .ext-pink-form {
   margin: 0;
-  padding: 16px 14px 22px;
-  background: linear-gradient(180deg, #fde4ef 0%, #fbd2e5 100%);
-  border-top: 2px solid #f3a9cb;
+  padding: 16px 12px 24px;
+  background: radial-gradient(circle at 50% 0%, #fff0f7 0%, #fde4ef 55%, #f9cce1 100%);
+  border-top: 2.5px solid #f08ab9;
 }
 
 .ext-pink-form-inner {
-  background: rgba(255, 255, 255, 0.72);
-  border: 2px solid #f3a9cb;
-  border-radius: 20px;
-  padding: 14px 12px 16px;
-  box-shadow: 0 8px 22px rgba(230, 25, 127, 0.12);
+  background: linear-gradient(180deg, #ffffff 0%, #fff5fa 100%);
+  border: 2.5px solid #ec4899;
+  border-radius: 24px;
+  padding: 16px 13px 18px;
+  box-shadow:
+    0 14px 32px rgba(230, 25, 127, 0.18),
+    inset 0 0 0 2px #ffffff;
+  position: relative;
 }
 
-.ext-pink-form h3 {
-  margin: 0 0 12px;
+.ext-form-header {
+  background: linear-gradient(135deg, #1a0d14 0%, #2d1221 55%, #1a0d14 100%);
+  border: 2px solid #eab308;
+  border-radius: 18px;
+  padding: 12px 12px 11px;
   text-align: center;
-  color: #fff;
+  margin-bottom: 14px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  position: relative;
+}
+
+.ext-form-promo-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   background: linear-gradient(90deg, #e6197f, #ff5fb0);
-  font-size: 19px;
+  color: #fff;
+  font-size: 12px;
   font-weight: 900;
-  padding: 9px 12px;
-  border-radius: 30px;
-  box-shadow: 0 3px 0 #a80f5c;
+  padding: 3px 12px;
+  border-radius: 999px;
+  margin-bottom: 5px;
+  box-shadow: 0 2px 8px rgba(230, 25, 127, 0.45);
+}
+
+.ext-form-header h3 {
+  margin: 0;
+  color: #fde047;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.ext-form-header p {
+  margin: 3px 0 0;
+  color: #fbcfe8;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* Offer Mode Toggle */
+.ext-offer-toggle {
+  display: grid;
+  grid-template-columns: 1.25fr 0.95fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.ext-offer-card {
+  position: relative;
+  border: 2px solid #f3a9cb;
+  border-radius: 16px;
+  background: #fff;
+  padding: 10px 8px 9px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: center;
+  transition: all 0.18s ease;
+  color: #1a1a1a;
+}
+
+.ext-offer-card.is-active {
+  border-color: #e6197f;
+  background: linear-gradient(180deg, #fff0f7 0%, #ffd9ec 100%);
+  box-shadow:
+    0 0 0 2px #e6197f,
+    0 6px 14px rgba(230, 25, 127, 0.22);
+}
+
+.ext-offer-tag {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, #170e13, #331626);
+  color: #fde047;
+  border: 1px solid #eab308;
+  font-size: 10.5px;
+  font-weight: 900;
+  padding: 1px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.ext-offer-name {
+  font-size: 13.5px;
+  font-weight: 900;
+  color: #1a1a1a;
+  margin-top: 2px;
+}
+
+.ext-offer-desc {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9d174d;
+  margin: 1px 0 4px;
+}
+
+.ext-offer-price-pill {
+  display: inline-block;
+  background: linear-gradient(90deg, #e6197f, #ff5fb0);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  padding: 2px 11px;
+  border-radius: 999px;
+}
+
+/* 2-Variant Selection Boxes */
+.ext-variant-picker-box {
+  background: #fff8fc;
+  border: 2px solid #f5b0d0;
+  border-radius: 16px;
+  padding: 10px 10px 11px;
+  margin-bottom: 11px;
+}
+
+.ext-variant-picker-box.is-second {
+  background: linear-gradient(180deg, #fffdf4 0%, #fff5fa 100%);
+  border-color: #eab308;
+}
+
+.ext-variant-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #9d174d;
+}
+
+.ext-variant-picker-box.is-second .ext-variant-picker-head {
+  color: #854d0e;
+}
+
+.ext-variant-selected-pill {
+  background: #1a0d14;
+  color: #fde047;
+  border: 1px solid #eab308;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+
+.ext-variant-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.ext-variant-mini-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border-radius: 11px;
+  border: 2px solid #f3a9cb;
+  background: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: right;
+  transition: all 0.15s ease;
+  color: #1a1a1a;
+}
+
+.ext-variant-mini-item img {
+  width: 28px;
+  height: 38px;
+  border-radius: 7px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid #f3a9cb;
+}
+
+.ext-variant-mini-item span {
+  font-size: 11.5px;
+  font-weight: 900;
+  line-height: 1.2;
+  color: #1a1a1a;
+}
+
+.ext-variant-mini-item.is-active {
+  border-color: #e6197f;
+  background: linear-gradient(90deg, #ffe0f0, #fff7fb);
+  box-shadow: 0 0 0 1.5px #e6197f, 0 4px 10px rgba(230, 25, 127, 0.18);
+}
+
+/* Input Fields */
+.ext-field-group {
+  position: relative;
+  margin-bottom: 9px;
+}
+
+.ext-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 9px;
 }
 
 .ext-pink-form input,
@@ -156,7 +363,6 @@
   padding: 12px 14px;
   border: 2px solid #f3a9cb;
   border-radius: 14px;
-  margin-bottom: 9px;
   background: #fff;
   color: #1a1a1a;
   outline: none;
@@ -171,10 +377,42 @@
 .ext-pink-form input:focus,
 .ext-pink-form select:focus {
   border-color: #e6197f;
-  box-shadow: 0 0 0 3px rgba(230, 25, 127, 0.15);
+  box-shadow: 0 0 0 3px rgba(230, 25, 127, 0.16);
 }
 
-.ext-pink-form button[type="submit"] {
+/* Order Summary Box */
+.ext-order-recap {
+  background: linear-gradient(135deg, #fff5fa 0%, #fde4ef 100%);
+  border: 2px dashed #e6197f;
+  border-radius: 15px;
+  padding: 10px 12px;
+  margin: 10px 0 12px;
+}
+
+.ext-order-recap-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 800;
+  color: #4a1530;
+  padding: 2px 0;
+}
+
+.ext-order-recap-total {
+  margin-top: 5px;
+  padding-top: 6px;
+  border-top: 1.5px solid #f3a9cb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 16.5px;
+  font-weight: 900;
+  color: #e6197f;
+}
+
+/* Submit Button */
+.ext-submit-btn {
   width: 100%;
   border: 0;
   background: linear-gradient(90deg, #e6197f, #ff5fb0);
@@ -182,19 +420,20 @@
   font: inherit;
   font-weight: 900;
   font-size: 21px;
-  padding: 13px;
+  padding: 14px;
   border-radius: 40px;
-  box-shadow: 0 4px 0 #a80f5c;
+  box-shadow: 0 4px 0 #a80f5c, 0 8px 20px rgba(230, 25, 127, 0.32);
   cursor: pointer;
   margin-top: 2px;
+  transition: transform 0.15s ease;
 }
 
-.ext-pink-form button[type="submit"]:active {
+.ext-submit-btn:active {
   transform: translateY(2px);
   box-shadow: 0 2px 0 #a80f5c;
 }
 
-.ext-pink-form button[type="submit"]:disabled {
+.ext-submit-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }

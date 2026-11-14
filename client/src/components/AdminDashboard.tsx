@@ -15,6 +15,7 @@ import {
   Package,
   Phone,
   PhoneOff,
+  Plus,
   RotateCcw,
   Search,
   Sparkles,
@@ -43,6 +44,7 @@ type Props = {
   onOpenCancelModal?: (order: Order) => void;
   onSetNrpLevel?: (id: string, level: 1 | 2 | 3) => void;
   onExport: () => void;
+  onCreateOrder?: () => void;
   onUpdateStatus?: (id: string, status: OrderStatus) => void;
   stockPanel: ReactNode;
 };
@@ -109,6 +111,7 @@ export function AdminDashboard({
   onOpenCancelModal,
   onSetNrpLevel,
   onExport,
+  onCreateOrder,
   onUpdateStatus,
   stockPanel,
 }: Props) {
@@ -200,15 +203,40 @@ export function AdminDashboard({
                 Flux Commandes <span className="app-count-bubble">{displayedOrders.length}</span>
               </h2>
             </div>
-            <button
-              type="button"
-              className="app-export-btn"
-              onClick={onExport}
-              disabled={!displayedOrders.length}
-            >
-              <ExternalLink size={15} />
-              <span>Exporter CSV</span>
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              {onCreateOrder && (
+                <button
+                  type="button"
+                  onClick={onCreateOrder}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "9px 15px",
+                    borderRadius: "12px",
+                    border: "1px solid rgba(16, 185, 129, 0.45)",
+                    background: "linear-gradient(135deg, #10b981, #059669)",
+                    color: "#fff",
+                    fontWeight: 800,
+                    fontSize: "13px",
+                    cursor: "pointer",
+                    boxShadow: "0 4px 14px rgba(16, 185, 129, 0.3)",
+                  }}
+                >
+                  <Plus size={16} />
+                  <span>Nouvelle commande</span>
+                </button>
+              )}
+              <button
+                type="button"
+                className="app-export-btn"
+                onClick={onExport}
+                disabled={!displayedOrders.length}
+              >
+                <ExternalLink size={15} />
+                <span>Exporter CSV</span>
+              </button>
+            </div>
           </div>
 
           {/* Search & Period Filter */}

@@ -191,6 +191,24 @@ export type StaffActivityLog = {
   warning?: string;
 };
 
+export const adminCreateOrderSchema = z.object({
+  customer: z.string().trim().min(1).max(160),
+  phone: z.string().trim().min(6).max(32),
+  productId: z.string().trim().min(1).max(64).optional(),
+  product: z.string().trim().min(1).max(255),
+  quantity: z.number().int().min(1).max(99),
+  total: z.number().int().min(0).max(10_000_000),
+  color: z.string().trim().max(255).optional().default(""),
+  size: z.string().trim().max(120).optional().default(""),
+  delivery: z.enum(["home", "office"]),
+  wilaya: z.string().trim().min(1).max(120),
+  commune: z.string().trim().min(1).max(120),
+  address: z.string().trim().max(300).optional().default(""),
+  note: z.string().trim().max(500).optional().default(""),
+  status: checkoutOrderStatusSchema.optional().default("confirmee"),
+});
+
+export type AdminCreateOrderInput = z.infer<typeof adminCreateOrderSchema>;
 export type UpdateOrderDetailsInput = z.infer<typeof updateOrderDetailsSchema>;
 export type UpdateOrderStatusWithMetaInput = z.infer<typeof updateOrderStatusWithMetaSchema>;
 export type RecordOrderInteractionInput = z.infer<typeof recordOrderInteractionSchema>;

@@ -12,6 +12,7 @@ import {
   verifyAdminPassword,
 } from "./adminSetup";
 import {
+  adminCreateOrderSchema,
   discardDraftSchema,
   recordOrderInteractionSchema,
   recoveryStatusSchema,
@@ -23,6 +24,7 @@ import {
   updateOrderStatusWithMetaSchema,
 } from "../shared/checkout";
 import {
+  createAdminOrder,
   discardCheckoutDraft,
   convertAbandonedToOrder,
   deleteAbandonedCheckout,
@@ -216,6 +218,12 @@ export const appRouter = router({
       .mutation(({ ctx, input }) => {
         const actor = resolveActor(ctx.user);
         return markMemoryOrderReturn(input.id, input.returnReceived, actor);
+      }),
+    createOrder: adminProcedure
+      .input(adminCreateOrderSchema)
+      .mutation(({ ctx, input }) => {
+        const actor = resolveActor(ctx.user);
+        return createAdminOrder(input, actor);
       }),
     updateOrderDetails: adminProcedure
       .input(updateOrderDetailsSchema)

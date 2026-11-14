@@ -10,6 +10,7 @@ import {
   type StoreProduct,
 } from "../drizzle/schema";
 import {
+  adminCreateOrderSchema,
   checkoutPayloadSchema,
   discardDraftSchema,
   recordOrderInteractionSchema,
@@ -18,6 +19,7 @@ import {
   submitOrderSchema,
   updateOrderDetailsSchema,
   type AbandonedCheckout,
+  type AdminCreateOrderInput,
   type CheckoutOrder,
   type CheckoutPayload,
   type DiscardDraftInput,
@@ -619,6 +621,80 @@ export function startPostponedReminderScheduler(intervalMs = 25000) {
 }
 
 startPostponedReminderScheduler();
+
+export async function createAdminOrder(
+  input: AdminCreateOrderInput,
+  actor?: { actorId: string; actorName: string }
+): Promise<CheckoutOrder> {
+  const parsed = adminCreateOrderSchema.parse(input);
+  await loadStore();
+
+  const actorId = actor?.actorId || "owner";
+  const actorName = actor?.actorName || "Admin (Patron)";
+  const nowIso = new Date().toISOString();
+  const number = orderNumber();
+  const dbId = nextMemoryOrderId++;
+  const normLoc = normalizeOrderLocation(parsed.wilaya, parsed.commune, parsed.address);
+  const status = parsed.status || "confirmee";
+
+  const createdOrder: CheckoutOrder = {
+    dbId,
+    id: number,
+    createdAt: nowIso,
+    customer: parsed.customer,
+    phone: parsed.phone,
+    productId: parsed.productId || "p-005",
+    product: parsed.product,
+    quantity: parsed.quantity,
+    initialQuantity: parsed.quantity,
+    total: parsed.total,
+    color: parsed.color || "",
+    size: parsed.size || "",
+    delivery: parsed.delivery,
+    wilaya: normLoc.wilaya,
+    commune: normLoc.commune,
+    address: normLoc.address,
+    note: parsed.note || "",
+    status,
+    assignedToId: actorId,
+    assignedToName: actorName,
+    ...(status === "confirmee"
+      ? {
+          confirmedById: actorId,
+          confirmedByName: actorName,
+          confirmedAt: nowIso,
+        }
+      : {}),
+    history: [
+      {
+        id: `ev-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        at: nowIso,
+        type: "created",
+        actorId,
+        actorName,
+        summary: `➕ Commande créée manuellement depuis l'administration par ${actorName} (${parsed.product} — ${parsed.total} DA)`,
+      },
+    ],
+  };
+
+  memoryOrders.unshift(createdOrder);
+
+  appendStaffActivityLog({
+    at: nowIso,
+    actorId,
+    actorName,
+    orderDbId: dbId,
+    orderId: number,
+    customer: createdOrder.customer,
+    phone: createdOrder.phone,
+    type: "created",
+    summary: `➕ Création manuelle de la commande #${number} (${createdOrder.product} — ${createdOrder.total} DA)`,
+  });
+
+  saveStore();
+  void pushOrderToGoogleSheet(createdOrder).catch(() => {});
+  return createdOrder;
+}
 
 export async function updateCheckoutOrderDetails(
   input: UpdateOrderDetailsInput,
