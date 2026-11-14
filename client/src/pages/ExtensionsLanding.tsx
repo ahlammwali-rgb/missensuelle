@@ -1,6 +1,5 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { Link } from "wouter";
-import { ChevronLeft, ChevronRight, ShieldCheck, Sparkles, Star, Truck } from "lucide-react";
+import { FormEvent, TouchEvent, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { type Order, type Product } from "@/lib/store-data";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
 import { trpc } from "@/lib/trpc";
@@ -16,104 +15,63 @@ type ExtensionShade = {
   id: string;
   name: string;
   subtitle: string;
-  badge: string;
   swatch: string;
-  image: string;
+  backCardImage: string;
+  frontModelImage: string;
 };
 
 const SHADES: readonly ExtensionShade[] = [
   {
-    id: "chatain-fonce",
-    name: "شاتان فونس",
-    subtitle: "بني شاتان طبيعي دافئ بتموجات لامعة يناسب أغلب ألوان الشعر",
-    badge: "الأكثر طلباً 🔥",
-    swatch: "#4b2818",
-    image: "/manus-storage/ext-c1-chatain-fonce.jpg",
-  },
-  {
-    id: "noir",
-    name: "أسود",
-    subtitle: "أسود ملكي جذاب بلمعة حريرية طبيعية وكثافة فائقة",
-    badge: "كلاسيكي فخم ✨",
-    swatch: "#151518",
-    image: "/manus-storage/ext-c2-noir.jpg",
+    id: "noir-naturel",
+    name: "أسود طبيعي",
+    subtitle: "أسود طبيعي جذاب بلمعة حريرية وكثافة فورية",
+    swatch: "#161518",
+    backCardImage: "/manus-storage/ext-pink-v1.jpg",
+    frontModelImage: "/manus-storage/ext-c2-noir.jpg",
   },
   {
     id: "brun-fonce",
     name: "بني غامق",
-    subtitle: "بني داكن شوكولا يمنحك إطلالة أنثوية ناعمة وطبيعية جداً",
-    badge: "طبيعي 100% 🤎",
-    swatch: "#361f14",
-    image: "/manus-storage/ext-c3-brun-fonce.jpg",
+    subtitle: "بني غامق شوكولا يمنحك إطلالة أنثوية طبيعية جداً",
+    swatch: "#3a2014",
+    backCardImage: "/manus-storage/ext-pink-v2.jpg",
+    frontModelImage: "/manus-storage/ext-c3-brun-fonce.jpg",
+  },
+  {
+    id: "brun-miel",
+    name: "بني عسلي",
+    subtitle: "بني عسلي دافئ بتموجات لامعة يناسب أغلب ألوان الشعر",
+    swatch: "#6b381b",
+    backCardImage: "/manus-storage/ext-pink-v3.jpg",
+    frontModelImage: "/manus-storage/ext-c1-chatain-fonce.jpg",
   },
   {
     id: "chatain-roux",
-    name: "شاتان روكس",
-    subtitle: "عسلي نحاسي دافئ يضيء الملامح ويمنحك ستايل عصري ساحر",
-    badge: "لون مميز 🌟",
-    swatch: "#80411e",
-    image: "/manus-storage/ext-c4-chatain-roux.jpg",
+    name: "شاتين روكس",
+    subtitle: "شاتين روكس نحاسي يضيء الملامح ويمنحك ستايل ساحر",
+    swatch: "#89451f",
+    backCardImage: "/manus-storage/ext-pink-v4.jpg",
+    frontModelImage: "/manus-storage/ext-c4-chatain-roux.jpg",
   },
   {
     id: "blond-clair",
     name: "أشقر فاتح",
-    subtitle: "أشقر ذهبي فاتح لإطلالة مشرقة ومثالية للمناسبات والأعراس",
-    badge: "إطلالة ملكية 👑",
-    swatch: "#d8be96",
-    image: "/manus-storage/ext-c5-blond-clair.jpg",
+    subtitle: "أشقر فاتح ذهبي لإطلالة مشرقة ومثالية للمناسبات",
+    swatch: "#d9be94",
+    backCardImage: "/manus-storage/ext-pink-v5.jpg",
+    frontModelImage: "/manus-storage/ext-c5-blond-clair.jpg",
   },
   {
-    id: "gris-balayage",
-    name: "نور بالياح غري",
-    subtitle: "بالياح رمادي عصري متدرج مع جذور داكنة لمظهر جريء وفخم",
-    badge: "ترند الموسم 💎",
-    swatch: "#76737d",
-    image: "/manus-storage/ext-c6-gris-balayage.jpg",
+    id: "noir-balayage-gris",
+    name: "نور بليلي غري",
+    subtitle: "رمادي مائل متدرج مع جذور داكنة لمظهر عصري فخم",
+    swatch: "#7b7782",
+    backCardImage: "/manus-storage/ext-pink-v6.jpg",
+    frontModelImage: "/manus-storage/ext-c6-gris-balayage.jpg",
   },
 ] as const;
 
-const DETAIL_PHOTOS = [
-  {
-    title: "خصلات طويلة وكثافة فورية",
-    desc: "طول مثالي يمنح شعرك حجماً مضاعفاً ومظهراً أنثوياً ساحراً من أول دقيقة.",
-    image: "/manus-storage/ext-detail-strand.jpg",
-    tag: "طول وكثافة XXL",
-  },
-  {
-    title: "كلبسات مخفية وثابتة",
-    desc: "مزودة بكلبسات مبطنة سهلة التركيب في دقيقتين، ثابتة طوال اليوم بدون شد أو ضرر.",
-    image: "/manus-storage/ext-detail-clips.jpg",
-    tag: "تركيب في دقيقتين",
-  },
-  {
-    title: "شعر طبيعي 50% بملمس حريري",
-    desc: "ألياف طبيعية فاخرة ناعمة الملمس تندمج كلياً مع شعرك وتتحمل التسريح والويفي.",
-    image: "/manus-storage/ext-detail-waves.jpg",
-    tag: "ملمس حريري ناعم",
-  },
-] as const;
-
-const REVIEWS = [
-  {
-    name: "سارة ب. · وهران ✅",
-    shade: "شاتان فونس",
-    text: "وصلتني في يومين برك! الشعر ناعم بزاف واللون شاتان فونس خرج نفس شعري تماماً، تركبيها في دقيقتين وتبان طبيعية 100% يعطيكم الصحة ❤️",
-  },
-  {
-    name: "إيمان م. · الجزائر العاصمة ✅",
-    shade: "أسود",
-    text: "كنت خايفة تبان اصطناعية بصح كي فتحت الكولي انبهرت بالجودة! الكلبسات تاوعها يحكمو مليح وما يوجعوش كامل في الراس، ديت عرض زوج قطع أنا وأختي.",
-  },
-  {
-    name: "أمينة ك. · قسنطينة ✅",
-    shade: "بني غامق",
-    text: "بهاد السعر 2700 دج والله غير صفقة رابحة! كثافة وطول يهبلو، درت بيها الويفي في عرس خويا كلشي سقسيوني وين شريتها 😍",
-  },
-] as const;
-
-const PACK_2_PRICE = 4800;
-
-const pad2 = (n: number) => String(n).padStart(2, "0");
+const PACK_2_PRICE = 4500;
 
 export default function ExtensionsLanding({
   product,
@@ -128,7 +86,6 @@ export default function ExtensionsLanding({
   const [offerMode, setOfferMode] = useState<OfferMode>("single");
   const [selectedWilaya, setSelectedWilaya] = useState<string>("");
   const [selectedCommune, setSelectedCommune] = useState<string>("");
-  const [remainingSeconds, setRemainingSeconds] = useState(14 * 3600 + 27 * 60 + 42);
   const [okMessage, setOkMessage] = useState<string>("");
   const [toastMsg, setToastMsg] = useState<string>("");
   const [toastShown, setToastShown] = useState<boolean>(false);
@@ -137,7 +94,9 @@ export default function ExtensionsLanding({
 
   const isSubmittingRef = useRef<boolean>(false);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const stripRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
+  const touchStartXRef = useRef<number | null>(null);
 
   const currentShade = SHADES[activeSlideIdx] ?? SHADES[0];
 
@@ -161,7 +120,7 @@ export default function ExtensionsLanding({
       ? PACK_2_PRICE
       : singleUnitPrice * Math.max(1, quantity || 1);
 
-  const showToast = (msg: string, duration = 2400) => {
+  const showToast = (msg: string, duration = 2200) => {
     setToastMsg(msg);
     setToastShown(true);
     if (toastTimerRef.current) {
@@ -203,39 +162,43 @@ export default function ExtensionsLanding({
 
   useEffect(() => {
     const prevTitle = document.title;
-    document.title = "Miss Sensuelle – إكستنشن الشعر الطبيعي الفاخر";
+    document.title = "إكستنشن الشعر — طول أكبر وكثافة أكثر";
     return () => {
       document.title = prevTitle;
     };
   }, []);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setRemainingSeconds(prev => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  const hours = pad2(Math.floor(remainingSeconds / 3600));
-  const minutes = pad2(Math.floor((remainingSeconds % 3600) / 60));
-  const seconds = pad2(remainingSeconds % 60);
 
   const selectShadeByIndex = (idx: number, announce = true) => {
     const safeIdx = (idx + SHADES.length) % SHADES.length;
     const chosen = SHADES[safeIdx];
     setActiveSlideIdx(safeIdx);
     setColor(chosen.name);
+
+    if (stripRef.current) {
+      const thumbEl = stripRef.current.children[safeIdx] as HTMLElement | undefined;
+      thumbEl?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    }
+
     if (announce) {
-      showToast(`✅ اللون المختار: ${chosen.name}`, 2200);
+      showToast(`✅ اللون المختار: ${chosen.name}`);
     }
   };
 
-  const selectShadeByName = (shadeName: string, announce = true) => {
-    const foundIdx = SHADES.findIndex(s => s.name === shadeName);
-    if (foundIdx >= 0) {
-      selectShadeByIndex(foundIdx, announce);
-    } else {
-      setColor(shadeName);
+  const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    touchStartXRef.current = e.touches[0]?.clientX ?? null;
+  };
+
+  const handleTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
+    if (touchStartXRef.current === null) return;
+    const endX = e.changedTouches[0]?.clientX ?? touchStartXRef.current;
+    const diffX = endX - touchStartXRef.current;
+    touchStartXRef.current = null;
+    if (Math.abs(diffX) > 36) {
+      if (diffX > 0) {
+        selectShadeByIndex(activeSlideIdx + 1);
+      } else {
+        selectShadeByIndex(activeSlideIdx - 1);
+      }
     }
   };
 
@@ -245,8 +208,8 @@ export default function ExtensionsLanding({
 
   const activatePack2Offer = () => {
     setOfferMode("pack2");
-    formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    showToast("🔥 تم تفعيل عرض قطعتين بـ 4,800 دج فقط !", 2600);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    showToast("🎁 تم تفعيل عرض: اشتري واحدة والثانية مجاناً بـ 4500 DA !", 2600);
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -256,7 +219,7 @@ export default function ExtensionsLanding({
     setIsSubmitting(true);
 
     const formData = new FormData(e.currentTarget);
-    const chosenColor = String(formData.get("color") || color || SHADES[0].name).trim();
+    const chosenColor = String(color || SHADES[0].name).trim();
     const customer = String(formData.get("name") || "زبونة Miss Sensuelle").trim();
     const rawPhone = String(formData.get("phone") || "").trim();
     const phone = rawPhone.replace(/[\s\-\.]/g, "");
@@ -274,7 +237,7 @@ export default function ExtensionsLanding({
 
     const offerNoteParts = [
       isPack
-        ? `🔥 عرض خاص: 2 إكستنشن بـ 4,800 دج بدل 5,400 دج — [القطعة 1: ${chosenColor} | القطعة 2: ${secondColor}]`
+        ? `🎁 عرض: اشتري واحدة والثانية مجاناً بـ 4500 دج — [القطعة 1: ${chosenColor} | القطعة 2: ${secondColor}]`
         : "",
       extraNote,
     ].filter(Boolean);
@@ -282,8 +245,8 @@ export default function ExtensionsLanding({
 
     setOkMessage(
       isPack
-        ? `✅ شكرًا لكِ ${customer}! تم تسجيل طلبك لعرض (2 إكستنشن بـ 4,800 دج 🔥)، سنتصل بك قريبًا لتأكيده.`
-        : `✅ شكرًا لكِ ${customer}! تم تسجيل طلبك (اللون: ${chosenColor})، سنتصل بك قريبًا لتأكيده.`
+        ? `✅ تم استلام طلبك بنجاح (${customer} — قطعتين بـ 4500 دج)، سنتصل بك قريباً!`
+        : `✅ تم استلام طلبك بنجاح (${customer} — اللون: ${chosenColor})، سنتصل بك قريباً!`
     );
 
     let serverOrderNumber = `MS-${Math.floor(1000 + Math.random() * 8999)}`;
@@ -303,9 +266,9 @@ export default function ExtensionsLanding({
         phone,
         wilaya,
         commune,
-        address: "",
-        note: offerNote,
+        address: commune || wilaya || "Algérie",
         delivery: "home",
+        note: offerNote,
         items: [
           {
             productId: product.id,
@@ -315,46 +278,45 @@ export default function ExtensionsLanding({
           },
         ],
       });
-      serverOrderNumber = res.orderNumber;
-      try {
-        window.sessionStorage.removeItem("miss-sensuelle-checkout-token");
-        window.localStorage.removeItem("miss-sensuelle-checkout-token");
-      } catch {}
-    } catch {
-      // Fallback local si hors-ligne
+      if (res?.orderNumber) {
+        serverOrderNumber = res.orderNumber;
+      }
+      window.sessionStorage.removeItem("miss-sensuelle-checkout-token");
+      window.localStorage.removeItem("miss-sensuelle-checkout-token");
+    } catch (err) {
+      console.error("[extensions-checkout] submit failed:", err);
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+      showToast("⚠️ يرجى التحقق من رقم الهاتف والمحاولة مرة أخرى", 3200);
+      return;
     }
 
-    const order: Order = {
-      id: serverOrderNumber,
-      createdAt: new Date().toISOString(),
-      customer,
-      phone,
-      product: isPack
-        ? `${product.name} (عرض 2 إكستنشن بـ 4800 دج)`
-        : `${product.name} · ${chosenColor}`,
-      productId: product.id,
-      color: summaryColor,
-      size: "",
-      delivery: "home",
-      quantity: billedQty,
-      total: orderTotal,
-      wilaya,
-      commune,
-      address: "",
-      note: offerNote,
-      status: "nouvelle",
-    };
-
     try {
-      const existing = JSON.parse(
-        localStorage.getItem("miss-sensuelle-orders") || "[]"
-      ) as Order[];
-      localStorage.setItem(
-        "miss-sensuelle-orders",
-        JSON.stringify([order, ...existing])
+      const rawOrders = window.localStorage.getItem("miss-sensuelle-orders-v2");
+      const parsed: Order[] = rawOrders ? JSON.parse(rawOrders) : [];
+      const newOrder: Order = {
+        id: serverOrderNumber,
+        createdAt: new Date().toLocaleDateString("fr-FR"),
+        customer,
+        phone,
+        product: `${product.name} × ${billedQty}`,
+        quantity: billedQty,
+        total: orderTotal,
+        color: summaryColor,
+        size: "",
+        delivery: "home",
+        wilaya,
+        commune,
+        address: commune || wilaya,
+        note: offerNote,
+        status: "nouvelle",
+      };
+      window.localStorage.setItem(
+        "miss-sensuelle-orders-v2",
+        JSON.stringify([newOrder, ...parsed])
       );
     } catch {
-      // Confirmation visuelle conservée
+      // ignore storage errors
     }
 
     trackPixelEvent("Purchase", {
@@ -364,348 +326,352 @@ export default function ExtensionsLanding({
       content_name: product.name,
       value: orderTotal,
       currency: "DZD",
+      num_items: billedQty,
       order_id: serverOrderNumber,
-      phone,
-      customer,
     });
 
     setOrderSubmitted(true);
     setIsSubmitting(false);
-    isSubmittingRef.current = false;
+    showToast("🎉 تم تسجيل طلبك بنجاح! سنتصل بك قريباً", 3500);
   };
 
   return (
-    <div className="extensions-template" dir="rtl" lang="ar">
-      <div className="ext-page">
-        {/* Top Announcement Promo Bar */}
-        <div className="ext-promo-bar">
-          ✨ عرض خاص لفترة محدودة : <strong>2,700 دج فقط</strong> بدل <del>3,500 دج</del> · الدفع عند الاستلام وتوصيل سريع لـ 58 ولاية 🚚
-        </div>
+    <div className="ext-pink-root" dir="rtl" lang="ar">
+      <div className={`ext-pink-toast ${toastShown ? "is-visible" : ""}`}>
+        {toastMsg}
+      </div>
 
-        {/* Section 1: Hero Banner Image + Instant Conversion Card */}
-        <section className="ext-hero-section">
-          <div className="ext-hero-banner-wrap">
-            <img
-              className="ext-hero-img"
-              src="/manus-storage/ext-hero-banner.jpg"
-              alt="Miss Sensuelle – إكستنشن الشعر الطبيعي الفاخر"
-            />
+      <div className="ext-pink-w">
+        {/* 1. Top Hero Slice from exex.html */}
+        <img
+          className="ext-pink-slice"
+          src="/manus-storage/ext-pink-1.jpg"
+          alt="إكستنشن الشعر الطبيعي - طول أكبر وكثافة أكثر"
+        />
+
+        {/* 2. INTERACTIVE VARIANT SLIDER (varient slyde) */}
+        <section className="ext-vslide-section" aria-label="سلايدر ألوان الإكستنشن">
+          <div className="ext-vslide-header">
+            <span className="ext-vslide-title-pill">
+              ✨ الألوان المتوفرة • اسحبي للاختيار
+            </span>
+            <span className="ext-vslide-counter">
+              {activeSlideIdx + 1} / {SHADES.length}
+            </span>
           </div>
 
-          <div className="ext-hero-summary">
-            <div className="ext-hero-summary-top">
-              <div>
-                <span className="ext-kicker">👑 MISS SENSUELLE · BEAUTÉ & CONFIANCE</span>
-                <h1>إكستنشن الشعر الطبيعي 50% — طول أكبر وكثافة ساحرة</h1>
-              </div>
-              <div className="ext-price-tag">
-                <strong>2,700 دج</strong>
-                <del>3,500 دج</del>
-                <span>خصم 23%-</span>
-              </div>
-            </div>
-
-            <div className="ext-urgency-box">
-              <div className="ext-urgency-labels">
-                <span>🔥 سارعي ! الكمية محدودة جداً بهذا السعر</span>
-                <span>👁️ تشاهده 34 زبونة الآن</span>
-              </div>
-              <div className="ext-urgency-bar">
-                <i />
-              </div>
-            </div>
-
+          <div
+            className="ext-vslide-stage"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
             <button
               type="button"
-              className="ext-hero-cta-btn"
-              onClick={scrollToOrderForm}
-            >
-              👇 اضغطي هنا لطلب لونك المفضل الآن (الدفع عند الاستلام)
-            </button>
-          </div>
-        </section>
-
-        {/* Section 2: 4 Luxury Guarantee Badges */}
-        <section className="ext-guarantees-grid">
-          <div className="ext-guarantee-item">
-            <span className="ext-g-icon">💎</span>
-            <b>شعر طبيعي 50%</b>
-            <small>ملمس حريري ناعم</small>
-          </div>
-          <div className="ext-guarantee-item">
-            <span className="ext-g-icon">⚡</span>
-            <b>سهل التركيب</b>
-            <small>في دقيقتين فقط</small>
-          </div>
-          <div className="ext-guarantee-item">
-            <span className="ext-g-icon">🚚</span>
-            <b>توصيل سريع</b>
-            <small>لكل 58 ولاية</small>
-          </div>
-          <div className="ext-guarantee-item">
-            <span className="ext-g-icon">🛡️</span>
-            <b>الدفع عند الاستلام</b>
-            <small>افحصي قبل الدفع</small>
-          </div>
-        </section>
-
-        {/* Section 3: BIG Interactive Color Slider + 3x2 Large Color Cards */}
-        <section className="ext-slider-section">
-          <div className="ext-section-head">
-            <span className="ext-badge-gold">🎨 متوفر بـ 6 ألوان ساحرة</span>
-            <h2>شوفي الألوان بحجم كبير واختاري اللون اللي يخرج عليك</h2>
-            <p>مرّري السلايدر أو اضغطي على أي لون بالأسفل لتكبيره واعتماده في طلبك</p>
-          </div>
-
-          {/* BIG Main Showcase Slider */}
-          <div className="ext-big-slider">
-            <button
-              type="button"
-              className="ext-slider-nav ext-slider-prev"
-              aria-label="اللون السابق"
+              className="ext-vslide-arrow ext-vslide-arrow-prev"
               onClick={() => selectShadeByIndex(activeSlideIdx - 1)}
+              aria-label="اللون السابق"
             >
-              <ChevronRight size={26} />
+              <ChevronRight className="w-5 h-5" />
             </button>
-
-            <div className="ext-big-slide-card">
-              <div className="ext-big-slide-img-wrap">
-                <img
-                  key={currentShade.id}
-                  src={currentShade.image}
-                  alt={currentShade.name}
-                  className="ext-big-slide-img"
-                />
-                <span className="ext-slide-floating-badge">{currentShade.badge}</span>
-                <span className="ext-slide-counter">
-                  {activeSlideIdx + 1} / {SHADES.length}
-                </span>
-              </div>
-
-              <div className="ext-big-slide-info">
-                <div className="ext-big-slide-title-row">
-                  <div className="ext-shade-Identity">
-                    <span
-                      className="ext-shade-dot-lg"
-                      style={{ background: currentShade.swatch }}
-                    />
-                    <div>
-                      <h3>اللون : {currentShade.name}</h3>
-                      <p>{currentShade.subtitle}</p>
-                    </div>
-                  </div>
-                  <div className="ext-slide-selected-pill">
-                    ✓ اللون المختار حالياً
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  className="ext-slide-order-btn"
-                  onClick={scrollToOrderForm}
-                >
-                  اطلبي اللون « {currentShade.name} » الآن بـ 2,700 دج 🛒
-                </button>
-              </div>
-            </div>
 
             <button
               type="button"
-              className="ext-slider-nav ext-slider-next"
-              aria-label="اللون التالي"
+              className="ext-vslide-arrow ext-vslide-arrow-next"
               onClick={() => selectShadeByIndex(activeSlideIdx + 1)}
+              aria-label="اللون التالي"
             >
-              <ChevronLeft size={26} />
+              <ChevronLeft className="w-5 h-5" />
             </button>
-          </div>
 
-          {/* Slider Dots */}
-          <div className="ext-slider-dots">
-            {SHADES.map((s, idx) => (
+            <div className="ext-vslide-dual">
+              <div className="ext-vslide-photo-card">
+                <img
+                  src={currentShade.backCardImage}
+                  alt={currentShade.name}
+                />
+                <span className="ext-vslide-photo-tag">من الخلف ✨</span>
+              </div>
+
+              <div className="ext-vslide-photo-card">
+                <img
+                  src={currentShade.frontModelImage}
+                  alt={`${currentShade.name} - إطلالة كاملة`}
+                />
+                <span className="ext-vslide-photo-tag">النتيجة النهائية 💖</span>
+              </div>
+            </div>
+
+            <div className="ext-vslide-caption">
+              <div className="ext-vslide-caption-right">
+                <span
+                  className="ext-vslide-swatch-dot"
+                  style={{ backgroundColor: currentShade.swatch }}
+                />
+                <div>
+                  <div className="ext-vslide-shade-name">{currentShade.name}</div>
+                  <div className="ext-vslide-shade-sub">{currentShade.subtitle}</div>
+                </div>
+              </div>
+
               <button
-                key={s.id}
                 type="button"
-                aria-label={s.name}
-                className={idx === activeSlideIdx ? "active" : ""}
-                onClick={() => selectShadeByIndex(idx)}
+                className="ext-vslide-pick-btn"
+                onClick={() => {
+                  selectShadeByIndex(activeSlideIdx, true);
+                  scrollToOrderForm();
+                }}
               >
-                <span style={{ background: s.swatch }} />
-                <b>{s.name}</b>
+                اطلبي هذا اللون 🛒
               </button>
-            ))}
+            </div>
           </div>
 
-          {/* LARGE 3x2 Color Cards Grid (2x larger & clearer than old poster) */}
-          <div className="ext-colors-grid-large">
+          <div className="ext-vslide-strip-title">
+            <span>👇 اضغطي على اللون أو اسحبي يميناً ويساراً:</span>
+            <span>مختار: {color}</span>
+          </div>
+
+          {/* Horizontal swipeable carousel of the 6 variant cards from ext-pink-2 */}
+          <div className="ext-vslide-strip" ref={stripRef}>
             {SHADES.map((shade, idx) => {
-              const isSelected = color === shade.name;
+              const isSelected = idx === activeSlideIdx;
               return (
                 <button
                   key={shade.id}
                   type="button"
-                  className={`ext-color-card-lg${isSelected ? " selected" : ""}`}
+                  className={`ext-vslide-thumb ${isSelected ? "is-active" : ""}`}
                   onClick={() => selectShadeByIndex(idx)}
                 >
-                  <div className="ext-color-card-img-box">
-                    <img src={shade.image} alt={shade.name} loading="lazy" />
-                    {isSelected && (
-                      <span className="ext-color-check">✓ تم الاختيار</span>
-                    )}
-                  </div>
-                  <div className="ext-color-card-footer">
-                    <i style={{ background: shade.swatch }} />
-                    <strong>{shade.name}</strong>
-                  </div>
+                  <img src={shade.backCardImage} alt={shade.name} />
+                  {isSelected && <span className="ext-vslide-thumb-check">✓</span>}
                 </button>
               );
             })}
           </div>
-        </section>
 
-        {/* Section 4: Detailed Close-Up Photos of the Hair Extension */}
-        <section className="ext-details-section">
-          <div className="ext-section-head">
-            <span className="ext-badge-gold">🔍 صور تفصيلية عن قرب</span>
-            <h2>لماذا تعشق زبوناتنا إكستنشن Miss Sensuelle ؟</h2>
-            <p>تفاصيل الجودة، الكلبسات المخفية والملمس الطبيعي عن قرب</p>
-          </div>
-
-          <div className="ext-details-grid">
-            {DETAIL_PHOTOS.map(detail => (
-              <article key={detail.title} className="ext-detail-card">
-                <div className="ext-detail-img-wrap">
-                  <img src={detail.image} alt={detail.title} loading="lazy" />
-                  <span className="ext-detail-tag">{detail.tag}</span>
-                </div>
-                <div className="ext-detail-copy">
-                  <h3>{detail.title}</h3>
-                  <p>{detail.desc}</p>
-                </div>
-              </article>
+          <div className="ext-vslide-dots">
+            {SHADES.map((shade, idx) => (
+              <button
+                key={shade.id}
+                type="button"
+                className={`ext-vslide-dot ${idx === activeSlideIdx ? "is-active" : ""}`}
+                onClick={() => selectShadeByIndex(idx)}
+                aria-label={shade.name}
+              />
             ))}
           </div>
         </section>
 
-        {/* Section 5: Harmonious Warm-Gold & Espresso High-Converting Order Form */}
-        <form className="ext-fm" id="f" ref={formRef} onSubmit={handleSubmit}>
-          <div className="ext-fh">
-            <div>
-              <span className="ext-form-kicker">⚡ استمارة الطلب السريع · الدفع عند الاستلام</span>
-              <h2>🔥 اطلبي الآن قبل نفاذ الكمية !</h2>
-            </div>
-            <div className="ext-tm">
-              الوقت المتبقي للعرض
-              <div>
-                <b id="h">{hours}</b>
-                <span>:</span>
-                <b id="m">{minutes}</b>
-                <span>:</span>
-                <b id="s">{seconds}</b>
-              </div>
-            </div>
-          </div>
+        {/* 3. How to wash, style & wear in seconds */}
+        <img
+          className="ext-pink-slice"
+          src="/manus-storage/ext-pink-3.jpg"
+          alt="تلبس في ثواني وتغسل وتصفف بسهولة"
+        />
 
-          {/* Visual Color Selector right inside the form */}
-          <div className="ext-form-color-picker">
-            <div className="ext-form-color-head">
-              <span>🎨 1. اختاري لون الإكستنشن :</span>
-              <strong>اللون المختار : {color}</strong>
+        {/* 4. Details & closeups */}
+        <img
+          className="ext-pink-slice"
+          src="/manus-storage/ext-pink-4.jpg"
+          alt="شعر ناعم وحريري ومشابك قوية لا تنزلق"
+        />
+
+        {/* 5. Special Offer Banner: 4500 DA Buy 1 Get 2nd Free */}
+        <img
+          className="ext-pink-slice ext-pink-slice-clickable"
+          src="/manus-storage/ext-pink-5.jpg"
+          alt="4500 DA اشتري واحدة والثانية مجاناً"
+          onClick={activatePack2Offer}
+          title="اضغطي لتفعيل عرض قطعتين بـ 4500 دج"
+        />
+
+        {/* 6. Quality Badges & Shades Preview */}
+        <img
+          className="ext-pink-slice"
+          src="/manus-storage/ext-pink-6.jpg"
+          alt="جودة عالية وخفيفة الوزن ومناسبة لجميع أنواع الشعر"
+        />
+
+        {/* 7. HOMOGENEOUS ORDER FORM (#f) */}
+        <form
+          id="f"
+          ref={formRef}
+          className="ext-pink-form-wrap"
+          onSubmit={handleSubmit}
+        >
+          <div className="ext-pink-form-card">
+            <div className="ext-pink-form-ribbon">
+              <h3>اطلبي الآن • الدفع عند الاستلام</h3>
+              <p>توصيل سريع لـ 58 ولاية لباب المنزل 🚚</p>
             </div>
-            <div className="ext-form-color-strip">
-              {SHADES.map((s, idx) => {
-                const active = color === s.name;
+
+            {/* Offer Choice (1 piece vs 2 pieces 4500 DA matching ext-pink-5.jpg) */}
+            <div className="ext-pink-field-label">
+              <span>1. اختاري العرض المناسب لكِ:</span>
+              <span>🔥 عرض محدود</span>
+            </div>
+
+            <div className="ext-pink-offers">
+              <button
+                type="button"
+                className={`ext-pink-offer-btn ${offerMode === "single" ? "is-active" : ""}`}
+                onClick={() => setOfferMode("single")}
+              >
+                <div className="ext-pink-offer-title">قطعة واحدة</div>
+                <div className="ext-pink-offer-sub">إكستنشن شعر طبيعي</div>
+                <span className="ext-pink-offer-price">
+                  {singleUnitPrice.toLocaleString("fr-FR")} DA
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className={`ext-pink-offer-btn ${offerMode === "pack2" ? "is-active" : ""}`}
+                onClick={() => setOfferMode("pack2")}
+              >
+                <span className="ext-pink-offer-badge">🎁 الثانية مجاناً</span>
+                <div className="ext-pink-offer-title">واحدة + الثانية مجاناً</div>
+                <div className="ext-pink-offer-sub">قطعتين (اختاري لونين)</div>
+                <span className="ext-pink-offer-price">
+                  {PACK_2_PRICE.toLocaleString("fr-FR")} DA
+                </span>
+              </button>
+            </div>
+
+            {/* Primary Color Selector synced with Variant Slider */}
+            <div className="ext-pink-field-label">
+              <span>
+                {offerMode === "pack2"
+                  ? "2. اختاري لون القطعة الأولى:"
+                  : "2. اختاري اللون المطلوب:"}
+              </span>
+              <span>اللون: {color}</span>
+            </div>
+
+            <div className="ext-pink-color-grid">
+              {SHADES.map((shade, idx) => {
+                const isSelected = color === shade.name;
                 return (
                   <button
-                    key={s.id}
+                    key={shade.id}
                     type="button"
-                    className={`ext-form-color-pill${active ? " active" : ""}`}
+                    className={`ext-pink-color-chip ${isSelected ? "is-active" : ""}`}
                     onClick={() => selectShadeByIndex(idx, false)}
                   >
-                    <img src={s.image} alt={s.name} />
-                    <span>{s.name}</span>
-                    {active && <i>✓</i>}
+                    <img
+                      src={shade.backCardImage}
+                      alt={shade.name}
+                      className="ext-pink-color-chip-thumb"
+                    />
+                    <span className="ext-pink-color-chip-name">{shade.name}</span>
                   </button>
                 );
               })}
             </div>
-          </div>
 
-          {/* Input Fields Grid matching the luxury aesthetic */}
-          <div className="ext-g">
-            <label className="ext-f">
-              <i>📞</i>
+            {/* Second Color Selector when Pack 2 is active */}
+            {offerMode === "pack2" && (
+              <>
+                <div className="ext-pink-field-label">
+                  <span>🎁 اختاري لون القطعة الثانية (المجانية):</span>
+                  <span>اللون: {secondColor}</span>
+                </div>
+                <div className="ext-pink-color-grid">
+                  {SHADES.map(shade => {
+                    const isSelected = secondColor === shade.name;
+                    return (
+                      <button
+                        key={`second-${shade.id}`}
+                        type="button"
+                        className={`ext-pink-color-chip ${isSelected ? "is-active" : ""}`}
+                        onClick={() => setSecondColor(shade.name)}
+                      >
+                        <img
+                          src={shade.backCardImage}
+                          alt={shade.name}
+                          className="ext-pink-color-chip-thumb"
+                        />
+                        <span className="ext-pink-color-chip-name">
+                          {shade.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            <input type="hidden" name="color" value={color} />
+
+            {/* Customer Info Inputs matching exex.html */}
+            <div className="ext-pink-field-label">
+              <span>3. معلومات التوصيل:</span>
+              <span>الدفع عند الاستلام 🤝</span>
+            </div>
+
+            <div className="ext-pink-input-group">
               <input
-                name="phone"
-                type="tel"
-                inputMode="numeric"
+                className="ext-pink-input"
+                name="name"
+                placeholder="الاسم الكامل"
                 required
+              />
+            </div>
+
+            <div className="ext-pink-input-group">
+              <input
+                className="ext-pink-input"
+                type="tel"
+                inputMode="tel"
+                name="phone"
+                placeholder="رقم الهاتف (مثال: 0550123456)"
                 pattern="0[5-7][0-9]{8}"
-                placeholder="رقم الهاتف (07/05/06...)"
-                onFocus={() =>
+                required
+                onFocus={() => {
                   trackPixelEvent("InitiateCheckout", {
                     content_type: "product",
                     content_id: product.id,
                     content_ids: [product.id],
                     content_name: product.name,
-                    value: product.price,
+                    value: goodsTotal,
                     currency: "DZD",
-                  })
-                }
+                  });
+                }}
               />
-            </label>
+            </div>
 
-            <label className="ext-f">
-              <i>👤</i>
-              <input name="name" required placeholder="الاسم الكامل" />
-            </label>
-
-            <label className="ext-f">
-              <i>🎨</i>
+            <div className="ext-pink-input-row">
               <select
-                name="color"
-                required
-                value={color}
-                onChange={e => selectShadeByName(e.target.value, false)}
-              >
-                {SHADES.map(c => (
-                  <option key={c.id} value={c.name}>
-                    اللون: {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="ext-f">
-              <i>📍</i>
-              <select
+                className="ext-pink-select"
                 name="wilaya"
-                required
                 value={selectedWilaya}
                 onChange={e => {
-                  setSelectedWilaya(e.target.value);
-                  setSelectedCommune("");
+                  const nextWilaya = e.target.value;
+                  setSelectedWilaya(nextWilaya);
+                  const firstCommune =
+                    (abayaCommunesByWilaya[nextWilaya] ?? [])[0] ?? "";
+                  setSelectedCommune(firstCommune);
                 }}
+                required
               >
-                <option value="">اختاري الولاية (58 ولاية)</option>
+                <option value="">الولاية</option>
                 {abayaWilayas.map(w => (
                   <option key={w} value={w}>
                     {w}
                   </option>
                 ))}
               </select>
-            </label>
 
-            <label className="ext-f">
-              <i>🏘️</i>
               <select
+                className="ext-pink-select"
                 name="commune"
-                required
-                disabled={!selectedWilaya}
                 value={selectedCommune}
                 onChange={e => setSelectedCommune(e.target.value)}
+                disabled={!selectedWilaya}
+                required
               >
                 <option value="">
-                  {selectedWilaya ? "اختاري البلدية" : "اختاري الولاية أولاً"}
+                  {selectedWilaya ? "البلدية" : "اختر الولاية أولاً"}
                 </option>
                 {communes.map(c => (
                   <option key={c} value={c}>
@@ -713,214 +679,71 @@ export default function ExtensionsLanding({
                   </option>
                 ))}
               </select>
-            </label>
-
-            <label className="ext-f">
-              <i>📝</i>
-              <input name="note" placeholder="ملاحظة للتوصيل (اختياري)" />
-            </label>
-          </div>
-
-          {/* Offer Choices: Single vs Pack Duo */}
-          <div className="ext-offer-choices">
-            <button
-              type="button"
-              className={`ext-offer-option${offerMode === "single" ? " active" : ""}`}
-              onClick={() => setOfferMode("single")}
-            >
-              <div className="ext-offer-main">
-                <span className="ext-offer-radio" />
-                <div className="ext-offer-text">
-                  <strong>قطعة واحدة (1 إكستنشن شعر)</strong>
-                  <small>العرض العادي · كثافة وطول طبيعي</small>
-                </div>
-              </div>
-              <div className="ext-offer-price">
-                <b>2,700 دج</b>
-                <del>3,500 دج</del>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className={`ext-offer-option${offerMode === "pack2" ? " active" : ""}`}
-              onClick={() => setOfferMode("pack2")}
-            >
-              <div className="ext-offer-main">
-                <span className="ext-offer-radio" />
-                <div className="ext-offer-text">
-                  <strong>🔥 عرض خاص : اشتري 2 إكستنشن بتخفيض رائع !</strong>
-                  <small>2 قطع بـ 4,800 دج فقط (وفّري 600 دج لكثافة مضاعفة)</small>
-                </div>
-              </div>
-              <div className="ext-offer-price">
-                <b>4,800 دج</b>
-                <del>5,400 دج</del>
-              </div>
-            </button>
-
-            {offerMode === "pack2" && (
-              <div className="ext-offer-subform">
-                <div className="ext-offer-subform-title">
-                  ✨ اختاري لون القطعة الثانية من الإكستنشن 💇‍♀️
-                </div>
-                <div className="ext-form-color-strip">
-                  {SHADES.map(s => {
-                    const active2 = secondColor === s.name;
-                    return (
-                      <button
-                        key={`second-${s.id}`}
-                        type="button"
-                        className={`ext-form-color-pill${active2 ? " active" : ""}`}
-                        onClick={() => setSecondColor(s.name)}
-                      >
-                        <img src={s.image} alt={s.name} />
-                        <span>{s.name}</span>
-                        {active2 && <i>✓</i>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Order Summary & Shipping Box */}
-          <div className="ext-summary-box">
-            <div className="ext-summary-row">
-              <span>🎨 اللون المختار :</span>
-              <strong>
-                {offerMode === "pack2"
-                  ? `1: ${color} + 2: ${secondColor}`
-                  : color}
-              </strong>
             </div>
-            <div className="ext-summary-row">
-              <span>🛍️ سعر الطلبية :</span>
-              <strong>{goodsTotal.toLocaleString("en-US")} دج</strong>
-            </div>
-            <div className="ext-summary-row">
-              <span>🚚 سعر التوصيل {selectedWilaya ? `إلى ${selectedWilaya}` : ""} :</span>
-              <strong>
-                {selectedWilaya
-                  ? `${shippingFee.toLocaleString("en-US")} دج`
-                  : "يُحدد فور اختيار الولاية"}
-              </strong>
-            </div>
-            <div className="ext-summary-total">
-              <span>💰 المبلغ الإجمالي عند الاستلام :</span>
-              <strong>
-                {(goodsTotal + shippingFee).toLocaleString("en-US")} دج
-              </strong>
-            </div>
-          </div>
 
-          {/* Submit CTA Button with Curved Arrow */}
-          <div className="ext-bt">
-            <svg viewBox="0 0 60 50">
-              <path
-                d="M5 4C8 30 25 42 48 40"
-                fill="none"
-                stroke="#f5c04a"
-                strokeWidth="5"
-                strokeLinecap="round"
+            <div className="ext-pink-input-group">
+              <input
+                className="ext-pink-input"
+                name="note"
+                placeholder="اللون المطلوب / ملاحظة (اختياري)"
               />
-              <path
-                d="M40 28L54 40 38 49"
-                fill="none"
-                stroke="#f5c04a"
-                strokeWidth="5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            </div>
+
+            {/* Order Summary */}
+            <div className="ext-pink-summary">
+              <div className="ext-pink-summary-row">
+                <span>
+                  {offerMode === "pack2"
+                    ? `عرض قطعتين (${color} + ${secondColor})`
+                    : `قطعة واحدة (${color})`}
+                </span>
+                <span>{goodsTotal.toLocaleString("fr-FR")} دج</span>
+              </div>
+              <div className="ext-pink-summary-row">
+                <span>سعر التوصيل للمنزل</span>
+                <span>
+                  {selectedWilaya
+                    ? shippingFee === 0
+                      ? "مجاني 🎉"
+                      : `${shippingFee.toLocaleString("fr-FR")} دج`
+                    : "يحدد حسب الولاية"}
+                </span>
+              </div>
+              <div className="ext-pink-summary-total">
+                <span>المجموع الكلي:</span>
+                <span>
+                  {(goodsTotal + shippingFee).toLocaleString("fr-FR")} دج
+                </span>
+              </div>
+            </div>
+
             <button
-              className="ext-go"
               type="submit"
+              className="ext-pink-submit-btn"
               disabled={isSubmitting || orderSubmitted}
             >
               {isSubmitting
-                ? "جاري تأكيد طلبك... ⏳"
+                ? "⏳ جاري تأكيد الطلب..."
                 : orderSubmitted
-                  ? "تم استلام طلبك بنجاح ✅"
-                  : offerMode === "pack2"
-                    ? "أؤكد طلبي للعرض (2 بـ 4,800 دج) 🛒"
-                    : "أؤكد طلبي الآن (2,700 دج) 🛒"}
+                  ? "✅ تم تسجيل طلبك بنجاح"
+                  : "🛒 تأكيد الطلب"}
             </button>
-          </div>
 
-          <p id="ok" style={{ display: okMessage ? "block" : "none" }}>
-            {okMessage}
-          </p>
+            {okMessage && <div className="ext-pink-ok-box">{okMessage}</div>}
+          </div>
         </form>
 
-        {/* Section 6: Under-Form Pack 2 Promo Banner */}
-        <div
-          className="ext-under-form-offer"
-          onClick={activatePack2Offer}
-          role="button"
-          tabIndex={0}
-          onKeyDown={e => {
-            if (e.key === "Enter" || e.key === " ") activatePack2Offer();
+        {/* 8. Sticky Bottom CTA Bar from exex.html */}
+        <a
+          className="ext-pink-bar"
+          href="#f"
+          onClick={e => {
+            e.preventDefault();
+            scrollToOrderForm();
           }}
         >
-          <span className="ext-under-badge">🔥 عرض التوفير الأكثر طلباً 🔥</span>
-          <h3>
-            اشتري 2 إكستنشن شعر بـ <span>4,800 دج فقط !</span>
-          </h3>
-          <p>
-            احصلي على قطعتين من إكستنشن الشعر الفاخر (يمكنك اختيار لونين مختلفين أو نفس اللون لكثافة مضاعفة) بسعر <b>4,800 دج</b> بدلاً من <del>5,400 دج</del> !
-          </p>
-          <span className="ext-under-cta">
-            {offerMode === "pack2"
-              ? "✅ تم تفعيل عرض 2 إكستنشن بـ 4,800 دج في الاستمارة أعلاه"
-              : "👈 اضغطي هنا لتفعيل عرض قطعتين بـ 4,800 دج"}
-          </span>
-        </div>
-
-        {/* Section 7: Customer Reviews Section */}
-        <section className="ext-reviews-section">
-          <div className="ext-reviews-header">
-            <div>
-              <strong>💬 آراء زبوناتنا بعد التجربة</strong>
-              <small>أكثر من 3,200 زبونة راضية في جميع ولايات الجزائر</small>
-            </div>
-            <div className="ext-rating-pill">⭐ 4.9 / 5</div>
-          </div>
-
-          <div className="ext-reviews-list">
-            {REVIEWS.map(rev => (
-              <div key={rev.name} className="ext-review-box">
-                <div className="ext-review-top">
-                  <div>
-                    <b>{rev.name}</b>
-                    <span className="ext-review-shade">اللون : {rev.shade}</span>
-                  </div>
-                  <em className="ext-review-stars">★★★★★</em>
-                </div>
-                <p>« {rev.text} »</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Footer */}
-        <footer className="ext-footer">
-          <div className="ext-footer-brand">
-            <span>👑</span>
-            <strong>Miss Sensuelle</strong>
-            <small>Beauté & Confiance · الجزائر</small>
-          </div>
-          <div className="ext-footer-trust">
-            <span>📦 توصيل سريع 58 ولاية</span>
-            <span>🛡️ دفع آمن 100% عند الاستلام</span>
-            <span>❤️ رضاكم يهمنا</span>
-          </div>
-        </footer>
-      </div>
-
-      <div id="t" className={`ext-toast${toastShown ? " s" : ""}`}>
-        {toastMsg}
+          <img src="/manus-storage/ext-pink-bar.jpg" alt="الطلب الآن" />
+        </a>
       </div>
     </div>
   );

@@ -943,7 +943,7 @@ function computeLineTotal(slugOrId: string, unitPrice: number, quantity: number)
     return 12900;
   }
   if ((slugOrId === "p-005" || slugOrId === "extensions-silk-wave" || slugOrId === "extensions-cheveux") && quantity === 2) {
-    return 4800;
+    return 4500;
   }
   return unitPrice * quantity;
 }
