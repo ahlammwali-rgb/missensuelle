@@ -71,7 +71,7 @@ const FEATURE_ICONS = [
   "/manus-storage/ext-vrait-11.jpg",
 ];
 
-const PACK_PRICE = 4500;
+const PACK_PRICE = 4700;
 const DRAFT_TOKEN_STORAGE_KEY = "miss-sensuelle-checkout-token";
 
 function createValidUuid(): string {
@@ -106,7 +106,7 @@ export default function ExtensionsLanding({
 
   const productId = activeProduct?.id || "p-005";
   const productTitle = activeProduct?.name || "Extensions Cheveux Naturel";
-  const packPrice = activeProduct?.packPrice || activeProduct?.price || PACK_PRICE;
+  const packPrice = activeProduct?.price || activeProduct?.packPrice || PACK_PRICE;
 
   const isCustomModel = Boolean(passedProduct && passedProduct.id !== "p-005");
 

@@ -196,7 +196,7 @@ export const products: Product[] = [
     categoryLabel: "Extensions cheveux",
     price: 4700,
     oldPrice: 5900,
-    packPrice: 4500,
+    packPrice: 4700,
     landingTemplate: "extensions",
     badge: "Offre 4 700 DA",
     description: "Extensions cheveux naturel 50%, longueur et volume instantanés, pose facile et tenue longue durée.",
@@ -332,13 +332,14 @@ export function getCatalogProducts(): Product[] {
           colors: JSON.stringify(product.colors) === JSON.stringify(["Lilac", "Ivoire", "Bleu ciel"]) ? ["Noir", "Blanc"] : product.colors,
         };
       }
-      if (product.id === "p-005" && (product.price === 9800 || product.image === extensionsImage)) {
+      if (product.id === "p-005" && (product.price === 9800 || product.price === 2700 || product.packPrice === 4500 || product.image === extensionsImage)) {
         colorsChanged = true;
         return {
           ...product,
           name: canonicalExtensions.name,
           price: canonicalExtensions.price,
           oldPrice: canonicalExtensions.oldPrice,
+          packPrice: canonicalExtensions.packPrice,
           badge: canonicalExtensions.badge,
           description: canonicalExtensions.description,
           details: canonicalExtensions.details,
