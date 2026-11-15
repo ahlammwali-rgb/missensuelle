@@ -1,10 +1,13 @@
 import { FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
-import { ArrowDown, ArrowLeft, ArrowRight, Check, ChevronDown, Clock3, Heart, MapPin, Minus, Plus, ShieldCheck, Sparkles, Star, Truck, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, Check, ChevronDown, Clock3, Flame, Heart, Home, LayoutGrid, MapPin, Minus, Plus, Search, ShieldCheck, ShoppingBag, Sparkles, Star, Truck, X } from "lucide-react";
+import "./home-app.css";
 import { CartDrawer, ScrollReveal, StoreFooter, StoreHeader, useLanguage } from "@/components/StoreLayout";
 import { categories, formatDZD, getCatalogProducts, getProduct, darkHeroImage, beautyImage, products, type CartLine, type CategoryId, type Order, type Product, wilayas } from "@/lib/store-data";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
 import { trackPixelEvent } from "@/lib/tracking";
+import { trpc } from "@/lib/trpc";
+import { shippingFeeFor } from "@shared/shipping";
 import { EmeraldOrder } from "@/components/AbayaOrder";
 import { CheckoutDraftNotice } from "@/components/CheckoutDraftNotice";
 import { useCheckoutDraft } from "@/components/useCheckoutDraft";
@@ -19,22 +22,307 @@ function ProductCard({ product, onAdd, index = 0 }: { product: typeof products[n
   const { lang } = useLanguage();
   const name = lang === "ar" && product.arName ? product.arName : product.name;
   const categoryLabel = lang === "ar" && product.arCategoryLabel ? product.arCategoryLabel : product.categoryLabel;
-  return <article className="product-card reveal" style={{ "--delay": `${index * 70}ms` } as React.CSSProperties}><Link href={`/produit/${product.slug}`} className="product-image"><img src={product.image} alt={name} /><span className="product-glow" style={{ background: product.accent }} /><span className="product-badge">{product.badge ?? (lang === "ar" ? "اختيار مميز" : "Coup de cœur")}</span><button className="heart-button" onClick={event => { event.preventDefault(); }} aria-label={lang === "ar" ? "إضافة للمفضلة" : "Ajouter aux favoris"}><Heart size={17} /></button></Link><div className="product-info"><div><span className="product-category">{categoryLabel}</span><Link href={`/produit/${product.slug}`}><h3>{name}</h3></Link></div><button className="add-mini" onClick={() => onAdd(product)} aria-label={`${lang === "ar" ? "إضافة" : "Ajouter"} ${name}`}><Plus size={18} /></button></div><div className="product-price"><strong>{formatDZD(product.price)}</strong>{product.oldPrice && <del>{formatDZD(product.oldPrice)}</del>}</div></article>;
+  const discountPct =
+    product.oldPrice && product.oldPrice > product.price
+      ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
+      : 0;
+  return (
+    <article className="app-vignette reveal" style={{ "--delay": `${index * 55}ms` } as React.CSSProperties}>
+      <Link href={`/produit/${product.slug}`} className="app-vignette-media">
+        <img src={product.image} alt={name} loading="lazy" />
+        <div className="app-vignette-badges">
+          <span className="app-badge-tag">{product.badge ?? (lang === "ar" ? "اختيار مميز" : "Coup de cœur")}</span>
+          {discountPct > 0 && <span className="app-discount-pill">-{discountPct}%</span>}
+        </div>
+        <span className="app-vignette-rating">
+          <Star size={12} fill="currentColor" /> 4.9
+        </span>
+      </Link>
+      <div className="app-vignette-body">
+        <span className="app-vignette-cat">{categoryLabel}</span>
+        <Link href={`/produit/${product.slug}`} className="app-vignette-title">
+          {name}
+        </Link>
+        <div className="app-vignette-price-row">
+          <strong>{formatDZD(product.price)}</strong>
+          {product.oldPrice && product.oldPrice > product.price && <del>{formatDZD(product.oldPrice)}</del>}
+        </div>
+        <div className="app-vignette-actions">
+          <Link href={`/produit/${product.slug}`} className="app-order-cta">
+            {lang === "ar" ? "اطلبي الآن" : "Commander"} <ArrowRight size={14} />
+          </Link>
+          <button
+            type="button"
+            className="app-cart-mini-btn"
+            onClick={() => onAdd(product)}
+            aria-label={`${lang === "ar" ? "إضافة" : "Ajouter"} ${name}`}
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export function HomePage({ onAdd }: { onAdd: (product: typeof products[number]) => void }) {
   const { lang } = useLanguage();
   const catalog = useCatalogProducts();
-  const featuredCatalog = [catalog.find(product => product.id === "p-008"), catalog.find(product => product.id === "p-005"), catalog.find(product => product.id === "p-007"), ...catalog.filter(product => product.id !== "p-007" && product.id !== "p-008" && product.id !== "p-005").slice(0, 1)].filter((product): product is Product => Boolean(product));
-  return <><StoreHeader cartCount={0} onOpenCart={() => window.dispatchEvent(new CustomEvent("open-cart"))} /><main>
-    <section className="hero container"><div className="hero-copy"><span className="eyebrow"><Sparkles size={15} /> {lang === "ar" ? "طاقة جديدة لإطلالتك" : "La nouvelle énergie de ton dressing"}</span><h1>{lang === "ar" ? <>تألقي<br /><em>بطريقتك.</em></> : <>Own your<br /><em>glow.</em></>}</h1><p>{lang === "ar" ? "قطع تلفت الأنظار وتفاصيل جمال تغيّر كل شيء. اكتشفي مزاجك مع ميس سنسويل." : "Des pièces qui font tourner les têtes, des détails beauté qui changent tout. Ta vibe, en version Miss Sensuelle."}</p><div className="hero-actions"><Link href="/catalogue" className="button button-dark">{lang === "ar" ? "تسوقي الجديد" : "Shopper les nouveautés"} <ArrowRight size={17} /></Link><Link href="/catalogue?cat=beaute" className="text-link">{lang === "ar" ? "اكتشفي الجمال" : "Voir la beauté"} <ArrowDown size={16} /></Link></div><div className="hero-proof"><div className="avatar-stack"><span>IM</span><span>LK</span><span>SA</span><b>+2k</b></div><span>{lang === "ar" ? <>فتيات في<br /><strong>#MissMood</strong></> : <>filles déjà dans<br /><strong>la #MissMood</strong></>}</span></div></div><div className="hero-visual"><div className="hero-blob blob-one" /><div className="hero-blob blob-two" /><div className="hero-image-frame"><img src={darkHeroImage} alt="Look Miss Sensuelle" /><div className="hero-float-card float-top"><Sparkles size={16} /><span>new energy</span></div><div className="hero-float-card float-bottom"><span>01</span><b>glow<br />edit</b><ArrowRight size={18} /></div><div className="hero-sticker">✦<span>feel<br />pretty</span></div></div></div><div className="hero-scroll"><span>{lang === "ar" ? "مرري لاكتشاف المزيد" : "Scroll to explore"}</span><ArrowDown size={15} /></div></section>
-    <section className="marquee"><div className="marquee-track"><span>{lang === "ar" ? "أسلوبك، قواعدك" : "YOUR STYLE, YOUR RULES"}</span><i>✦</i><span>{lang === "ar" ? "توصيل لكل الجزائر" : "LIVRAISON PARTOUT EN ALGÉRIE"}</span><i>✦</i><span>{lang === "ar" ? "الدفع عند الاستلام" : "PAY ON DELIVERY"}</span><i>✦</i><span>{lang === "ar" ? "أسلوبك، قواعدك" : "YOUR STYLE, YOUR RULES"}</span><i>✦</i></div></section>
-    <ScrollReveal><section className="section container category-section"><div className="section-heading"><div><span className="eyebrow">{lang === "ar" ? "اكتشفي عوالمنا" : "Tes univers"}</span><h2>{lang === "ar" ? <>اختاري<br /><em>مزاجك.</em></> : <>Choisis ta <em>mood.</em></>}</h2></div><Link href="/catalogue" className="text-link">{lang === "ar" ? "اكتشفي الكل" : "Tout voir"} <ArrowRight size={16} /></Link></div><div className="category-ribbon">{categories.map((category, index) => <Link href={`/catalogue?cat=${category.id}`} className={`category-card category-${category.color}`} key={category.id}><div className="category-copy"><span>{category.kicker}</span><h3>{lang === "ar" ? category.arLabel : category.label}</h3><small>{category.count} <ArrowRight size={13} /></small></div><img src={category.image} alt="" /><b className="category-number">0{index + 1}</b></Link>)}</div></section></ScrollReveal>
-    <ScrollReveal><section className="section container featured-section"><div className="section-heading"><div><span className="eyebrow">Sélection Miss</span><h2>Les pièces qui font <em>tilt.</em></h2></div><Link href="/catalogue" className="text-link">Shopper tout <ArrowRight size={16} /></Link></div><div className="product-grid">{featuredCatalog.map((product, index) => <ProductCard key={product.id} product={product} onAdd={onAdd} index={index} />)}</div></section></ScrollReveal>
-    <ScrollReveal><section className="editorial container"><div className="editorial-card editorial-lilac"><div className="editorial-copy"><span className="eyebrow">Glow guide</span><h2>Le détail qui change <em>tout.</em></h2><p>Un look simple, une touche de couleur et le bon accessoire. C'est tout ce qu'il faut pour créer ton moment signature.</p><Link href="/catalogue?cat=beaute" className="button button-light">Découvrir la beauty edit <ArrowRight size={16} /></Link></div><div className="editorial-orb orb-a" /><div className="editorial-orb orb-b" /><div className="editorial-shape">✦</div></div><div className="editorial-card editorial-image"><img src={beautyImage} alt="Beauty edit Miss Sensuelle" /><div className="image-caption"><span>the beauty edit</span><strong>soft glam<br />all day</strong></div></div></section></ScrollReveal>
-    <ScrollReveal><section className="trust-strip"><div className="container trust-grid"><div><Truck size={22} /><span><b>Livraison Algérie</b>On vient jusqu'à toi</span></div><div><ShieldCheck size={22} /><span><b>Paiement à la livraison</b>Commande sans stress</span></div><div><Clock3 size={22} /><span><b>Confirmation rapide</b>On t'appelle pour valider</span></div></div></section></ScrollReveal>
-    <section className="newsletter container"><div><span className="eyebrow">Miss mood mail</span><h2>Un peu de glow<br /><em>dans ta boîte.</em></h2></div><div><p>Les nouveautés, les drops et les petites inspirations beauté. Pas de spam, juste les bons vibes.</p><div className="newsletter-form"><input placeholder="Ton adresse email" /><button className="button button-dark">Je m'inscris <ArrowRight size={16} /></button></div></div></section>
-  </main><StoreFooter /></>;
+  const [activeCat, setActiveCat] = useState<CategoryId | "all">("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const heroSpotlight = useMemo(() => {
+    const preferred = [
+      catalog.find(p => p.id === "p-008"),
+      catalog.find(p => p.id === "p-005"),
+      catalog.find(p => p.id === "p-007"),
+    ].filter((p): p is Product => Boolean(p));
+    if (preferred.length >= 2) return preferred.slice(0, 2);
+    return catalog.slice(0, 2);
+  }, [catalog]);
+
+  const visibleProducts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return catalog.filter(product => {
+      const catMatch = activeCat === "all" || product.category === activeCat;
+      if (!catMatch) return false;
+      if (!q) return true;
+      return (
+        product.name.toLowerCase().includes(q) ||
+        (product.arName?.toLowerCase().includes(q) ?? false) ||
+        product.categoryLabel.toLowerCase().includes(q)
+      );
+    });
+  }, [catalog, activeCat, searchQuery]);
+
+  return (
+    <>
+      <StoreHeader cartCount={0} onOpenCart={() => window.dispatchEvent(new CustomEvent("open-cart"))} />
+      <main className="app-home">
+        <div className="app-container">
+          <div className="app-top-strip">
+            <div className="app-greeting">
+              <div className="app-greeting-badge">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <h2>{lang === "ar" ? "مرحباً بك في Miss Sensuelle" : "Bienvenue chez Miss Sensuelle"}</h2>
+                <p>{lang === "ar" ? "أزياء، جمال وتوصيل سريع لـ 58 ولاية" : "Mode, beauté & livraison 58 wilayas"}</p>
+              </div>
+            </div>
+            <label className="app-search-box">
+              <Search size={18} />
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder={lang === "ar" ? "ابحثي عن عباية، دودون، إكستنشن..." : "Rechercher abaya, doudoune, extensions..."}
+              />
+            </label>
+          </div>
+
+          <section className="app-hero-banner">
+            <div className="app-hero-copy">
+              <span className="app-hero-pill">
+                <Flame size={14} /> {lang === "ar" ? "تشكيلة حصرية · عروض اليوم" : "COLLECTION EXCLUSIVE · OFFRES DU MOMENT"}
+              </span>
+              <h1>
+                {lang === "ar" ? (
+                  <>
+                    تألقي <em>بإطلالة ساحرة</em> كل يوم.
+                  </>
+                ) : (
+                  <>
+                    Révèle ton <em>éclat</em> avec style.
+                  </>
+                )}
+              </h1>
+              <p>
+                {lang === "ar"
+                  ? "قطع مختارة بعناية وجودة مضمونة، الدفع عند الاستلام وتوصيل سريع لباب منزلك أو للمكتب."
+                  : "Des pièces tendance sélectionnées avec soin, paiement à la livraison et expédition rapide partout en Algérie."}
+              </p>
+              <div className="app-hero-actions">
+                <a href="#app-products" className="app-btn-primary">
+                  {lang === "ar" ? "تسوقي الآن" : "Découvrir les produits"} <ArrowRight size={16} />
+                </a>
+                <Link href="/catalogue" className="app-btn-ghost">
+                  {lang === "ar" ? "كل الكتالوج" : "Voir tout le catalogue"}
+                </Link>
+              </div>
+            </div>
+            <div className="app-hero-visual">
+              {heroSpotlight.map(item => (
+                <Link key={item.id} href={`/produit/${item.slug}`} className="app-hero-mini-card">
+                  <img src={item.image} alt={lang === "ar" && item.arName ? item.arName : item.name} />
+                  <div className="app-hero-mini-meta">
+                    <strong>{lang === "ar" && item.arName ? item.arName : item.name}</strong>
+                    <span>{formatDZD(item.price)}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+
+          <div className="app-promo-strip" aria-label="Avantages">
+            <span className="app-promo-chip"><Truck size={16} /> {lang === "ar" ? "توصيل 58 ولاية" : "Livraison 58 Wilayas"}</span>
+            <span className="app-promo-chip"><ShieldCheck size={16} /> {lang === "ar" ? "الدفع عند الاستلام" : "Paiement à la livraison"}</span>
+            <span className="app-promo-chip"><Sparkles size={16} /> {lang === "ar" ? "جودة مضمونة 100%" : "Qualité premium vérifiée"}</span>
+            <span className="app-promo-chip"><Clock3 size={16} /> {lang === "ar" ? "تأكيد سريع بالهاتف" : "Confirmation rapide"}</span>
+          </div>
+
+          <section id="app-categories">
+            <div className="app-sec-head">
+              <div>
+                <span className="app-eyebrow">{lang === "ar" ? "التصنيفات" : "Catégories"}</span>
+                <h2>{lang === "ar" ? "اختاري الفئة التي تناسبك" : "Explore par univers"}</h2>
+              </div>
+              <Link href="/catalogue" className="app-sec-link">
+                {lang === "ar" ? "عرض الكل" : "Tout voir"} <ArrowRight size={15} />
+              </Link>
+            </div>
+            <div className="app-category-grid">
+              {categories.map(category => {
+                const count = catalog.filter(p => p.category === category.id).length;
+                const isSelected = activeCat === category.id;
+                return (
+                  <button
+                    type="button"
+                    key={category.id}
+                    onClick={() => setActiveCat(isSelected ? "all" : category.id)}
+                    className={`app-cat-card cat-${category.color} ${isSelected ? "is-selected" : ""}`}
+                  >
+                    <div className="app-cat-info">
+                      <span className="app-cat-kicker">{category.kicker}</span>
+                      <h3>{lang === "ar" ? category.arLabel : category.label}</h3>
+                      <span className="app-cat-count">
+                        {count} {lang === "ar" ? "منتج" : "articles"} <ArrowRight size={12} />
+                      </span>
+                    </div>
+                    <img className="app-cat-thumb" src={category.image} alt="" />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section id="app-products">
+            <div className="app-sec-head">
+              <div>
+                <span className="app-eyebrow">{lang === "ar" ? "منتجاتنا" : "Boutique"}</span>
+                <h2>{lang === "ar" ? "أجمل القطع المختارة لك" : "Nos meilleures pièces"}</h2>
+              </div>
+              <span className="app-sec-link" style={{ color: "var(--app-muted)" }}>
+                {visibleProducts.length} {lang === "ar" ? "منتج" : "produits"}
+              </span>
+            </div>
+
+            <div className="app-filter-pills">
+              <button
+                type="button"
+                className={`app-pill ${activeCat === "all" ? "active" : ""}`}
+                onClick={() => setActiveCat("all")}
+              >
+                {lang === "ar" ? "الكل" : "Tout"} <span>{catalog.length}</span>
+              </button>
+              {categories.map(category => (
+                <button
+                  type="button"
+                  key={category.id}
+                  className={`app-pill ${activeCat === category.id ? "active" : ""}`}
+                  onClick={() => setActiveCat(category.id)}
+                >
+                  {lang === "ar" ? category.arLabel : category.label}{" "}
+                  <span>{catalog.filter(p => p.category === category.id).length}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="app-product-grid">
+              {visibleProducts.map((product, index) => (
+                <ProductCard key={product.id} product={product} onAdd={onAdd} index={index} />
+              ))}
+            </div>
+
+            {visibleProducts.length === 0 && (
+              <div className="empty-state" style={{ marginBottom: 24 }}>
+                <div className="empty-orb">✦</div>
+                <h2>{lang === "ar" ? "لا توجد نتائج" : "Aucun produit trouvé"}</h2>
+                <button
+                  type="button"
+                  className="button button-dark"
+                  onClick={() => {
+                    setActiveCat("all");
+                    setSearchQuery("");
+                  }}
+                >
+                  {lang === "ar" ? "إظهار كل المنتجات" : "Afficher tous les produits"}
+                </button>
+              </div>
+            )}
+          </section>
+
+          <section className="app-trust-grid">
+            <div className="app-trust-card">
+              <div className="app-trust-icon" style={{ background: "linear-gradient(135deg, #ec4899, #f472b6)" }}>
+                <Truck size={20} />
+              </div>
+              <div>
+                <b>{lang === "ar" ? "توصيل سريع" : "Livraison rapide"}</b>
+                <span>{lang === "ar" ? "للمنزل أو المكتب" : "Domicile ou Stop Desk"}</span>
+              </div>
+            </div>
+            <div className="app-trust-card">
+              <div className="app-trust-icon" style={{ background: "linear-gradient(135deg, #7c3aed, #a855f7)" }}>
+                <ShieldCheck size={20} />
+              </div>
+              <div>
+                <b>{lang === "ar" ? "دفع آمن" : "Paiement à la livraison"}</b>
+                <span>{lang === "ar" ? "عند استلام الطلب" : "Zéro risque à l'achat"}</span>
+              </div>
+            </div>
+            <div className="app-trust-card">
+              <div className="app-trust-icon" style={{ background: "linear-gradient(135deg, #f59e0b, #fbbf24)" }}>
+                <Star size={20} />
+              </div>
+              <div>
+                <b>{lang === "ar" ? "تقييم ممتاز" : "Noté 4.9 / 5"}</b>
+                <span>{lang === "ar" ? "+5000 زبونة راضية" : "+5000 clientes satisfaites"}</span>
+              </div>
+            </div>
+            <div className="app-trust-card">
+              <div className="app-trust-icon" style={{ background: "linear-gradient(135deg, #059669, #34d399)" }}>
+                <Clock3 size={20} />
+              </div>
+              <div>
+                <b>{lang === "ar" ? "خدمة متواصلة" : "Confirmation express"}</b>
+                <span>{lang === "ar" ? "تأكيد فوري بالهاتف" : "Appel de suivi rapide"}</span>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <nav className="app-bottom-nav" aria-label="Navigation mobile">
+          <a href="#top" className="is-active" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+            <Home size={19} />
+            <span>{lang === "ar" ? "الرئيسية" : "Accueil"}</span>
+          </a>
+          <a href="#app-categories">
+            <LayoutGrid size={19} />
+            <span>{lang === "ar" ? "الفئات" : "Catégories"}</span>
+          </a>
+          <Link href="/catalogue">
+            <Sparkles size={19} />
+            <span>{lang === "ar" ? "الكتالوج" : "Catalogue"}</span>
+          </Link>
+          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent("open-cart"))}>
+            <ShoppingBag size={19} />
+            <span>{lang === "ar" ? "السلة" : "Panier"}</span>
+          </button>
+        </nav>
+      </main>
+      <StoreFooter />
+    </>
+  );
 }
 
 function CataloguePage({ onAdd }: { onAdd: (product: typeof products[number]) => void }) {
@@ -113,48 +401,97 @@ function ProductPage({ onAdd, slugOverride }: { onAdd: (product: typeof products
   if (isExtensions) return <ExtensionsLanding key={product.id} product={product} quantity={quantity} />;
   const displayCategory = lang === "ar" && product.arCategoryLabel ? product.arCategoryLabel : product.categoryLabel;
   const displayDescription = lang === "ar" && product.arDescription ? product.arDescription : product.description;
-  return <><StoreHeader cartCount={0} onOpenCart={() => window.dispatchEvent(new CustomEvent("open-cart"))} /><main className={`product-page container ${isVest ? "vest-product-page" : ""}`}><Link href="/catalogue" className="back-link"><ArrowLeft size={16} /> Retour à la boutique</Link><div className="product-detail"><div className="detail-visual"><div className="detail-image"><img src={activeImage} alt={displayName} /><span style={{ background: product.accent }} /></div><div className="gallery-heading"><span>{lang === "ar" ? "صور المنتج" : "Photos du produit"}</span><b>{gallery.length} {lang === "ar" ? "صور" : "vues"}</b></div><div className="product-gallery">{gallery.map((image, index) => <button key={`${image}-${index}`} className={activeImage === image ? "active" : ""} onClick={() => setActiveImage(image)} aria-label={`Voir la photo ${index + 1}`}><img src={image} alt="" /></button>)}</div><div className="detail-note"><Sparkles size={16} /> {lang === "ar" ? "قطعة مختارة بحب من ميس سنسويل" : "Pièce choisie avec amour par Miss Sensuelle"}</div><a className="button button-gradient start-now-button start-now-under-gallery" href="#order" onClick={() => trackPixelEvent("InitiateCheckout", { content_ids: [product.id], value: product.price, currency: "DZD" })}>{lang === "ar" ? "ابدئي الآن" : "Commencer maintenant"} <ArrowRight size={18} /></a></div><div className="detail-copy"><span className="product-category">{displayCategory}</span><div className="detail-title-row"><h1>{displayName}</h1><button className="heart-button static"><Heart size={20} /></button></div><div className="detail-rating"><span><Star size={14} fill="currentColor" /> 4.9</span><small>·</small><span>{lang === "ar" ? "18 تقييم" : "18 avis"}</span></div><div className="detail-price"><strong>{formatDZD(product.price)}</strong>{product.oldPrice && <del>{formatDZD(product.oldPrice)}</del>}</div><p className="detail-description">{displayDescription}</p><div className="detail-option"><span>{lang === "ar" ? "اللون" : "Couleur"} <b>{selectedColor}</b></span><div className="color-options">{product.colors.map((color, index) => <button key={color} className={selectedColor === color ? "selected" : ""} onClick={() => setSelectedColor(color)}><i style={{ background: ["#9B82F6", "#F2E7D7", "#79B5FF", "#1D2433", "#C87B5B", "#F7DC5A"][index % 6] }} />{color}</button>)}</div></div><div className="detail-option"><span>{lang === "ar" ? "الكمية" : "Quantité"}</span><div className="quantity-control"><button onClick={() => setQuantity(value => Math.max(1, value - 1))}><Minus size={16} /></button><b>{quantity}</b><button onClick={() => setQuantity(value => value + 1)}><Plus size={16} /></button></div></div><div className="delivery-card"><div><Truck size={18} /><span><b>{lang === "ar" ? "توصيل في كل الجزائر" : "Livraison partout en Algérie"}</b>{lang === "ar" ? "نتصل بك للتأكيد" : "On te contacte pour confirmer"}</span></div><div><ShieldCheck size={18} /><span><b>{lang === "ar" ? "الدفع عند الاستلام" : "Paiement à la livraison"}</b>{lang === "ar" ? "ادفعي عند استلام طلبك" : "Tu paies à la réception"}</span></div></div><div className="detail-accordion"><details open><summary>{lang === "ar" ? "عن هذه القطعة" : "À propos de cette pièce"} <ChevronDown size={16} /></summary><ul>{product.details.map(detail => <li key={detail}><Check size={15} />{detail}</li>)}</ul></details><details><summary>{lang === "ar" ? "التوصيل والاسترجاع" : "Livraison & retours"} <ChevronDown size={16} /></summary><p>{lang === "ar" ? "نتواصل معك بعد تأكيد الطلب لتنظيم التوصيل حسب ولايتك." : "La livraison est organisée avec toi après confirmation téléphonique. On t'indique le délai selon ta wilaya."}</p></details></div></div></div>{isVest && <VestSalesSections product={product} />}<ProductOrderFlow product={product} /><ProductFAQ product={product} /></main><StoreFooter /></>;
+  return <><StoreHeader cartCount={0} onOpenCart={() => window.dispatchEvent(new CustomEvent("open-cart"))} /><main className={`product-page container ${isVest ? "vest-product-page" : ""}`}><Link href="/catalogue" className="back-link"><ArrowLeft size={16} /> Retour à la boutique</Link><div className="product-detail"><div className="detail-visual"><div className="detail-image"><img src={activeImage} alt={displayName} /><span style={{ background: product.accent }} /></div><div className="gallery-heading"><span>{lang === "ar" ? "صور المنتج" : "Photos du produit"}</span><b>{gallery.length} {lang === "ar" ? "صور" : "vues"}</b></div><div className="product-gallery">{gallery.map((image, index) => <button key={`${image}-${index}`} className={activeImage === image ? "active" : ""} onClick={() => setActiveImage(image)} aria-label={`Voir la photo ${index + 1}`}><img src={image} alt="" /></button>)}</div><div className="detail-note"><Sparkles size={16} /> {lang === "ar" ? "قطعة مختارة بحب من ميس سنسويل" : "Pièce choisie avec amour par Miss Sensuelle"}</div><a className="button button-gradient start-now-button start-now-under-gallery" href="#order" onClick={() => trackPixelEvent("InitiateCheckout", { content_ids: [product.id], value: product.price, currency: "DZD" })}>{lang === "ar" ? "ابدئي الآن" : "Commencer maintenant"} <ArrowRight size={18} /></a></div><div className="detail-copy"><span className="product-category">{displayCategory}</span><div className="detail-title-row"><h1>{displayName}</h1><button className="heart-button static"><Heart size={20} /></button></div><div className="detail-rating"><span><Star size={14} fill="currentColor" /> 4.9</span><small>·</small><span>{lang === "ar" ? "18 تقييم" : "18 avis"}</span></div><div className="detail-price"><strong>{formatDZD(product.price)}</strong>{product.oldPrice && <del>{formatDZD(product.oldPrice)}</del>}</div><p className="detail-description">{displayDescription}</p><div className="detail-option"><span>{lang === "ar" ? "اللون" : "Couleur"} <b>{selectedColor}</b></span><div className="color-options">{product.colors.map((color, index) => <button key={color} className={selectedColor === color ? "selected" : ""} onClick={() => setSelectedColor(color)}><i style={{ background: ["#9B82F6", "#F2E7D7", "#79B5FF", "#1D2433", "#C87B5B", "#F7DC5A"][index % 6] }} />{color}</button>)}</div></div><div className="detail-option"><span>{lang === "ar" ? "الكمية" : "Quantité"}</span><div className="quantity-control"><button onClick={() => setQuantity(value => Math.max(1, value - 1))}><Minus size={16} /></button><b>{quantity}</b><button onClick={() => setQuantity(value => value + 1)}><Plus size={16} /></button></div></div><div className="delivery-card"><div><Truck size={18} /><span><b>{lang === "ar" ? "توصيل في كل الجزائر" : "Livraison partout en Algérie"}</b>{lang === "ar" ? "نتصل بك للتأكيد" : "On te contacte pour confirmer"}</span></div><div><ShieldCheck size={18} /><span><b>{lang === "ar" ? "الدفع عند الاستلام" : "Paiement à la livraison"}</b>{lang === "ar" ? "ادفعي عند استلام طلبك" : "Tu paies à la réception"}</span></div></div><div className="detail-accordion"><details open><summary>{lang === "ar" ? "عن هذه القطعة" : "À propos de cette pièce"} <ChevronDown size={16} /></summary><ul>{product.details.map(detail => <li key={detail}><Check size={15} />{detail}</li>)}</ul></details><details><summary>{lang === "ar" ? "التوصيل والاسترجاع" : "Livraison & retours"} <ChevronDown size={16} /></summary><p>{lang === "ar" ? "نتواصل معك بعد تأكيد الطلب لتنظيم التوصيل حسب ولايتك." : "La livraison est organisée avec toi après confirmation téléphonique. On t'indique le délai selon ta wilaya."}</p></details></div></div></div>{isVest && <VestSalesSections product={product} />}<ProductOrderFlow product={product} quantity={quantity} /><ProductFAQ product={product} /></main><StoreFooter /></>;
 }
 function ShoppingIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 8h12l1 12H5L6 8Z" /><path d="M9 8a3 3 0 0 1 6 0" /></svg>; }
 
-function ProductOrderFlow({ product }: { product: typeof products[number] }) {
+function ProductOrderFlow({ product, quantity = 1 }: { product: typeof products[number]; quantity?: number }) {
   const { lang } = useLanguage();
   const [color, setColor] = useState(product.colors[0] ?? "");
-  const [delivery, setDelivery] = useState("home");
+  const [delivery, setDelivery] = useState<"home" | "office">("home");
   const [selectedWilaya, setSelectedWilaya] = useState("");
+  const [selectedCommune, setSelectedCommune] = useState("");
   const [sent, setSent] = useState(false);
+  const [orderNum, setOrderNum] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
+  const checkoutStarted = useRef(false);
+
+  const ratesQuery = trpc.store.shippingRates.useQuery(undefined, {
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   const communeOptions = selectedWilaya ? (abayaCommunesByWilaya[selectedWilaya] ?? [selectedWilaya]) : [];
+  const subtotal = product.price * quantity;
+  const homeFee = selectedWilaya ? shippingFeeFor(ratesQuery.data?.rates, selectedWilaya, "home", [product.id]) : null;
+  const officeFee = selectedWilaya ? shippingFeeFor(ratesQuery.data?.rates, selectedWilaya, "office", [product.id]) : null;
+  const shippingFee = selectedWilaya ? shippingFeeFor(ratesQuery.data?.rates, selectedWilaya, delivery, [product.id]) : 0;
+  const grandTotal = subtotal + shippingFee;
+
+  const checkout = useCheckoutDraft({
+    formRef,
+    source: "product",
+    getItems: () => [{ productId: product.id, quantity, color, size: "" }],
+    watchKey: `${color}|${selectedWilaya}|${selectedCommune}|${delivery}|${quantity}`,
+    aliases: {
+      customer: ["flow-customer"],
+      phone: ["flow-phone"],
+      wilaya: ["flow-wilaya"],
+      commune: ["flow-commune"],
+      address: ["flow-address"],
+    },
+  });
+
+  function startCheckout() {
+    if (checkoutStarted.current) return;
+    checkoutStarted.current = true;
+    trackPixelEvent("InitiateCheckout", {
+      content_type: "product",
+      content_id: product.id,
+      content_ids: [product.id],
+      content_name: product.name,
+      quantity,
+      value: grandTotal,
+      currency: "DZD",
+    });
+  }
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (sent || checkout.pending) return;
     const form = new FormData(event.currentTarget);
     const customer = String(form.get("flow-customer") || "Cliente Miss Sensuelle");
     const phone = String(form.get("flow-phone") || "");
     const wilaya = String(form.get("flow-wilaya") || "");
     const commune = String(form.get("flow-commune") || "");
     const address = String(form.get("flow-address") || "");
-    const note = delivery === "office" ? "Livraison au bureau" : "Livraison à domicile";
-    let serverOrderNumber = `MS-${Math.floor(1000 + Math.random() * 8999)}`;
-    try {
-      const token = globalThis.crypto?.randomUUID?.() ?? `00000000-0000-4000-8000-${String(Date.now()).padStart(12, "0").slice(-12)}`;
-      const res = await submitCheckoutOrder(token, {
-        source: "product",
-        customer,
-        phone,
-        wilaya,
-        commune,
-        address,
-        note,
-        delivery: delivery === "office" ? "office" : "home",
-        items: [{ productId: product.id, quantity: 1, color, size: "" }],
-      });
-      serverOrderNumber = res.orderNumber;
-    } catch { /* fallback local */ }
-    const order: Order = { id: serverOrderNumber, createdAt: new Date().toISOString(), customer, phone, product: `${product.name} · ${color}`, quantity: 1, total: product.price, wilaya, commune, address, note, status: "nouvelle" };
+    const note = delivery === "office" ? "Livraison au bureau (Stop Desk)" : "Livraison à domicile";
+
+    const result = await checkout.submitOrder();
+    const serverOrderNumber = result?.orderNumber || `MS-${Math.floor(1000 + Math.random() * 8999)}`;
+    const finalTotal = result?.total ?? grandTotal;
+
+    const order: Order = { id: serverOrderNumber, createdAt: new Date().toISOString(), customer, phone, product: `${product.name}${color ? ` · ${color}` : ""}`, quantity, total: finalTotal, wilaya, commune, address, note, status: "nouvelle" };
     try { const existing = JSON.parse(localStorage.getItem("miss-sensuelle-orders") || "[]") as Order[]; localStorage.setItem("miss-sensuelle-orders", JSON.stringify([order, ...existing])); } catch { /* confirmation visuelle conservée */ }
-    trackPixelEvent("Purchase", { content_ids: [product.id], value: product.price, currency: "DZD", order_id: serverOrderNumber });
+
+    trackPixelEvent("Purchase", {
+      content_type: "product",
+      content_id: product.id,
+      content_ids: [product.id],
+      content_name: product.name,
+      quantity,
+      value: finalTotal,
+      currency: "DZD",
+      order_id: serverOrderNumber,
+      phone,
+      customer,
+    });
+    setOrderNum(serverOrderNumber);
     setSent(true);
   };
-  return <section className="product-order-flow" id="order"><div className="flow-intro"><span className="eyebrow">02 · {lang === "ar" ? "الطلب المباشر" : "Commande directe"}</span><h2>{lang === "ar" ? <>اطلبيها<br /><em>بكل سهولة.</em></> : <>Commande-la<br /><em>en quelques gestes.</em></>}</h2><p>{lang === "ar" ? "أدخلي معلوماتك، اختاري اللون وطريقة التوصيل. سيظهر المبلغ قبل الإرسال." : "Renseigne tes informations, choisis ta couleur et ton mode de livraison. Le total est clair avant l'envoi."}</p><div className="flow-steps"><span className="active"><b>01</b>{lang === "ar" ? "معلوماتك" : "Tes infos"}</span><i /><span><b>02</b>{lang === "ar" ? "اللون" : "Ta couleur"}</span><i /><span><b>03</b>{lang === "ar" ? "التوصيل" : "Livraison"}</span></div></div><div className="flow-layout"><form className="flow-form" onSubmit={submit}>{sent ? <div className="flow-success"><div>✦</div><span>{lang === "ar" ? "شكراً! تم تسجيل طلبك." : "Merci, ta commande est bien enregistrée."}</span><small>{lang === "ar" ? "سنتصل بك قريباً لتأكيدها." : "On t'appelle très vite pour la confirmer."}</small></div> : <><section className="flow-card"><div className="flow-card-title"><b>01</b><div><h3>{lang === "ar" ? "معلومات التواصل" : "Informations de contact"}</h3><p>{lang === "ar" ? "أدخلي بيانات استلام طلبك" : "Pour pouvoir te joindre et préparer ton colis"}</p></div></div><div className="flow-fields"><input name="flow-customer" required placeholder={lang === "ar" ? "الاسم الكامل" : "Nom complet"} /><input name="flow-phone" required pattern="[0-9 +()-]{8,}" placeholder={lang === "ar" ? "رقم الهاتف" : "Numéro de téléphone"} /><select name="flow-wilaya" required value={selectedWilaya} onChange={event => { setSelectedWilaya(event.target.value); }}><option value="" disabled>{lang === "ar" ? "اختاري الولاية" : "Choisis ta wilaya"}</option>{abayaWilayas.map(w => <option key={w} value={w}>{w}</option>)}</select><select key={selectedWilaya} name="flow-commune" required defaultValue=""><option value="" disabled>{lang === "ar" ? "اختاري البلدية" : "Choisis ta commune"}</option>{communeOptions.map(commune => <option key={commune}>{commune}</option>)}</select><textarea name="flow-address" placeholder={lang === "ar" ? "عنوان إضافي (اختياري)" : "Adresse complémentaire (facultative)"} /></div></section><section className="flow-card"><div className="flow-card-title"><b>02</b><div><h3>{lang === "ar" ? "اختاري اللون" : "Choisis ta couleur"}</h3><p>{lang === "ar" ? "اختيارك يحدد القطعة التي سنجهزها" : "La couleur sélectionnée sera préparée dans ton colis"}</p></div></div><div className="flow-choice-grid">{product.colors.map((item, index) => <button type="button" key={item} className={color === item ? "selected" : ""} onClick={() => setColor(item)}><i style={{ background: ["#9B82F6", "#F2E7D7", "#79B5FF", "#1D2433", "#F7DC5A"][index % 5] }} />{item}</button>)}</div></section><section className="flow-card"><div className="flow-card-title"><b>03</b><div><h3>{lang === "ar" ? "طريقة التوصيل" : "Mode de livraison"}</h3><p>{lang === "ar" ? "اختاري المكان الأنسب لاستلام طلبك" : "Choisis l'endroit le plus pratique pour toi"}</p></div></div><div className="delivery-choice"><button type="button" className={delivery === "home" ? "selected" : ""} onClick={() => setDelivery("home")}><MapPin size={18} /><span><b>{lang === "ar" ? "إلى المنزل" : "À domicile"}</b><small>{lang === "ar" ? "نوصّل طلبك إلى عنوانك" : "On vient jusqu'à ton adresse"}</small></span></button><button type="button" className={delivery === "office" ? "selected" : ""} onClick={() => setDelivery("office")}><PackageIcon /><span><b>{lang === "ar" ? "إلى المكتب" : "Au bureau"}</b><small>{lang === "ar" ? "توصيل إلى مقر العمل" : "Livraison sur ton lieu de travail"}</small></span></button></div></section><button className="button button-gradient flow-submit" type="submit">{lang === "ar" ? "أرسلي طلبي الآن" : "Envoyer ma commande"} <ArrowRight size={17} /></button></>}</form><aside className="flow-summary"><span className="eyebrow">{lang === "ar" ? "ملخص الطلب" : "Résumé de la commande"}</span><div className="summary-product"><img src={product.image} alt="" /><div><strong>{product.name}</strong><span>{lang === "ar" ? "اللون المفضل" : "Couleur choisie"} : {color}</span></div></div><div className="summary-lines"><div><span>{lang === "ar" ? "سعر المنتج" : "Prix du produit"}</span><b>{formatDZD(product.price)}</b></div><div><span>{lang === "ar" ? "التوصيل" : "Livraison"}</span><b>{lang === "ar" ? "يحدد حسب الولاية" : "Selon ta wilaya"}</b></div><div className="summary-total"><span>{lang === "ar" ? "المبلغ الإجمالي" : "Total"}</span><strong>{formatDZD(product.price)}</strong></div></div><div className="cod-note"><ShieldCheck size={17} /><span><b>{lang === "ar" ? "الدفع عند الاستلام" : "Paiement à la livraison"}</b>{lang === "ar" ? "لن تدفعي شيئاً الآن" : "Tu ne paies rien maintenant"}</span></div></aside></div></section>;
+
+  return <section className="product-order-flow" id="order"><div className="flow-intro"><span className="eyebrow">02 · {lang === "ar" ? "الطلب المباشر" : "Commande directe"}</span><h2>{lang === "ar" ? <>اطلبيها<br /><em>بكل سهولة.</em></> : <>Commande-la<br /><em>en quelques gestes.</em></>}</h2><p>{lang === "ar" ? "أدخلي معلوماتك، اختاري اللون وطريقة التوصيل. سيظهر المبلغ قبل الإرسال." : "Renseigne tes informations, choisis ta couleur et ton mode de livraison. Le total est clair avant l'envoi."}</p><div className="flow-steps"><span className="active"><b>01</b>{lang === "ar" ? "معلوماتك" : "Tes infos"}</span><i /><span><b>02</b>{lang === "ar" ? "اللون" : "Ta couleur"}</span><i /><span><b>03</b>{lang === "ar" ? "التوصيل" : "Livraison"}</span></div></div><div className="flow-layout"><form ref={formRef} className="flow-form" onSubmit={submit} onFocusCapture={startCheckout}>{sent ? <div className="flow-success"><div>✦</div><span>{lang === "ar" ? "شكراً! تم تسجيل طلبك." : "Merci, ta commande est bien enregistrée."}</span>{orderNum && <strong>#{orderNum}</strong>}<small>{lang === "ar" ? "سنتصل بك قريباً لتأكيدها." : "On t'appelle très vite pour la confirmer."}</small></div> : <><CheckoutDraftNotice checked={checkout.consent} onChange={checkout.setConsent} status={checkout.draftStatus} error={checkout.draftError} /><input type="hidden" name="delivery" value={delivery} /><input type="hidden" name="color" value={color} /><section className="flow-card"><div className="flow-card-title"><b>01</b><div><h3>{lang === "ar" ? "معلومات التواصل" : "Informations de contact"}</h3><p>{lang === "ar" ? "أدخلي بيانات استلام طلبك" : "Pour pouvoir te joindre et préparer ton colis"}</p></div></div><div className="flow-fields"><input name="flow-customer" required placeholder={lang === "ar" ? "الاسم الكامل" : "Nom complet"} /><input name="flow-phone" required pattern="[0-9 +()-]{8,}" placeholder={lang === "ar" ? "رقم الهاتف" : "Numéro de téléphone"} /><select name="flow-wilaya" required value={selectedWilaya} onChange={event => { setSelectedWilaya(event.target.value); setSelectedCommune(""); }}><option value="" disabled>{lang === "ar" ? "اختاري الولاية" : "Choisis ta wilaya"}</option>{abayaWilayas.map(w => <option key={w} value={w}>{w}</option>)}</select><select key={selectedWilaya} name="flow-commune" required value={selectedCommune} onChange={event => setSelectedCommune(event.target.value)}><option value="" disabled>{lang === "ar" ? "اختاري البلدية" : "Choisis ta commune"}</option>{communeOptions.map(c => <option key={c} value={c}>{c}</option>)}</select><textarea name="flow-address" placeholder={lang === "ar" ? "عنوان إضافي (اختياري)" : "Adresse complémentaire (facultative)"} /></div></section><section className="flow-card"><div className="flow-card-title"><b>02</b><div><h3>{lang === "ar" ? "اختاري اللون" : "Choisis ta couleur"}</h3><p>{lang === "ar" ? "اختيارك يحدد القطعة التي سنجهزها" : "La couleur sélectionnée sera préparée dans ton colis"}</p></div></div><div className="flow-choice-grid">{product.colors.map((item, index) => <button type="button" key={item} className={color === item ? "selected" : ""} onClick={() => setColor(item)}><i style={{ background: ["#9B82F6", "#F2E7D7", "#79B5FF", "#1D2433", "#F7DC5A"][index % 5] }} />{item}</button>)}</div></section><section className="flow-card"><div className="flow-card-title"><b>03</b><div><h3>{lang === "ar" ? "طريقة التوصيل" : "Mode de livraison"}</h3><p>{lang === "ar" ? "اختاري المكان الأنسب لاستلام طلبك" : "Choisis l'endroit le plus pratique pour toi"}</p></div></div><div className="delivery-choice"><button type="button" className={delivery === "home" ? "selected" : ""} onClick={() => setDelivery("home")}><MapPin size={18} /><span><b>{lang === "ar" ? "إلى المنزل" : "À domicile"}{homeFee !== null ? ` · ${homeFee === 0 ? (lang === "ar" ? "مجاني" : "Gratuit") : formatDZD(homeFee)}` : ""}</b><small>{lang === "ar" ? "نوصّل طلبك إلى عنوانك" : "On vient jusqu'à ton adresse"}</small></span></button><button type="button" className={delivery === "office" ? "selected" : ""} onClick={() => setDelivery("office")}><PackageIcon /><span><b>{lang === "ar" ? "إلى المكتب (Stop Desk)" : "Au bureau (Stop Desk)"}{officeFee !== null ? ` · ${officeFee === 0 ? (lang === "ar" ? "مجاني" : "Gratuit") : formatDZD(officeFee)}` : ""}</b><small>{lang === "ar" ? "استلام من مكتب التوصيل" : "Retrait en agence / stop desk"}</small></span></button></div></section>{checkout.draftError && <p style={{ color: "#b91c1c", fontWeight: 700, fontSize: ".9rem" }}>{checkout.draftError}</p>}<button className="button button-gradient flow-submit" type="submit" disabled={checkout.pending}>{checkout.pending ? (lang === "ar" ? "جارٍ الإرسال..." : "Envoi en cours...") : (lang === "ar" ? "أرسلي طلبي الآن" : "Envoyer ma commande")} <ArrowRight size={17} /></button></>}</form><aside className="flow-summary"><span className="eyebrow">{lang === "ar" ? "ملخص الطلب" : "Résumé de la commande"}</span><div className="summary-product"><img src={product.image} alt="" /><div><strong>{product.name}</strong><span>{lang === "ar" ? "اللون المفضل" : "Couleur choisie"} : {color} · ×{quantity}</span></div></div><div className="summary-lines"><div><span>{lang === "ar" ? "سعر المنتج" : "Prix du produit"}</span><b>{formatDZD(subtotal)}</b></div><div><span>{lang === "ar" ? "التوصيل" : "Livraison"}</span><b>{selectedWilaya ? (shippingFee === 0 ? (lang === "ar" ? "مجاني" : "Gratuit") : formatDZD(shippingFee)) : (lang === "ar" ? "يحدد حسب الولاية" : "Selon ta wilaya")}</b></div><div className="summary-total"><span>{lang === "ar" ? "المبلغ الإجمالي" : "Total"}</span><strong>{formatDZD(grandTotal)}</strong></div></div><div className="cod-note"><ShieldCheck size={17} /><span><b>{lang === "ar" ? "الدفع عند الاستلام" : "Paiement à la livraison"}</b>{lang === "ar" ? "لن تدفعي شيئاً الآن" : "Tu ne paies rien maintenant"}</span></div></aside></div></section>;
 }
 function PackageIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m4 7 8-4 8 4-8 4-8-4Z"/><path d="M4 7v10l8 4 8-4V7M12 11v10"/></svg>; }
 

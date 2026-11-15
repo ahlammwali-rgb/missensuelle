@@ -106,7 +106,7 @@ export default function ExtensionsLanding({
 
   const productId = activeProduct?.id || "p-005";
   const productTitle = activeProduct?.name || "Extensions Cheveux Naturel";
-  const packPrice = activeProduct?.packPrice || PACK_PRICE;
+  const packPrice = activeProduct?.packPrice || activeProduct?.price || PACK_PRICE;
 
   const isCustomModel = Boolean(passedProduct && passedProduct.id !== "p-005");
 
@@ -194,7 +194,7 @@ export default function ExtensionsLanding({
   // Initialize Meta & TikTok Pixels + fire ViewContent on mount
   useEffect(() => {
     const prevTitle = document.title;
-    document.title = "إكستنشن الشعر";
+    document.title = isCustomModel ? (activeProduct?.arName || activeProduct?.name || "Miss Sensuelle") : "إكستنشن الشعر";
     initializePixels();
     try {
       const win = window as Window & { ttq?: { page?: () => void } };

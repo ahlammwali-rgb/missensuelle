@@ -66,6 +66,7 @@ export default function DoudouneLanding({
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [selectedWilaya, setSelectedWilaya] = useState<string>("");
   const [selectedCommune, setSelectedCommune] = useState<string>("");
+  const [delivery, setDelivery] = useState<"home" | "office">("home");
   const [offerMode, setOfferMode] = useState<OfferMode>("single");
   const [secondColor, setSecondColor] = useState<string>(isBuiltIn ? "black" : ((customVariants[1] ?? customVariants[0])?.name ?? "اللون 2"));
   const [secondSize, setSecondSize] = useState<string>("L");
@@ -80,9 +81,13 @@ export default function DoudouneLanding({
     ? (abayaCommunesByWilaya[selectedWilaya] ?? [])
     : [];
   const ratesQuery = trpc.store.shippingRates.useQuery(undefined, { retry: false, staleTime: 10 * 60 * 1000, refetchOnWindowFocus: false });
-  const shippingFee = selectedWilaya
+  const homeShippingFee = selectedWilaya
     ? shippingFeeFor(ratesQuery.data?.rates, selectedWilaya, "home", [product.id])
     : 0;
+  const officeShippingFee = selectedWilaya
+    ? shippingFeeFor(ratesQuery.data?.rates, selectedWilaya, "office", [product.id])
+    : 0;
+  const shippingFee = delivery === "office" ? officeShippingFee : homeShippingFee;
   const goodsTotal = offerMode === "pack2" ? PACK_2_PRICE : product.price * Math.max(1, quantity || 1);
 
   const getColorLabel = (c: string) => isBuiltIn ? (AR[c as ColorKey] || c) : c;
@@ -105,7 +110,7 @@ export default function DoudouneLanding({
             : selectedSize,
       },
     ],
-    watchKey: `${color}|${selectedSize}|${selectedWilaya}|${selectedCommune}|${offerMode}|${secondColor}|${secondSize}|${quantity}`,
+    watchKey: `${color}|${selectedSize}|${selectedWilaya}|${selectedCommune}|${delivery}|${offerMode}|${secondColor}|${secondSize}|${quantity}`,
   });
 
   useLayoutEffect(() => {
@@ -216,7 +221,7 @@ export default function DoudouneLanding({
         commune,
         address: "",
         note: offerNote,
-        delivery: "home",
+        delivery,
         items: [
           {
             productId: product.id,
@@ -246,7 +251,7 @@ export default function DoudouneLanding({
       productId: product.id,
       color: summaryColor,
       size: summarySize,
-      delivery: "home",
+      delivery,
       quantity: billedQty,
       total: orderTotal,
       wilaya,
@@ -565,6 +570,50 @@ export default function DoudouneLanding({
                 ))}
               </select>
             </label>
+          </div>
+
+          <input type="hidden" name="delivery" value={delivery} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, margin: "10px 0 4px" }}>
+            <button
+              type="button"
+              onClick={() => setDelivery("home")}
+              style={{
+                padding: "10px 8px",
+                borderRadius: 12,
+                border: delivery === "home" ? "2px solid #e0112b" : "1.5px solid #cbd5e1",
+                background: delivery === "home" ? "rgba(224,17,43,0.08)" : "#fff",
+                color: "#1e293b",
+                fontWeight: 800,
+                fontSize: 13,
+                cursor: "pointer",
+                textAlign: "center",
+              }}
+            >
+              <div>🏠 التوصيل للمنزل</div>
+              <small style={{ color: "#e0112b", fontWeight: 900 }}>
+                {selectedWilaya ? (homeShippingFee > 0 ? `${homeShippingFee.toLocaleString("en-US")} دج` : "مجاناً") : "حسب الولاية"}
+              </small>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDelivery("office")}
+              style={{
+                padding: "10px 8px",
+                borderRadius: 12,
+                border: delivery === "office" ? "2px solid #e0112b" : "1.5px solid #cbd5e1",
+                background: delivery === "office" ? "rgba(224,17,43,0.08)" : "#fff",
+                color: "#1e293b",
+                fontWeight: 800,
+                fontSize: 13,
+                cursor: "pointer",
+                textAlign: "center",
+              }}
+            >
+              <div>🏢 المكتب (Stop Desk)</div>
+              <small style={{ color: "#e0112b", fontWeight: 900 }}>
+                {selectedWilaya ? (officeShippingFee > 0 ? `${officeShippingFee.toLocaleString("en-US")} دج` : "مجاناً") : "حسب الولاية"}
+              </small>
+            </button>
           </div>
 
           <div className="offer-choices">

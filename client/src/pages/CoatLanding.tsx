@@ -5,6 +5,8 @@ import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
 import { coatImages } from "@/lib/coat-images";
 import { getProduct, type Product } from "@/lib/store-data";
 import { trackPixelEvent } from "@/lib/tracking";
+import { trpc } from "@/lib/trpc";
+import { shippingFeeFor } from "@shared/shipping";
 import { CheckoutDraftNotice } from "@/components/CheckoutDraftNotice";
 import { useCheckoutDraft } from "@/components/useCheckoutDraft";
 import "./coat-template.css";
@@ -73,8 +75,17 @@ export default function CoatLanding({ product, quantity = 1 }: { product: Produc
   const current: CoatColor = color === "white" ? "white" : "black";
   const images = coatImages[current];
   const abaya = getProduct("abaya-royal-emerald");
+  const ratesQuery = trpc.store.shippingRates.useQuery(undefined, {
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
   const communes = abayaCommunesByWilaya[wilaya] ?? [];
   const total = product.price * quantity;
+  const homeFee = wilaya ? shippingFeeFor(ratesQuery.data?.rates, wilaya, "home", [product.id]) : null;
+  const officeFee = wilaya ? shippingFeeFor(ratesQuery.data?.rates, wilaya, "office", [product.id]) : null;
+  const shippingFee = wilaya ? shippingFeeFor(ratesQuery.data?.rates, wilaya, delivery, [product.id]) : 0;
+  const grandTotal = total + shippingFee;
   const activeColorValue = isBuiltIn ? (color === "white" ? "Blanc" : "Noir") : (color || dynamicColorChoices[0]?.label || "Noir");
   const checkout = useCheckoutDraft({
     formRef,
@@ -189,9 +200,9 @@ export default function CoatLanding({ product, quantity = 1 }: { product: Produc
                 <div style={{ gridColumn: "1 / -1" }}><div className="fld"><i aria-hidden="true">📏</i><select name="size" aria-label="المقاس" required value={size} onChange={event => setSize(event.target.value)}><option value="">المقاس</option>{["S", "M", "L", "XL", "XXL"].map(item => <option key={item}>{item}</option>)}</select></div><div className="err" role={errors.size ? "alert" : undefined}>{errors.size}</div></div>
               </div>
               <label>اللون</label><div className="sw">{dynamicColorChoices.map(item => <button type="button" key={item.id} aria-pressed={color === item.id} onClick={() => setColor(item.id)}><span className="dot" style={{ background: item.hex }} />{item.label}</button>)}</div><div className="err" role={errors.color ? "alert" : undefined}>{errors.color}</div>
-              <label>نوع التوصيل</label><div className="sw"><button type="button" aria-pressed={delivery === "home"} onClick={() => setDelivery("home")}>🏠 إلى المنزل</button><button type="button" aria-pressed={delivery === "office"} onClick={() => setDelivery("office")}>🏢 إلى المكتب</button></div>
+              <label>نوع التوصيل</label><div className="sw"><button type="button" aria-pressed={delivery === "home"} onClick={() => setDelivery("home")}>🏠 إلى المنزل{homeFee !== null ? ` (${homeFee === 0 ? "مجاني" : `${homeFee} DA`})` : ""}</button><button type="button" aria-pressed={delivery === "office"} onClick={() => setDelivery("office")}>🏢 إلى المكتب{officeFee !== null ? ` (${officeFee === 0 ? "مجاني" : `${officeFee} DA`})` : ""}</button></div>
               <div className="fld" style={{ marginTop: 10 }}><i aria-hidden="true">💬</i><textarea name="note" aria-label="ملاحظة اختيارية" rows={2} maxLength={300} placeholder="ملاحظة (اختياري)" style={{ borderRadius: 20 }} /></div>
-              <div className="sum">المقاس: {size || "—"} | اللون: {dynamicColorChoices.find(item => item.id === color)?.label ?? "—"}<br />الولاية: {wilaya || "—"} | البلدية: {commune || "—"}<br />التوصيل: {delivery === "home" ? "إلى المنزل" : "إلى المكتب"}<br /><b>سعر المنتج: <span dir="ltr">{total} DA</span></b> — الدفع عند الاستلام<br /><small>مصاريف التوصيل تُؤكد هاتفياً حسب الولاية.</small></div>
+              <div className="sum">المقاس: {size || "—"} | اللون: {dynamicColorChoices.find(item => item.id === color)?.label ?? "—"}<br />الولاية: {wilaya || "—"} | البلدية: {commune || "—"}<br />التوصيل: {delivery === "home" ? "إلى المنزل" : "إلى المكتب"} {wilaya ? `(${shippingFee === 0 ? "مجاني" : `${shippingFee} DA`})` : ""}<br /><b>المجموع: <span dir="ltr">{grandTotal} DA</span></b> — الدفع عند الاستلام{!wilaya && <><br /><small>اختاري الولاية لحساب سعر التوصيل.</small></>}</div>
               <div className="err" role={errors.form || checkout.draftError ? "alert" : undefined}>{errors.form || checkout.draftError}</div><button className="btn" type="submit" disabled={product.stock <= 0 || checkout.pending}>{checkout.pending ? "جارٍ إرسال الطلب…" : "أكدي طلبك الآن 🛒"}</button>
             </form>
           )}
