@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import { ArrowDown, ArrowLeft, ArrowRight, Check, ChevronDown, Clock3, Heart, MapPin, Minus, Plus, ShieldCheck, Sparkles, Star, Truck, X } from "lucide-react";
 import { CartDrawer, ScrollReveal, StoreFooter, StoreHeader, useLanguage } from "@/components/StoreLayout";
@@ -84,6 +84,25 @@ function ProductPage({ onAdd, slugOverride }: { onAdd: (product: typeof products
   const [activeImage, setActiveImage] = useState(gallery[0] ?? "");
   const { lang } = useLanguage();
   useEffect(() => { setActiveImage(gallery[0] ?? ""); }, [params?.slug]);
+  useLayoutEffect(() => {
+    try {
+      if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
+      }
+      if (window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    } catch {}
+    const raf = window.requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [slug, product?.id]);
   useEffect(() => { if (product) trackPixelEvent("ViewContent", { content_type: "product", content_id: product.id, content_ids: [product.id], content_name: product.name, value: product.price, currency: "DZD" }); }, [product?.id]);
   useEffect(() => { document.body.classList.toggle("vest-experience", Boolean(isVest)); return () => document.body.classList.remove("vest-experience"); }, [isVest]);
   if (!product) return <div className="not-found-inline"><h1>Cette pièce a disparu.</h1><Link href="/catalogue" className="button button-dark">Retour à la boutique</Link></div>;
@@ -222,6 +241,20 @@ export default function Storefront({ cart, onAdd, onUpdate, onClear }: { cart: C
 }
 
 function RouteContent({ onAdd, cart, onClear }: { onAdd: (product: typeof products[number]) => void; cart: CartLine[]; onClear: () => void }) {
+  const [location] = useLocation();
+  useLayoutEffect(() => {
+    try {
+      if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
+      }
+      if (window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    } catch {}
+  }, [location]);
   const [home] = useRoute("/");
   const [catalogue] = useRoute("/catalogue");
   const [product] = useRoute("/produit/:slug");

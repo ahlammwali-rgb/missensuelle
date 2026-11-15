@@ -1,4 +1,4 @@
-import React, { type FormEvent, useEffect, useRef, useState } from "react";
+import React, { type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { Search, ShoppingBag } from "lucide-react";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
@@ -73,6 +73,26 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
   const [secondsLeft, setSecondsLeft] = useState(2 * 3600 + 43 * 60 + 50);
   const formRef = useRef<HTMLFormElement>(null);
   const checkoutStarted = useRef(false);
+
+  useLayoutEffect(() => {
+    try {
+      if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
+      }
+      if (window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    } catch {}
+    const raf = window.requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [product.id]);
 
   useEffect(() => {
     trackPixelEvent("ViewContent", {

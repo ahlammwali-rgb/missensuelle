@@ -1,4 +1,4 @@
-import React, { type FormEvent, useRef, useState } from "react";
+import React, { type FormEvent, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { Search, ShoppingBag } from "lucide-react";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
@@ -50,6 +50,26 @@ export default function CoatLanding({ product, quantity = 1 }: { product: Produc
   const [orderNumber, setOrderNumber] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const checkoutStarted = useRef(false);
+
+  useLayoutEffect(() => {
+    try {
+      if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
+      }
+      if (window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    } catch {}
+    const raf = window.requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [product.id]);
   const current: CoatColor = color === "white" ? "white" : "black";
   const images = coatImages[current];
   const abaya = getProduct("abaya-royal-emerald");

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Order, type Product } from "@/lib/store-data";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
 import { trpc } from "@/lib/trpc";
@@ -107,6 +107,26 @@ export default function DoudouneLanding({
     ],
     watchKey: `${color}|${selectedSize}|${selectedWilaya}|${selectedCommune}|${offerMode}|${secondColor}|${secondSize}|${quantity}`,
   });
+
+  useLayoutEffect(() => {
+    try {
+      if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
+      }
+      if (window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    } catch {}
+    const raf = window.requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [product.id]);
 
   useEffect(() => {
     trackPixelEvent("ViewContent", {

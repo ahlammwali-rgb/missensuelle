@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, MouseEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { abayaCommunesByWilaya } from "@/lib/abaya-communes";
 import {
   discardCheckoutDraft,
@@ -118,6 +118,33 @@ export default function ExtensionsLanding({
   const pauseUntilRef = useRef<number>(0);
   const formRef = useRef<HTMLFormElement | null>(null);
   const checkoutTrackedRef = useRef(false);
+
+  // Always open at the very top of the page (never at the bottom form)
+  useLayoutEffect(() => {
+    try {
+      if ("scrollRestoration" in window.history) {
+        window.history.scrollRestoration = "manual";
+      }
+      if (window.location.hash) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    } catch {}
+    const raf = window.requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [productId]);
+
+  const scrollToForm = (e?: MouseEvent<HTMLAnchorElement>) => {
+    e?.preventDefault();
+    triggerInitiateCheckoutOnce();
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   // Initialize Meta & TikTok Pixels + fire ViewContent on mount
   useEffect(() => {
@@ -477,7 +504,7 @@ export default function ExtensionsLanding({
             {c1 || c2 ? (
               <>
                 1️⃣ {c1 || "—"} • 🎁 {c2 || "—"} —{" "}
-                <a href="#f" onClick={triggerInitiateCheckoutOnce}>
+                <a href="#f" onClick={scrollToForm}>
                   أكملي الطلب ↓
                 </a>
               </>
@@ -498,7 +525,7 @@ export default function ExtensionsLanding({
 
         <img className="fd" src={detailImage} alt="" loading="lazy" />
 
-        <a href="#f" className="fd3" onClick={triggerInitiateCheckoutOnce}>
+        <a href="#f" className="fd3" onClick={scrollToForm}>
           <img src={ctaImage} alt="أطلبي الآن" loading="lazy" />
         </a>
 
@@ -654,7 +681,7 @@ export default function ExtensionsLanding({
       </div>
 
       <div className={`st${hideSticky ? " hide" : ""}`} id="st">
-        <a href="#f" onClick={triggerInitiateCheckoutOnce}>
+        <a href="#f" onClick={scrollToForm}>
           <b>اطلبي الآن 🛒</b>
           <span>{packPrice} DA • الثانية مجاناً 🎁</span>
         </a>
