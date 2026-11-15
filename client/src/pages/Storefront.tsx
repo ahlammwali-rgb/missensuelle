@@ -27,7 +27,7 @@ function ProductCard({ product, onAdd, index = 0 }: { product: typeof products[n
       ? Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)
       : 0;
   return (
-    <article className="app-vignette reveal" style={{ "--delay": `${index * 55}ms` } as React.CSSProperties}>
+    <article className="app-vignette">
       <Link href={`/produit/${product.slug}`} className="app-vignette-media">
         <img src={product.image} alt={name} loading="lazy" />
         <div className="app-vignette-badges">
