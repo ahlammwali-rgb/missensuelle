@@ -1426,7 +1426,14 @@ export async function listAbandonedCheckouts(): Promise<AbandonedCheckout[]> {
           phone: payload.phone,
           product: rows.map(row => row.product?.name ?? row.item.productId).join(", "),
           quantity: rows.reduce((sum, row) => sum + row.item.quantity, 0),
-          total: rows.reduce((sum, row) => sum + (row.product?.price ?? 0) * row.item.quantity, 0),
+          total: rows.reduce(
+            (sum, row) =>
+              sum +
+              (row.product
+                ? computeLineTotal(row.product.id, row.product.price, row.item.quantity)
+                : 0),
+            0
+          ),
           wilaya: payload.wilaya,
           commune: payload.commune,
           address: payload.address,
@@ -1456,7 +1463,14 @@ export async function listAbandonedCheckouts(): Promise<AbandonedCheckout[]> {
     });
     const product = rows.map(row => row.product?.name ?? row.item.productId).join(", ");
     const quantity = rows.reduce((sum, row) => sum + row.item.quantity, 0);
-    const total = rows.reduce((sum, row) => sum + (row.product?.price ?? 0) * row.item.quantity, 0);
+    const total = rows.reduce(
+      (sum, row) =>
+        sum +
+        (row.product
+          ? computeLineTotal(row.product.slug, row.product.price, row.item.quantity)
+          : 0),
+      0
+    );
     return [{
       id: session.id,
       createdAt: iso(session.createdAt),

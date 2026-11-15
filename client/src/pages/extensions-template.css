@@ -570,3 +570,117 @@
     transform: scale(1.035);
   }
 }
+
+/* Delivery Type Selector (Home vs Stop Desk) */
+.ext-vrait-root .dlv {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ext-vrait-root .dlv-b {
+  background: #ffffff14;
+  border: 2px solid #ffffff33;
+  border-radius: 14px;
+  padding: 9px 6px;
+  text-align: center;
+  font: inherit;
+  color: #fff;
+  box-shadow: none;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: all 0.18s ease;
+}
+
+.ext-vrait-root .dlv-b b {
+  font-size: 13.5px;
+  font-weight: 900;
+  color: #fff;
+}
+
+.ext-vrait-root .dlv-b span {
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffe9a8;
+}
+
+.ext-vrait-root .dlv-b.on {
+  border-color: #f2c14e;
+  background: #f2c14e33;
+  box-shadow: 0 0 0 1px #f2c14e;
+}
+
+.ext-vrait-root .dlv-b.on::after {
+  content: "✔";
+  position: absolute;
+  top: -8px;
+  left: -6px;
+  background: #f2c14e;
+  color: #3b0f27;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 20px;
+}
+
+/* Order Summary / Récapitulatif (.rcp) */
+.ext-vrait-root .rcp {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1.5px dashed #f2c14e;
+  border-radius: 16px;
+  padding: 10px 12px;
+  margin: 4px 0 12px;
+}
+
+.ext-vrait-root .rcp-h {
+  font-size: 13.5px;
+  font-weight: 900;
+  color: #f2c14e;
+  margin-bottom: 6px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(242, 193, 78, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ext-vrait-root .rcp-r {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffeaf4;
+  padding: 3px 0;
+}
+
+.ext-vrait-root .rcp-r b {
+  font-weight: 900;
+  color: #fff;
+}
+
+.ext-vrait-root .rcp-t {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding-top: 7px;
+  border-top: 1.5px solid rgba(242, 193, 78, 0.45);
+  font-size: 16.5px;
+  font-weight: 900;
+  color: #f2c14e;
+}
+
+.ext-vrait-root .rcp-t strong {
+  font-size: 19px;
+  color: #f2c14e;
+}

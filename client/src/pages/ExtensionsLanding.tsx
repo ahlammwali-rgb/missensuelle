@@ -1,4 +1,13 @@
-import { FormEvent, MouseEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  MouseEvent,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { abayaCommunesByWilaya } from "@/lib/abaya-communes";
 import {
   discardCheckoutDraft,
@@ -7,6 +16,8 @@ import {
 } from "@/lib/checkout-api";
 import { getCatalogProducts, type Product } from "@/lib/store-data";
 import { initializePixels, trackPixelEvent } from "@/lib/tracking";
+import { trpc } from "@/lib/trpc";
+import { shippingFeeFor } from "@shared/shipping";
 import "./extensions-template.css";
 
 const WILAYAS_AR =
@@ -61,6 +72,23 @@ const FEATURE_ICONS = [
 ];
 
 const PACK_PRICE = 4500;
+const DRAFT_TOKEN_STORAGE_KEY = "miss-sensuelle-checkout-token";
+
+function createValidUuid(): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  const cryptoObj = globalThis.crypto;
+  if (cryptoObj?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    cryptoObj.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, b => b.toString(16).padStart(2, "0"));
+    return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+  }
+  return `00000000-0000-4000-8000-${String(Date.now()).padStart(12, "0").slice(-12)}`;
+}
 
 export default function ExtensionsLanding({
   product,
@@ -94,8 +122,10 @@ export default function ExtensionsLanding({
   }, [isCustomModel, passedProduct]);
 
   const heroImage = (isCustomModel && passedProduct?.image) || "/manus-storage/ext-vrait-1.jpg";
-  const beforeAfterImage = (isCustomModel && passedProduct?.gallery?.[0]) || "/manus-storage/ext-vrait-12.jpg";
-  const detailImage = (isCustomModel && passedProduct?.gallery?.[1]) || "/manus-storage/ext-vrait-13.jpg";
+  const beforeAfterImage =
+    (isCustomModel && passedProduct?.gallery?.[0]) || "/manus-storage/ext-vrait-12.jpg";
+  const detailImage =
+    (isCustomModel && passedProduct?.gallery?.[1]) || "/manus-storage/ext-vrait-13.jpg";
   const ctaImage = "/manus-storage/ext-vrait-14.jpg";
 
   const [c1, setC1] = useState<string | null>(null);
@@ -107,6 +137,7 @@ export default function ExtensionsLanding({
   const [wilaya, setWilaya] = useState("");
   const [commune, setCommune] = useState("");
   const [customCommune, setCustomCommune] = useState("");
+  const [delivery, setDelivery] = useState<"home" | "office">("home");
 
   const [colorError, setColorError] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -118,6 +149,26 @@ export default function ExtensionsLanding({
   const pauseUntilRef = useRef<number>(0);
   const formRef = useRef<HTMLFormElement | null>(null);
   const checkoutTrackedRef = useRef(false);
+
+  // Live E-com Delivery shipping rates by Wilaya (Domicile vs Stop Desk)
+  const ratesQuery = trpc.store.shippingRates.useQuery(undefined, {
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const homeShippingFee = useMemo(() => {
+    if (!wilaya) return 0;
+    return shippingFeeFor(ratesQuery.data?.rates, wilaya, "home", [productId]);
+  }, [ratesQuery.data?.rates, wilaya, productId]);
+
+  const officeShippingFee = useMemo(() => {
+    if (!wilaya) return 0;
+    return shippingFeeFor(ratesQuery.data?.rates, wilaya, "office", [productId]);
+  }, [ratesQuery.data?.rates, wilaya, productId]);
+
+  const shippingFee = delivery === "office" ? officeShippingFee : homeShippingFee;
+  const grandTotal = packPrice + shippingFee;
 
   // Always open at the very top of the page (never at the bottom form)
   useLayoutEffect(() => {
@@ -140,12 +191,6 @@ export default function ExtensionsLanding({
     return () => window.cancelAnimationFrame(raf);
   }, [productId]);
 
-  const scrollToForm = (e?: MouseEvent<HTMLAnchorElement>) => {
-    e?.preventDefault();
-    triggerInitiateCheckoutOnce();
-    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
   // Initialize Meta & TikTok Pixels + fire ViewContent on mount
   useEffect(() => {
     const prevTitle = document.title;
@@ -160,6 +205,7 @@ export default function ExtensionsLanding({
     trackPixelEvent("ViewContent", {
       content_name: productTitle,
       content_ids: [productId],
+      content_id: productId,
       content_type: "product",
       value: packPrice,
       currency: "DZD",
@@ -215,21 +261,15 @@ export default function ExtensionsLanding({
     return () => observer.disconnect();
   }, []);
 
-  const wilayaCode = useMemo(() => {
-    if (!wilaya) return "";
-    const match = wilaya.match(/^(\d+)\s*-/);
-    return match ? match[1].padStart(2, "0") : "";
-  }, [wilaya]);
-
   const wilayaCleanName = useMemo(() => {
     if (!wilaya) return "";
     return wilaya.replace(/^\d+\s*-\s*/, "").trim();
   }, [wilaya]);
 
   const extraCommunes: string[] = useMemo(() => {
-    if (!wilayaCode) return [];
-    return (abayaCommunesByWilaya as Record<string, string[]>)[wilayaCode] ?? [];
-  }, [wilayaCode]);
+    if (!wilayaCleanName) return [];
+    return (abayaCommunesByWilaya as Record<string, string[]>)[wilayaCleanName] ?? [];
+  }, [wilayaCleanName]);
 
   const resolvedCommune = useMemo(() => {
     if (commune === "other") {
@@ -244,53 +284,144 @@ export default function ExtensionsLanding({
     return `1: ${first} + 2 (مجاناً): ${second}`;
   }, [c1, c2, variants]);
 
+  // Persistent session token & revision counter for Abandoned Checkouts
   const tokenRef = useRef<string>("");
   const revisionRef = useRef<number>(0);
 
-  const ensureToken = () => {
+  const ensureToken = useCallback((): string => {
     if (tokenRef.current) return tokenRef.current;
-    const created =
-      globalThis.crypto?.randomUUID?.() ??
-      `00000000-0000-4000-8000-${String(Date.now()).padStart(12, "0").slice(-12)}`;
+    try {
+      const stored =
+        window.sessionStorage.getItem(DRAFT_TOKEN_STORAGE_KEY) ||
+        window.localStorage.getItem(DRAFT_TOKEN_STORAGE_KEY);
+      if (stored && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(stored)) {
+        tokenRef.current = stored;
+        return stored;
+      }
+    } catch {}
+    const created = createValidUuid();
     tokenRef.current = created;
+    try {
+      window.sessionStorage.setItem(DRAFT_TOKEN_STORAGE_KEY, created);
+      window.localStorage.setItem(DRAFT_TOKEN_STORAGE_KEY, created);
+    } catch {}
     return created;
+  }, []);
+
+  const latestDraftPayloadRef = useRef({
+    customer,
+    phone,
+    wilaya,
+    resolvedCommune,
+    delivery,
+    chosenSummary,
+    productId,
+    orderNumber,
+  });
+  latestDraftPayloadRef.current = {
+    customer,
+    phone,
+    wilaya,
+    resolvedCommune,
+    delivery,
+    chosenSummary,
+    productId,
+    orderNumber,
   };
 
-  // Save abandoned checkout draft when phone/name/wilaya are typed
+  const persistDraftNow = useCallback(
+    (keepalive = false) => {
+      const cur = latestDraftPayloadRef.current;
+      if (cur.orderNumber) return;
+      if (!cur.customer.trim() && !cur.phone.trim() && !cur.wilaya) return;
+      const token = ensureToken();
+      const revision = ++revisionRef.current;
+      void saveCheckoutDraft(
+        {
+          token,
+          revision,
+          consent: true,
+          payload: {
+            source: "product",
+            customer: cur.customer.trim() || "Cliente Extensions",
+            phone: cur.phone.trim(),
+            wilaya: cur.wilaya,
+            commune: cur.resolvedCommune,
+            address: cur.resolvedCommune || cur.wilaya,
+            delivery: cur.delivery,
+            note: `عرض قطعتين (${cur.chosenSummary}) — ${
+              cur.delivery === "office" ? "المكتب Stop Desk" : "توصيل للمنزل"
+            }`,
+            items: [
+              {
+                productId: cur.productId,
+                quantity: 2,
+                color: cur.chosenSummary,
+                size: "Standard",
+              },
+            ],
+          },
+        },
+        keepalive
+      ).catch(() => {});
+    },
+    [ensureToken]
+  );
+
+  // Debounced draft save on every form change
   useEffect(() => {
     if (orderNumber) return;
     if (!customer.trim() && !phone.trim() && !wilaya) return;
-
     const timer = window.setTimeout(() => {
-      const token = ensureToken();
-      const revision = ++revisionRef.current;
-      void saveCheckoutDraft({
-        token,
-        revision,
-        consent: true,
-        payload: {
-          source: "product",
-          customer: customer || "Cliente Extensions",
-          phone,
-          wilaya,
-          commune: resolvedCommune,
-          address: resolvedCommune || wilaya,
-          delivery: "home",
-          note: `عرض قطعتين (${chosenSummary}) — الدفع عند الاستلام`,
-          items: [
-            {
-              productId,
-              quantity: 2,
-              color: chosenSummary,
-              size: "Standard",
-            },
-          ],
-        },
-      }).catch(() => {});
-    }, 650);
-
+      persistDraftNow(false);
+    }, 400);
     return () => window.clearTimeout(timer);
-  }, [customer, phone, wilaya, resolvedCommune, chosenSummary, orderNumber, productId]);
+  }, [
+    customer,
+    phone,
+    wilaya,
+    resolvedCommune,
+    delivery,
+    chosenSummary,
+    orderNumber,
+    persistDraftNow,
+  ]);
+
+  // Flush abandoned checkout draft with keepalive=true if the user closes tab or switches app
+  useEffect(() => {
+    const onPageHide = () => persistDraftNow(true);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        persistDraftNow(true);
+      }
+    };
+    window.addEventListener("pagehide", onPageHide);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [persistDraftNow]);
+
+  const triggerInitiateCheckoutOnce = () => {
+    if (checkoutTrackedRef.current) return;
+    checkoutTrackedRef.current = true;
+    trackPixelEvent("InitiateCheckout", {
+      content_name: productTitle,
+      content_ids: [productId],
+      content_id: productId,
+      content_type: "product",
+      value: grandTotal,
+      num_items: 2,
+      currency: "DZD",
+    });
+  };
+
+  const scrollToForm = (e?: MouseEvent<HTMLAnchorElement>) => {
+    e?.preventDefault();
+    triggerInitiateCheckoutOnce();
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const handleTrackFigureClick = (shadeName: string) => {
     const slot: 1 | 2 = !c1 ? 1 : !c2 ? 2 : nextSlotRef.current;
@@ -305,6 +436,7 @@ export default function ExtensionsLanding({
     trackPixelEvent("AddToCart", {
       content_name: `${productTitle} - ${shadeName}`,
       content_ids: [productId],
+      content_id: productId,
       content_type: "product",
       value: packPrice,
       currency: "DZD",
@@ -317,6 +449,7 @@ export default function ExtensionsLanding({
     trackPixelEvent("AddToCart", {
       content_name: `${productTitle} (1) - ${shadeName}`,
       content_ids: [productId],
+      content_id: productId,
       content_type: "product",
       value: packPrice,
       currency: "DZD",
@@ -329,21 +462,9 @@ export default function ExtensionsLanding({
     trackPixelEvent("AddToCart", {
       content_name: `${productTitle} (2 مجاناً) - ${shadeName}`,
       content_ids: [productId],
+      content_id: productId,
       content_type: "product",
       value: packPrice,
-      currency: "DZD",
-    });
-  };
-
-  const triggerInitiateCheckoutOnce = () => {
-    if (checkoutTrackedRef.current) return;
-    checkoutTrackedRef.current = true;
-    trackPixelEvent("InitiateCheckout", {
-      content_name: productTitle,
-      content_ids: [productId],
-      content_type: "product",
-      value: packPrice,
-      num_items: 2,
       currency: "DZD",
     });
   };
@@ -381,7 +502,9 @@ export default function ExtensionsLanding({
 
     try {
       const finalColor = `1: ${c1} + 2 (مجاناً): ${c2}`;
-      const finalNote = `عرض قطعتين (${finalColor}) — ${packPrice} دج`;
+      const finalNote = `عرض قطعتين (${finalColor}) — ${
+        delivery === "office" ? "المكتب Stop Desk" : "توصيل للمنزل"
+      } — الإجمالي: ${grandTotal} دج`;
       const finalCommune = resolvedCommune;
       const token = ensureToken();
 
@@ -392,7 +515,7 @@ export default function ExtensionsLanding({
         wilaya,
         commune: finalCommune,
         address: finalCommune,
-        delivery: "home",
+        delivery,
         note: finalNote,
         items: [
           {
@@ -404,6 +527,8 @@ export default function ExtensionsLanding({
         ],
       });
 
+      const finalTotal = result.total || grandTotal;
+
       const createdOrder = {
         id: result.orderNumber,
         createdAt: new Date().toISOString(),
@@ -412,10 +537,10 @@ export default function ExtensionsLanding({
         productId,
         product: `${productTitle} × 2 (${finalColor})`,
         quantity: 2,
-        total: packPrice,
+        total: finalTotal,
         color: finalColor,
         size: "Standard",
-        delivery: "home" as const,
+        delivery,
         wilaya,
         commune: finalCommune,
         address: finalCommune,
@@ -432,10 +557,12 @@ export default function ExtensionsLanding({
             JSON.stringify([createdOrder, ...existing])
           );
         }
+        window.sessionStorage.removeItem(DRAFT_TOKEN_STORAGE_KEY);
+        window.localStorage.removeItem(DRAFT_TOKEN_STORAGE_KEY);
+        tokenRef.current = "";
       } catch {
         // Ignore storage error
       }
-      void discardCheckoutDraft({ token, revision: ++revisionRef.current }).catch(() => {});
 
       // Fire Purchase + CompletePayment + PlaceAnOrder + SubmitForm on TikTok & Meta Pixels
       trackPixelEvent("Purchase", {
@@ -443,7 +570,7 @@ export default function ExtensionsLanding({
         content_ids: [productId],
         content_id: productId,
         content_type: "product",
-        value: packPrice,
+        value: finalTotal,
         quantity: 2,
         num_items: 2,
         currency: "DZD",
@@ -546,6 +673,7 @@ export default function ExtensionsLanding({
             value={customer}
             onFocus={triggerInitiateCheckoutOnce}
             onChange={e => setCustomer(e.target.value)}
+            onBlur={() => persistDraftNow(false)}
             required
           />
 
@@ -557,6 +685,7 @@ export default function ExtensionsLanding({
             value={phone}
             onFocus={triggerInitiateCheckoutOnce}
             onChange={e => setPhone(e.target.value)}
+            onBlur={() => persistDraftNow(false)}
             required
           />
 
@@ -564,8 +693,10 @@ export default function ExtensionsLanding({
             id="w"
             value={wilaya}
             onChange={e => {
-              setWilaya(e.target.value);
-              setCommune("");
+              const nextWilaya = e.target.value;
+              const nextClean = nextWilaya.replace(/^\d+\s*-\s*/, "").trim();
+              setWilaya(nextWilaya);
+              setCommune(nextClean || "");
               setCustomCommune("");
             }}
             required
@@ -598,11 +729,13 @@ export default function ExtensionsLanding({
               <>
                 <option value={wilayaCleanName}>{wilayaCleanName} (مركز الولاية)</option>
                 <option value="other">بلدية أخرى</option>
-                {extraCommunes.map(c => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
+                {extraCommunes
+                  .filter(c => c !== wilayaCleanName)
+                  .map(c => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
               </>
             )}
           </select>
@@ -616,6 +749,40 @@ export default function ExtensionsLanding({
               required
             />
           )}
+
+          <div className="vt">
+            <em>🚚</em> اختاري طريقة التوصيل
+          </div>
+          <div className="dlv">
+            <button
+              type="button"
+              className={`dlv-b${delivery === "home" ? " on" : ""}`}
+              onClick={() => setDelivery("home")}
+            >
+              <b>🏠 التوصيل للمنزل</b>
+              <span>
+                {wilaya
+                  ? homeShippingFee > 0
+                    ? `${homeShippingFee} DA`
+                    : "مجاناً"
+                  : "حسب الولاية"}
+              </span>
+            </button>
+            <button
+              type="button"
+              className={`dlv-b${delivery === "office" ? " on" : ""}`}
+              onClick={() => setDelivery("office")}
+            >
+              <b>🏢 المكتب (Stop Desk)</b>
+              <span>
+                {wilaya
+                  ? officeShippingFee > 0
+                    ? `${officeShippingFee} DA`
+                    : "مجاناً"
+                  : "حسب الولاية"}
+              </span>
+            </button>
+          </div>
 
           <div className="vt">
             <em>1</em> اختاري لون الإكستنشن الأولى
@@ -653,6 +820,34 @@ export default function ExtensionsLanding({
             ))}
           </div>
 
+          <div className="rcp">
+            <div className="rcp-h">
+              <span>📋 ملخص الطلب</span>
+              <span>الدفع عند الاستلام</span>
+            </div>
+            <div className="rcp-r">
+              <span>العرض (قطعة + الثانية مجاناً 🎁)</span>
+              <b>{packPrice} DA</b>
+            </div>
+            <div className="rcp-r">
+              <span>اللون 1 • اللون 2</span>
+              <b>
+                {c1 || "—"} • {c2 || "—"}
+              </b>
+            </div>
+            <div className="rcp-r">
+              <span>
+                سعر التوصيل ({delivery === "office" ? "المكتب Stop Desk" : "للمنزل"}
+                {wilayaCleanName ? ` - ${wilayaCleanName}` : ""})
+              </span>
+              <b>{wilaya ? `${shippingFee} DA` : "اختاري الولاية"}</b>
+            </div>
+            <div className="rcp-t">
+              <span>المجموع الكلي</span>
+              <strong>{grandTotal} DA</strong>
+            </div>
+          </div>
+
           {colorError && (
             <div className="er" id="er" style={{ display: "block" }}>
               من فضلك اختاري لون القطعتين
@@ -666,7 +861,7 @@ export default function ExtensionsLanding({
           )}
 
           <button className="go2" type="submit" disabled={submitting}>
-            {submitting ? "جاري إرسال طلبك..." : "✅ تأكيد الطلب"}
+            {submitting ? "جاري إرسال طلبك..." : `✅ تأكيد الطلب — ${grandTotal} DA`}
           </button>
 
           {orderNumber && (
