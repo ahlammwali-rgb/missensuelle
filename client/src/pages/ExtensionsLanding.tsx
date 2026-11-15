@@ -1,615 +1,663 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { type Order, type Product } from "@/lib/store-data";
-import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
-import { trpc } from "@/lib/trpc";
-import { shippingFeeFor } from "@shared/shipping";
-import { useCheckoutDraft } from "@/components/useCheckoutDraft";
-import { submitCheckoutOrder } from "@/lib/checkout-api";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { abayaCommunesByWilaya } from "@/lib/abaya-communes";
+import {
+  discardCheckoutDraft,
+  saveCheckoutDraft,
+  submitCheckoutOrder,
+} from "@/lib/checkout-api";
+import { getCatalogProducts, type Product } from "@/lib/store-data";
 import { initializePixels, trackPixelEvent } from "@/lib/tracking";
 import "./extensions-template.css";
 
-type OfferMode = "pack2" | "single";
+const WILAYAS_AR =
+  "أدرار,الشلف,الأغواط,أم البواقي,باتنة,بجاية,بسكرة,بشار,البليدة,البويرة,تمنراست,تبسة,تلمسان,تيارت,تيزي وزو,الجزائر,الجلفة,جيجل,سطيف,سعيدة,سكيكدة,سيدي بلعباس,عنابة,قالمة,قسنطينة,المدية,مستغانم,المسيلة,معسكر,ورقلة,وهران,البيض,إليزي,برج بوعريريج,بومرداس,الطارف,تندوف,تيسمسيلت,الوادي,خنشلة,سوق أهراس,تيبازة,ميلة,عين الدفلى,النعامة,عين تموشنت,غرداية,غليزان,تيميمون,برج باجي مختار,أولاد جلال,بني عباس,عين صالح,عين قزام,تقرت,جانت,المغير,المنيعة".split(
+    ","
+  );
 
-const DEFAULT_VARIANT_CARDS = [
-  { id: "v1", name: "أسود طبيعي", image: "/manus-storage/ext-m2-v1.jpg" },
-  { id: "v2", name: "بني غامق", image: "/manus-storage/ext-m2-v2.jpg" },
-  { id: "v3", name: "بني عسلي", image: "/manus-storage/ext-m2-v3.jpg" },
-  { id: "v4", name: "شاتين روكس", image: "/manus-storage/ext-m2-v4.jpg" },
-  { id: "v5", name: "أشقر فاتح", image: "/manus-storage/ext-m2-v5.jpg" },
-  { id: "v6", name: "نور بليلج غري", image: "/manus-storage/ext-m2-v6.jpg" },
-] as const;
+type VariantDef = {
+  name: string;
+  slideImg: string;
+  swatchImg: string;
+};
 
-const HERO_FEATURES = [
-  { top: "39.66%", text: "شعر طبيعي 60%" },
-  { top: "46.67%", text: "يتليس ويتبوكل" },
-  { top: "53.68%", text: "سهل التركيب" },
-  { top: "60.68%", text: "مريح وخفيف" },
-  { top: "67.69%", text: "يدوم لفترة طويلة" },
-  { top: "74.70%", text: "مظهر طبيعي ولامع" },
-] as const;
+const DEFAULT_VARIANTS: VariantDef[] = [
+  {
+    name: "أسود طبيعي",
+    slideImg: "/manus-storage/ext-vrait-2.jpg",
+    swatchImg: "/manus-storage/ext-vrait-15.jpg",
+  },
+  {
+    name: "بني غامق",
+    slideImg: "/manus-storage/ext-vrait-3.jpg",
+    swatchImg: "/manus-storage/ext-vrait-16.jpg",
+  },
+  {
+    name: "بني عسلي",
+    slideImg: "/manus-storage/ext-vrait-4.jpg",
+    swatchImg: "/manus-storage/ext-vrait-17.jpg",
+  },
+  {
+    name: "شاتين روكس",
+    slideImg: "/manus-storage/ext-vrait-5.jpg",
+    swatchImg: "/manus-storage/ext-vrait-18.jpg",
+  },
+  {
+    name: "أشقر فاتح",
+    slideImg: "/manus-storage/ext-vrait-6.jpg",
+    swatchImg: "/manus-storage/ext-vrait-19.jpg",
+  },
+  {
+    name: "نور بليلح غري",
+    slideImg: "/manus-storage/ext-vrait-7.jpg",
+    swatchImg: "/manus-storage/ext-vrait-20.jpg",
+  },
+];
 
-const DEFAULT_PACK_2_PRICE = 4500;
+const FEATURE_ICONS = [
+  "/manus-storage/ext-vrait-8.jpg",
+  "/manus-storage/ext-vrait-9.jpg",
+  "/manus-storage/ext-vrait-10.jpg",
+  "/manus-storage/ext-vrait-11.jpg",
+];
+
+const PACK_PRICE = 4500;
 
 export default function ExtensionsLanding({
   product,
-  quantity,
+  customProduct,
 }: {
-  product: Product;
-  quantity: number;
+  product?: Product;
+  customProduct?: Product;
+  quantity?: number;
 }) {
-  const isBuiltIn =
-    product.id === "p-005" ||
-    product.slug === "extensions-silk-wave" ||
-    product.slug === "extensions-cheveux";
+  const passedProduct = customProduct || product;
+  const activeProduct = useMemo(() => {
+    if (passedProduct) return passedProduct;
+    return getCatalogProducts().find(p => p.id === "p-005");
+  }, [passedProduct]);
 
-  const hasCustomVariants =
-    Array.isArray(product.variantImages) &&
-    product.variantImages.some(v => v && (v.image || v.name));
+  const productId = activeProduct?.id || "p-005";
+  const productTitle = activeProduct?.name || "Extensions Cheveux Naturel";
+  const packPrice = activeProduct?.packPrice || PACK_PRICE;
 
-  const VARIANT_CARDS = hasCustomVariants
-    ? product.variantImages!.map((v, idx) => ({
-        id: `v${idx + 1}`,
-        name: v.name || product.colors?.[idx] || `اللون ${idx + 1}`,
-        image:
-          v.image ||
-          product.gallery?.[idx] ||
-          product.image ||
-          DEFAULT_VARIANT_CARDS[idx % DEFAULT_VARIANT_CARDS.length].image,
-      }))
-    : !isBuiltIn && product.colors && product.colors.length > 0
-      ? product.colors.map((c, idx) => ({
-          id: `v${idx + 1}`,
-          name: c,
-          image: product.gallery?.[idx] || product.image,
-        }))
-      : !isBuiltIn && product.gallery && product.gallery.length > 0
-        ? product.gallery.map((img, idx) => ({
-            id: `v${idx + 1}`,
-            name: product.colors?.[idx] || `الموديل ${idx + 1}`,
-            image: img,
-          }))
-        : DEFAULT_VARIANT_CARDS;
+  const isCustomModel = Boolean(passedProduct && passedProduct.id !== "p-005");
 
-  const isCustomHeroImage =
-    Boolean(product.image) &&
-    product.image !== "/manus-storage/ext-pink-1.jpg" &&
-    product.image !== "/manus-storage/ext-m2-hero.jpg";
+  const variants: VariantDef[] = useMemo(() => {
+    if (isCustomModel && passedProduct?.variantImages && passedProduct.variantImages.length > 0) {
+      return passedProduct.variantImages.map(v => ({
+        name: v.name,
+        slideImg: v.image,
+        swatchImg: v.image,
+      }));
+    }
+    return DEFAULT_VARIANTS;
+  }, [isCustomModel, passedProduct]);
 
-  const heroImageSrc = isCustomHeroImage
-    ? product.image
-    : isBuiltIn
-      ? "/manus-storage/ext-m2-hero.jpg"
-      : product.image ||
-        product.gallery?.[0] ||
-        VARIANT_CARDS[0]?.image ||
-        "/manus-storage/ext-m2-hero.jpg";
+  const heroImage = (isCustomModel && passedProduct?.image) || "/manus-storage/ext-vrait-1.jpg";
+  const beforeAfterImage = (isCustomModel && passedProduct?.gallery?.[0]) || "/manus-storage/ext-vrait-12.jpg";
+  const detailImage = (isCustomModel && passedProduct?.gallery?.[1]) || "/manus-storage/ext-vrait-13.jpg";
+  const ctaImage = "/manus-storage/ext-vrait-14.jpg";
 
-  const legacyDefaultGallery = new Set([
-    "/manus-storage/extensions-poster.jpg",
-    "/manus-storage/async-images/uM7lQJWYdXHIVBYkKtIu8c/image-3.webp",
-    "/manus-storage/async-images/vHn8VKRbVex1NUkhameC59/image-3.webp",
-    "/manus-storage/async-images/vHn8VKRbVex1NUkhameC59/image-2.webp",
-    "/manus-storage/async-images/vHn8VKRbVex1NUkhameC59/image-1.webp",
-    "/manus-storage/async-images/CiRxshIVQV0OT7GfuQSZCa/image-5.webp",
-  ]);
-  const effectiveGallery = (product.gallery ?? []).filter(
-    img => Boolean(img) && !(isBuiltIn && legacyDefaultGallery.has(img))
-  );
+  const [c1, setC1] = useState<string | null>(null);
+  const [c2, setC2] = useState<string | null>(null);
+  const nextSlotRef = useRef<1 | 2>(1);
 
-  const PACK_2_PRICE =
-    product.packPrice ||
-    (isBuiltIn ? DEFAULT_PACK_2_PRICE : Math.round((product.price || 2700) * 1.65));
+  const [customer, setCustomer] = useState("");
+  const [phone, setPhone] = useState("");
+  const [wilaya, setWilaya] = useState("");
+  const [commune, setCommune] = useState("");
+  const [customCommune, setCustomCommune] = useState("");
 
-  const [offerMode, setOfferMode] = useState<OfferMode>("pack2");
-  const [color1, setColor1] = useState<string>(VARIANT_CARDS[0]?.name ?? "أسود طبيعي");
-  const [color2, setColor2] = useState<string>(
-    (VARIANT_CARDS[1] ?? VARIANT_CARDS[0])?.name ?? "بني غامق"
-  );
-  const [nextSlotToFill, setNextSlotToFill] = useState<1 | 2>(1);
-  const [selectedWilaya, setSelectedWilaya] = useState<string>("");
-  const [selectedCommune, setSelectedCommune] = useState<string>("");
-  const [formError, setFormError] = useState<string>("");
-  const [orderSubmitted, setOrderSubmitted] = useState<boolean>(false);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [colorError, setColorError] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [orderNumber, setOrderNumber] = useState("");
+  const [hideSticky, setHideSticky] = useState(false);
 
-  const isSubmittingRef = useRef<boolean>(false);
-  const checkoutInitiatedRef = useRef<boolean>(false);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const pauseUntilRef = useRef<number>(0);
   const formRef = useRef<HTMLFormElement | null>(null);
+  const checkoutTrackedRef = useRef(false);
 
-  const communes = selectedWilaya
-    ? (abayaCommunesByWilaya[selectedWilaya] ?? [])
-    : [];
-
-  const ratesQuery = trpc.store.shippingRates.useQuery(undefined, {
-    retry: false,
-    staleTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
-  });
-
-  const shippingFee = selectedWilaya
-    ? shippingFeeFor(ratesQuery.data?.rates, selectedWilaya, "home", [product.id])
-    : 0;
-
-  const singleUnitPrice = product.price || 2700;
-  const isPack2 = offerMode === "pack2";
-  const billedQty = isPack2 ? 2 : Math.max(1, quantity || 1);
-  const goodsTotal = isPack2 ? PACK_2_PRICE : singleUnitPrice * billedQty;
-  const combinedColorLabel = isPack2 ? `1: ${color1} | 2: ${color2}` : color1;
-
-  useCheckoutDraft({
-    formRef,
-    source: "product",
-    aliases: { customer: ["name"] },
-    getItems: () => [
-      {
-        productId: product.id,
-        quantity: billedQty,
-        color: combinedColorLabel,
-        size: "",
-      },
-    ],
-    watchKey: `${offerMode}|${color1}|${color2}|${selectedWilaya}|${selectedCommune}|${quantity}`,
-  });
-
-  useEffect(() => {
-    initializePixels();
-    trackPixelEvent("ViewContent", {
-      content_type: "product",
-      content_id: product.id,
-      content_ids: [product.id],
-      content_name: product.name,
-      value: PACK_2_PRICE,
-      currency: "DZD",
-    });
-  }, [product.id, product.name, PACK_2_PRICE]);
-
+  // Initialize Meta & TikTok Pixels + fire ViewContent on mount
   useEffect(() => {
     const prevTitle = document.title;
     document.title = "إكستنشن الشعر";
+    initializePixels();
+    try {
+      const win = window as Window & { ttq?: { page?: () => void } };
+      win.ttq?.page?.();
+    } catch {
+      // Ignore
+    }
+    trackPixelEvent("ViewContent", {
+      content_name: productTitle,
+      content_ids: [productId],
+      content_type: "product",
+      value: packPrice,
+      currency: "DZD",
+    });
     return () => {
       document.title = prevTitle;
     };
+  }, [productId, productTitle, packPrice]);
+
+  // Auto-scroll slider every 2300ms (pauses 6000ms on touch/mouse/wheel)
+  useEffect(() => {
+    const tk = trackRef.current;
+    if (!tk) return;
+    const pause = () => {
+      pauseUntilRef.current = Date.now() + 6000;
+    };
+    tk.addEventListener("touchstart", pause, { passive: true });
+    tk.addEventListener("mousedown", pause, { passive: true });
+    tk.addEventListener("wheel", pause, { passive: true });
+
+    const interval = window.setInterval(() => {
+      if (Date.now() < pauseUntilRef.current) return;
+      const currentTrack = trackRef.current;
+      if (!currentTrack) return;
+      const firstFig = currentTrack.querySelector("figure") as HTMLElement | null;
+      if (!firstFig) return;
+      const step = firstFig.offsetWidth + 8;
+      if (currentTrack.scrollLeft + currentTrack.clientWidth >= currentTrack.scrollWidth - 4) {
+        currentTrack.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        currentTrack.scrollBy({ left: step, behavior: "smooth" });
+      }
+    }, 2300);
+
+    return () => {
+      tk.removeEventListener("touchstart", pause);
+      tk.removeEventListener("mousedown", pause);
+      tk.removeEventListener("wheel", pause);
+      window.clearInterval(interval);
+    };
   }, []);
 
-  const handlePickFromSlider = (shadeName: string) => {
-    if (!isPack2) {
-      setColor1(shadeName);
-    } else if (nextSlotToFill === 1) {
-      setColor1(shadeName);
-      setNextSlotToFill(2);
-    } else {
-      setColor2(shadeName);
-      setNextSlotToFill(1);
+  // Hide sticky bottom bar when form #f is visible on screen
+  useEffect(() => {
+    const fo = formRef.current;
+    if (!fo || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0]) {
+        setHideSticky(entries[0].isIntersecting);
+      }
+    });
+    observer.observe(fo);
+    return () => observer.disconnect();
+  }, []);
+
+  const wilayaCode = useMemo(() => {
+    if (!wilaya) return "";
+    const match = wilaya.match(/^(\d+)\s*-/);
+    return match ? match[1].padStart(2, "0") : "";
+  }, [wilaya]);
+
+  const wilayaCleanName = useMemo(() => {
+    if (!wilaya) return "";
+    return wilaya.replace(/^\d+\s*-\s*/, "").trim();
+  }, [wilaya]);
+
+  const extraCommunes: string[] = useMemo(() => {
+    if (!wilayaCode) return [];
+    return (abayaCommunesByWilaya as Record<string, string[]>)[wilayaCode] ?? [];
+  }, [wilayaCode]);
+
+  const resolvedCommune = useMemo(() => {
+    if (commune === "other") {
+      return customCommune.trim() || `${wilayaCleanName} (بلدية أخرى)`;
     }
+    return commune || wilayaCleanName;
+  }, [commune, customCommune, wilayaCleanName]);
 
-    setFormError("");
+  const chosenSummary = useMemo(() => {
+    const first = c1 || variants[0]?.name || "أسود طبيعي";
+    const second = c2 || first;
+    return `1: ${first} + 2 (مجاناً): ${second}`;
+  }, [c1, c2, variants]);
+
+  const tokenRef = useRef<string>("");
+  const revisionRef = useRef<number>(0);
+
+  const ensureToken = () => {
+    if (tokenRef.current) return tokenRef.current;
+    const created =
+      globalThis.crypto?.randomUUID?.() ??
+      `00000000-0000-4000-8000-${String(Date.now()).padStart(12, "0").slice(-12)}`;
+    tokenRef.current = created;
+    return created;
+  };
+
+  // Save abandoned checkout draft when phone/name/wilaya are typed
+  useEffect(() => {
+    if (orderNumber) return;
+    if (!customer.trim() && !phone.trim() && !wilaya) return;
+
+    const timer = window.setTimeout(() => {
+      const token = ensureToken();
+      const revision = ++revisionRef.current;
+      void saveCheckoutDraft({
+        token,
+        revision,
+        consent: true,
+        payload: {
+          source: "product",
+          customer: customer || "Cliente Extensions",
+          phone,
+          wilaya,
+          commune: resolvedCommune,
+          address: resolvedCommune || wilaya,
+          delivery: "home",
+          note: `عرض قطعتين (${chosenSummary}) — الدفع عند الاستلام`,
+          items: [
+            {
+              productId,
+              quantity: 2,
+              color: chosenSummary,
+              size: "Standard",
+            },
+          ],
+        },
+      }).catch(() => {});
+    }, 650);
+
+    return () => window.clearTimeout(timer);
+  }, [customer, phone, wilaya, resolvedCommune, chosenSummary, orderNumber, productId]);
+
+  const handleTrackFigureClick = (shadeName: string) => {
+    const slot: 1 | 2 = !c1 ? 1 : !c2 ? 2 : nextSlotRef.current;
+    if (slot === 1) {
+      setC1(shadeName);
+      nextSlotRef.current = 2;
+    } else {
+      setC2(shadeName);
+      nextSlotRef.current = 1;
+    }
+    setColorError(false);
     trackPixelEvent("AddToCart", {
+      content_name: `${productTitle} - ${shadeName}`,
+      content_ids: [productId],
       content_type: "product",
-      content_id: product.id,
-      content_ids: [product.id],
-      content_name: `${product.name} - ${shadeName}`,
-      value: goodsTotal,
+      value: packPrice,
       currency: "DZD",
     });
-
-    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const handleFormFocus = () => {
-    if (checkoutInitiatedRef.current) return;
-    checkoutInitiatedRef.current = true;
+  const handleSelectColor1 = (shadeName: string) => {
+    setC1(shadeName);
+    setColorError(false);
+    trackPixelEvent("AddToCart", {
+      content_name: `${productTitle} (1) - ${shadeName}`,
+      content_ids: [productId],
+      content_type: "product",
+      value: packPrice,
+      currency: "DZD",
+    });
+  };
+
+  const handleSelectColor2 = (shadeName: string) => {
+    setC2(shadeName);
+    setColorError(false);
+    trackPixelEvent("AddToCart", {
+      content_name: `${productTitle} (2 مجاناً) - ${shadeName}`,
+      content_ids: [productId],
+      content_type: "product",
+      value: packPrice,
+      currency: "DZD",
+    });
+  };
+
+  const triggerInitiateCheckoutOnce = () => {
+    if (checkoutTrackedRef.current) return;
+    checkoutTrackedRef.current = true;
     trackPixelEvent("InitiateCheckout", {
+      content_name: productTitle,
+      content_ids: [productId],
       content_type: "product",
-      content_id: product.id,
-      content_ids: [product.id],
-      content_name: product.name,
-      value: goodsTotal,
+      value: packPrice,
+      num_items: 2,
       currency: "DZD",
     });
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (isSubmittingRef.current || orderSubmitted) return;
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmitError("");
 
-    if (!color1 || (isPack2 && !color2)) {
-      setFormError("اختاري اللونين من فضلك");
+    if (!c1 || !c2) {
+      setColorError(true);
+      document.getElementById("c1")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
-    setFormError("");
-    isSubmittingRef.current = true;
-    setIsSubmitting(true);
+    const cleanPhone = phone.replace(/[\s\-.()]/g, "");
+    if (!customer.trim()) {
+      setSubmitError("يرجى إدخال الاسم الكامل.");
+      return;
+    }
+    if (!/^(?:\+?213|0)[567]\d{8}$/.test(cleanPhone)) {
+      setSubmitError("يرجى إدخال رقم هاتف جزائري صحيح (مثال: 0550123456).");
+      return;
+    }
+    if (!wilaya) {
+      setSubmitError("يرجى اختيار الولاية.");
+      return;
+    }
+    if (!commune || (commune === "other" && !customCommune.trim())) {
+      setSubmitError("يرجى اختيار أو كتابة اسم البلدية.");
+      return;
+    }
 
-    const formData = new FormData(e.currentTarget);
-    const customer = String(formData.get("name") || "زبونة Miss Sensuelle").trim();
-    const rawPhone = String(formData.get("phone") || "").trim();
-    const phone = rawPhone.replace(/[\s\-\.]/g, "");
-    const wilaya = String(formData.get("wilaya") || selectedWilaya).trim();
-    const commune = String(
-      formData.get("commune") || selectedCommune || wilaya
-    ).trim();
-
-    const orderTotal = goodsTotal + shippingFee;
-    const offerNote = isPack2
-      ? `🎁 عرض 1 + 1 مجاناً (${PACK_2_PRICE} دج) — [القطعة 1: ${color1} | القطعة 2: ${color2}]`
-      : `قطعة واحدة — [اللون: ${color1}]`;
-
-    let serverOrderNumber = `MS-${Math.floor(1000 + Math.random() * 8999)}`;
+    setSubmitting(true);
+    triggerInitiateCheckoutOnce();
 
     try {
-      const storedToken =
-        window.sessionStorage.getItem("miss-sensuelle-checkout-token") ||
-        window.localStorage.getItem("miss-sensuelle-checkout-token");
-      const token =
-        storedToken ??
-        globalThis.crypto?.randomUUID?.() ??
-        `00000000-0000-4000-8000-${String(Date.now()).padStart(12, "0").slice(-12)}`;
+      const finalColor = `1: ${c1} + 2 (مجاناً): ${c2}`;
+      const finalNote = `عرض قطعتين (${finalColor}) — ${packPrice} دج`;
+      const finalCommune = resolvedCommune;
+      const token = ensureToken();
 
-      const res = await submitCheckoutOrder(token, {
+      const result = await submitCheckoutOrder(token, {
         source: "product",
-        customer,
-        phone,
+        customer: customer.trim(),
+        phone: cleanPhone,
         wilaya,
-        commune,
-        address: commune || wilaya || "Algérie",
+        commune: finalCommune,
+        address: finalCommune,
         delivery: "home",
-        note: offerNote,
+        note: finalNote,
         items: [
           {
-            productId: product.id,
-            quantity: billedQty,
-            color: combinedColorLabel,
-            size: "",
+            productId,
+            quantity: 2,
+            color: finalColor,
+            size: "Standard",
           },
         ],
       });
-      if (res?.orderNumber) {
-        serverOrderNumber = res.orderNumber;
-      }
-      window.sessionStorage.removeItem("miss-sensuelle-checkout-token");
-      window.localStorage.removeItem("miss-sensuelle-checkout-token");
-    } catch (err) {
-      console.error("[extensions-checkout] submit failed:", err);
-      isSubmittingRef.current = false;
-      setIsSubmitting(false);
-      return;
-    }
 
-    try {
-      const rawOrders = window.localStorage.getItem("miss-sensuelle-orders-v2");
-      const parsed: Order[] = rawOrders ? JSON.parse(rawOrders) : [];
-      const newOrder: Order = {
-        id: serverOrderNumber,
-        createdAt: new Date().toLocaleDateString("fr-FR"),
-        customer,
-        phone,
-        product: `${product.name} × ${billedQty}`,
-        quantity: billedQty,
-        total: orderTotal,
-        color: combinedColorLabel,
-        size: "",
-        delivery: "home",
+      const createdOrder = {
+        id: result.orderNumber,
+        createdAt: new Date().toISOString(),
+        customer: customer.trim(),
+        phone: cleanPhone,
+        productId,
+        product: `${productTitle} × 2 (${finalColor})`,
+        quantity: 2,
+        total: packPrice,
+        color: finalColor,
+        size: "Standard",
+        delivery: "home" as const,
         wilaya,
-        commune,
-        address: commune || wilaya,
-        note: offerNote,
-        status: "nouvelle",
+        commune: finalCommune,
+        address: finalCommune,
+        note: finalNote,
+        status: "nouvelle" as const,
       };
-      window.localStorage.setItem(
-        "miss-sensuelle-orders-v2",
-        JSON.stringify([newOrder, ...parsed])
+
+      try {
+        const raw = localStorage.getItem("miss-sensuelle-orders");
+        const existing = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(existing)) {
+          localStorage.setItem(
+            "miss-sensuelle-orders",
+            JSON.stringify([createdOrder, ...existing])
+          );
+        }
+      } catch {
+        // Ignore storage error
+      }
+      void discardCheckoutDraft({ token, revision: ++revisionRef.current }).catch(() => {});
+
+      // Fire Purchase + CompletePayment + PlaceAnOrder + SubmitForm on TikTok & Meta Pixels
+      trackPixelEvent("Purchase", {
+        content_name: `${productTitle} (${finalColor})`,
+        content_ids: [productId],
+        content_id: productId,
+        content_type: "product",
+        value: packPrice,
+        quantity: 2,
+        num_items: 2,
+        currency: "DZD",
+        order_id: result.orderNumber,
+        phone: cleanPhone,
+        customer: customer.trim(),
+      });
+
+      setOrderNumber(result.orderNumber);
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : "حدث خطأ أثناء إرسال الطلب، يرجى المحاولة مرة أخرى."
       );
-    } catch {
-      // ignore localStorage errors
+    } finally {
+      setSubmitting(false);
     }
-
-    trackPixelEvent("Purchase", {
-      content_type: "product",
-      content_id: product.id,
-      content_ids: [product.id],
-      content_name: product.name,
-      value: orderTotal,
-      quantity: billedQty,
-      num_items: billedQty,
-      currency: "DZD",
-      order_id: serverOrderNumber,
-      phone,
-      customer,
-    });
-
-    setOrderSubmitted(true);
-    setIsSubmitting(false);
   };
 
   return (
-    <div className="ext-m2-root" dir="rtl" lang="ar">
+    <div className="ext-vrait-root" dir="rtl" lang="ar">
       <div className="w">
-        {/* 1. BIGGER HERO WITH 6 FEATURE ROWS + SMOOTH BOTTOM GRADIENT */}
-        <div className="hero">
-          <img
-            src={heroImageSrc}
-            alt={product.arName || product.name}
-          />
-          {isBuiltIn && !isCustomHeroImage &&
-            HERO_FEATURES.map((feat, idx) => (
-              <div key={idx} className="rw" style={{ top: feat.top }}>
-                <span>{feat.text}</span>
-                <i>✔</i>
-              </div>
-            ))}
+        <div className="hero2 fd4">
+          <img src={heroImage} alt="إكستنشن الشعر" />
+          <div className="pl">
+            <b>شعر طبيعي 60%</b>
+            <span>يتلیس ويتبوكل</span>
+          </div>
         </div>
 
-        {/* 2. VARIANT CARDS SLIDER */}
-        <div className="ext-m2-slider-sec">
-          <span className="pill">متوفر بجميع الألوان</span>
-          <div className="sl" id="sl">
-            {VARIANT_CARDS.map(card => {
-              const isC1 = color1 === card.name;
-              const isC2 = isPack2 && color2 === card.name;
-              const isPicked = isC1 || isC2;
+        <div className="sl">
+          <span className="tg">متوفر بجميع الألوان</span>
+          <div className="track" dir="ltr" ref={trackRef}>
+            {variants.map(v => {
+              const isS1 = c1 === v.name;
+              const isS2 = c2 === v.name;
+              let badge = "";
+              if (isS1) badge += "1";
+              if (isS2) badge += (badge ? "+" : "") + "🎁";
+              const figClass = [isS1 ? "s1" : "", isS2 && !isS1 ? "s2" : ""]
+                .filter(Boolean)
+                .join(" ");
+
               return (
-                <div
-                  key={card.id}
-                  className={`cd ${isPicked ? "is-picked" : ""}`}
+                <figure
+                  key={v.name}
+                  data-n={v.name}
+                  data-b={badge}
+                  className={figClass || undefined}
+                  onClick={() => handleTrackFigureClick(v.name)}
                 >
-                  {isC1 && isC2 ? (
-                    <span className="ext-m2-cd-badge">① + ② 🎁</span>
-                  ) : isC1 ? (
-                    <span className="ext-m2-cd-badge">① المختار</span>
-                  ) : isC2 ? (
-                    <span className="ext-m2-cd-badge">② مجانية 🎁</span>
-                  ) : null}
-                  <img src={card.image} alt={card.name} />
-                  <button
-                    type="button"
-                    onClick={() => handlePickFromSlider(card.name)}
-                  >
-                    اختاري هذا اللون
-                  </button>
-                </div>
+                  <img src={v.slideImg} alt={v.name} />
+                  <figcaption>{v.name}</figcaption>
+                </figure>
               );
             })}
           </div>
-          <div className="hint">‹ اسحبي لرؤية كل الألوان ›</div>
-        </div>
-
-        {/* 3. STACKED PROMO SECTIONS + CTA IMAGE */}
-        <div className="ext-m2-banners">
-          {effectiveGallery.length > 0 ? (
-            effectiveGallery.map((sliceUrl, idx) => (
-              <img key={`${sliceUrl}-${idx}`} src={sliceUrl} alt="" />
-            ))
-          ) : isBuiltIn ? (
-            <>
-              <img src="/manus-storage/ext-m2-s1.jpg" alt="" />
-              <img src="/manus-storage/ext-m2-s2.jpg" alt="" />
-            </>
-          ) : null}
-
-          <a
-            href="#f"
-            className="ext-m2-cta-link"
-            onClick={e => {
-              e.preventDefault();
-              formRef.current?.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-              });
-            }}
-          >
-            <img src="/manus-storage/ext-m2-cta.jpg" alt="أطلبي الآن" />
-          </a>
-        </div>
-
-        {/* 4. LUXURY DARK ESPRESSO & CHAMPAGNE GOLD FORM (LESS PINK) */}
-        <div className="fm">
-          <form
-            id="f"
-            ref={formRef}
-            className="fb"
-            onFocus={handleFormFocus}
-            onSubmit={handleSubmit}
-          >
-            <span className="ft">اطلبي الآن</span>
-
-            <div className="of">
-              <span className="ext-m2-of-badge">
-                {isPack2
-                  ? "اشتري واحدة والثانية مجاناً 🎁"
-                  : "عرض قطعة واحدة ✨"}
-              </span>
-              <b>{goodsTotal.toLocaleString("fr-FR")} DA</b>
-              <span className="ext-m2-of-sub">
-                الدفع عند الاستلام • توصيل سريع لباب المنزل
-              </span>
-            </div>
-
-            {/* Option to pick 1+1 Free (4500 DA) or 1 piece (2700 DA) */}
-            <div className="ext-m2-mode-switch">
-              <button
-                type="button"
-                className={`ext-m2-mode-btn ${isPack2 ? "is-active" : ""}`}
-                onClick={() => setOfferMode("pack2")}
-              >
-                <strong>🎁 قطعتين (1 + 1 مجاناً)</strong>
-                <small>{PACK_2_PRICE.toLocaleString("fr-FR")} DA</small>
-              </button>
-              <button
-                type="button"
-                className={`ext-m2-mode-btn ${!isPack2 ? "is-active" : ""}`}
-                onClick={() => setOfferMode("single")}
-              >
-                <strong>قطعة واحدة</strong>
-                <small>{singleUnitPrice.toLocaleString("fr-FR")} DA</small>
-              </button>
-            </div>
-
-            <input
-              name="name"
-              placeholder="الاسم الكامل"
-              required
-            />
-
-            <input
-              type="tel"
-              inputMode="tel"
-              name="phone"
-              placeholder="رقم الهاتف (05 / 06 / 07)"
-              pattern="0[5-7][0-9]{8}"
-              required
-            />
-
-            <div className="ext-m2-row-2">
-              <select
-                id="w"
-                name="wilaya"
-                value={selectedWilaya}
-                onChange={e => {
-                  const nextW = e.target.value;
-                  setSelectedWilaya(nextW);
-                  const firstC = (abayaCommunesByWilaya[nextW] ?? [])[0] ?? "";
-                  setSelectedCommune(firstC);
-                }}
-                required
-              >
-                <option value="">الولاية</option>
-                {abayaWilayas.map(wName => (
-                  <option key={wName} value={wName}>
-                    {wName}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                name="commune"
-                value={selectedCommune}
-                onChange={e => setSelectedCommune(e.target.value)}
-                disabled={!selectedWilaya}
-                required
-              >
-                <option value="">
-                  {selectedWilaya ? "البلدية" : "اختر الولاية أولاً"}
-                </option>
-                {communes.map(cName => (
-                  <option key={cName} value={cName}>
-                    {cName}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* ① First Shade Picker */}
-            <label>
-              <span>① اللون الأول (المشتراة)</span>
-              <span className="ext-m2-picked-pill">{color1}</span>
-            </label>
-            <div className="ch" id="g0">
-              {VARIANT_CARDS.map(card => {
-                const active = color1 === card.name;
-                return (
-                  <div
-                    key={`g0-${card.id}`}
-                    className={active ? "on" : ""}
-                    onClick={() => {
-                      setColor1(card.name);
-                      setFormError("");
-                    }}
-                  >
-                    {active && <span className="ext-m2-ch-check">✔</span>}
-                    <img src={card.image} alt={card.name} />
-                    {card.name}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* ② Second Shade Picker (Free Gift) */}
-            {isPack2 && (
+          <div className="sel" id="sel">
+            {c1 || c2 ? (
               <>
-                <label className="gf">
-                  <span>② اللون الثاني (🎁 مجانية)</span>
-                  <span className="ext-m2-picked-pill">{color2}</span>
-                </label>
-                <div className="ch" id="g1">
-                  {VARIANT_CARDS.map(card => {
-                    const active = color2 === card.name;
-                    return (
-                      <div
-                        key={`g1-${card.id}`}
-                        className={active ? "on" : ""}
-                        onClick={() => {
-                          setColor2(card.name);
-                          setFormError("");
-                        }}
-                      >
-                        {active && <span className="ext-m2-ch-check">✔</span>}
-                        <img src={card.image} alt={card.name} />
-                        {card.name}
-                      </div>
-                    );
-                  })}
-                </div>
+                1️⃣ {c1 || "—"} • 🎁 {c2 || "—"} —{" "}
+                <a href="#f" onClick={triggerInitiateCheckoutOnce}>
+                  أكملي الطلب ↓
+                </a>
+              </>
+            ) : (
+              "اضغطي على لون لاختياره"
+            )}
+          </div>
+        </div>
+
+        <div className="ft fd">
+          <div className="ic">
+            {FEATURE_ICONS.map((src, i) => (
+              <img key={i} src={src} alt="" loading="lazy" />
+            ))}
+          </div>
+          <img className="ba" src={beforeAfterImage} alt="" loading="lazy" />
+        </div>
+
+        <img className="fd" src={detailImage} alt="" loading="lazy" />
+
+        <a href="#f" className="fd3" onClick={triggerInitiateCheckoutOnce}>
+          <img src={ctaImage} alt="أطلبي الآن" loading="lazy" />
+        </a>
+
+        <form id="f" className="fm" ref={formRef} onSubmit={handleSubmit}>
+          <div className="fh">
+            🛒 اطلبي الآن
+            <small>الدفع عند الاستلام • توصيل لكل الولايات</small>
+          </div>
+
+          <div className="of">
+            <span>اشتري واحدة</span>
+            <b>{packPrice} DA</b>
+            <span>والثانية مجاناً 🎁</span>
+          </div>
+
+          <input
+            placeholder="الاسم الكامل"
+            value={customer}
+            onFocus={triggerInitiateCheckoutOnce}
+            onChange={e => setCustomer(e.target.value)}
+            required
+          />
+
+          <input
+            type="tel"
+            inputMode="tel"
+            placeholder="رقم الهاتف"
+            pattern="0[5-7][0-9]{8}"
+            value={phone}
+            onFocus={triggerInitiateCheckoutOnce}
+            onChange={e => setPhone(e.target.value)}
+            required
+          />
+
+          <select
+            id="w"
+            value={wilaya}
+            onChange={e => {
+              setWilaya(e.target.value);
+              setCommune("");
+              setCustomCommune("");
+            }}
+            required
+          >
+            <option value="">الولاية</option>
+            {WILAYAS_AR.map((wName, idx) => {
+              const label = `${idx + 1} - ${wName}`;
+              return (
+                <option key={label} value={label}>
+                  {label}
+                </option>
+              );
+            })}
+          </select>
+
+          <select
+            id="cm"
+            value={commune}
+            disabled={!wilaya}
+            onChange={e => {
+              setCommune(e.target.value);
+              if (e.target.value !== "other") {
+                setCustomCommune("");
+              }
+            }}
+            required
+          >
+            <option value="">البلدية</option>
+            {wilayaCleanName && (
+              <>
+                <option value={wilayaCleanName}>{wilayaCleanName} (مركز الولاية)</option>
+                <option value="other">بلدية أخرى</option>
+                {extraCommunes.map(c => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </>
             )}
+          </select>
 
-            {/* Order Recap */}
-            <div className="ext-m2-recap">
-              <div className="ext-m2-recap-line">
-                <span>
-                  {isPack2
-                    ? `🎁 عرض 1+1 (${color1} + ${color2})`
-                    : `✨ قطعة واحدة (${color1})`}
-                </span>
-                <span>{goodsTotal.toLocaleString("fr-FR")} DA</span>
-              </div>
-              <div className="ext-m2-recap-line">
-                <span>🚚 التوصيل</span>
-                <span>
-                  {selectedWilaya
-                    ? shippingFee === 0
-                      ? "مجاني 🎉"
-                      : `${shippingFee.toLocaleString("fr-FR")} DA`
-                    : "حسب الولاية"}
-                </span>
-              </div>
-              <div className="ext-m2-recap-total">
-                <span>المجموع الكلي :</span>
-                <span>
-                  {(goodsTotal + shippingFee).toLocaleString("fr-FR")} DA
-                </span>
+          {commune === "other" && (
+            <input
+              id="cx"
+              placeholder="اكتبي اسم البلدية"
+              value={customCommune}
+              onChange={e => setCustomCommune(e.target.value)}
+              required
+            />
+          )}
+
+          <div className="vt">
+            <em>1</em> اختاري لون الإكستنشن الأولى
+          </div>
+          <div className="ch" id="c1">
+            {variants.map(v => (
+              <button
+                key={v.name}
+                type="button"
+                className={`c${c1 === v.name ? " on" : ""}`}
+                data-n={v.name}
+                onClick={() => handleSelectColor1(v.name)}
+              >
+                <i style={{ background: `url(${v.swatchImg}) center/cover` }} />
+                {v.name}
+              </button>
+            ))}
+          </div>
+
+          <div className="vt">
+            <em>🎁 مجاناً</em> اختاري لون الثانية
+          </div>
+          <div className="ch g" id="c2">
+            {variants.map(v => (
+              <button
+                key={v.name}
+                type="button"
+                className={`c${c2 === v.name ? " on" : ""}`}
+                data-n={v.name}
+                onClick={() => handleSelectColor2(v.name)}
+              >
+                <i style={{ background: `url(${v.swatchImg}) center/cover` }} />
+                {v.name}
+              </button>
+            ))}
+          </div>
+
+          {colorError && (
+            <div className="er" id="er" style={{ display: "block" }}>
+              من فضلك اختاري لون القطعتين
+            </div>
+          )}
+
+          {submitError && (
+            <div className="er" style={{ display: "block" }}>
+              ⚠️ {submitError}
+            </div>
+          )}
+
+          <button className="go2" type="submit" disabled={submitting}>
+            {submitting ? "جاري إرسال طلبك..." : "✅ تأكيد الطلب"}
+          </button>
+
+          {orderNumber && (
+            <div className="ok" id="ok" style={{ display: "block" }}>
+              ✅ تم استلام طلبك، سنتصل بك قريباً
+              <div style={{ fontSize: "12px", opacity: 0.9, marginTop: "3px" }}>
+                رقم الطلب: <span dir="ltr">{orderNumber}</span>
               </div>
             </div>
+          )}
+        </form>
+      </div>
 
-            {formError && (
-              <div className="er" id="er">
-                {formError}
-              </div>
-            )}
-
-            <button
-              className="go"
-              type="submit"
-              disabled={isSubmitting || orderSubmitted}
-            >
-              {isSubmitting
-                ? "⏳ جاري تأكيد الطلب..."
-                : orderSubmitted
-                  ? "✅ تم تسجيل طلبك بنجاح"
-                  : "🛒 تأكيد الطلب"}
-            </button>
-
-            {orderSubmitted && (
-              <div className="ok" id="ok">
-                ✅ تم استلام طلبك بنجاح
-                <br />
-                {isPack2 ? `${color1} + ${color2} 🎁` : color1}
-                <br />
-                سنتصل بك قريباً لتأكيد الإرسال
-              </div>
-            )}
-          </form>
-        </div>
+      <div className={`st${hideSticky ? " hide" : ""}`} id="st">
+        <a href="#f" onClick={triggerInitiateCheckoutOnce}>
+          <b>اطلبي الآن 🛒</b>
+          <span>{packPrice} DA • الثانية مجاناً 🎁</span>
+        </a>
       </div>
     </div>
   );

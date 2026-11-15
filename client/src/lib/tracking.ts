@@ -250,9 +250,9 @@ export function trackPixelEvent(name: PixelEvent, data: Record<string, unknown> 
 
   if (config.facebookPixelId) win.fbq?.("track", name, data);
   if (config.tiktokPixelId || config.tiktokCode) {
-    win.ttq?.track?.(name, data);
+    const tiktokPayload = buildTikTokPayload(data);
+    win.ttq?.track?.(name, tiktokPayload);
     if (name === "Purchase") {
-      const tiktokPayload = buildTikTokPayload(data);
       win.ttq?.track?.("CompletePayment", tiktokPayload);
       win.ttq?.track?.("PlaceAnOrder", tiktokPayload);
       win.ttq?.track?.("SubmitForm", tiktokPayload);
