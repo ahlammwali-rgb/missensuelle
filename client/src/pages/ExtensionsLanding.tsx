@@ -329,13 +329,28 @@ export default function ExtensionsLanding({
     orderNumber,
   };
 
+  const nextRevision = useCallback(() => {
+    // Toujours croissant, même après un rechargement de page (sinon le serveur refuse le brouillon)
+    const timeBased = Math.floor((Date.now() - 1_700_000_000_000) / 100);
+    revisionRef.current = Math.max(revisionRef.current + 1, timeBased);
+    return revisionRef.current;
+  }, []);
+
+  const resetToken = useCallback(() => {
+    tokenRef.current = "";
+    try {
+      window.sessionStorage.removeItem(DRAFT_TOKEN_STORAGE_KEY);
+      window.localStorage.removeItem(DRAFT_TOKEN_STORAGE_KEY);
+    } catch {}
+  }, []);
+
   const persistDraftNow = useCallback(
-    (keepalive = false) => {
+    (keepalive = false, retried = false) => {
       const cur = latestDraftPayloadRef.current;
       if (cur.orderNumber) return;
       if (!cur.customer.trim() && !cur.phone.trim() && !cur.wilaya) return;
       const token = ensureToken();
-      const revision = ++revisionRef.current;
+      const revision = nextRevision();
       void saveCheckoutDraft(
         {
           token,
@@ -363,9 +378,17 @@ export default function ExtensionsLanding({
           },
         },
         keepalive
-      ).catch(() => {});
+      )
+        .then(result => {
+          // Jeton déjà utilisé par une commande validée/annulée → nouveau jeton et nouvel essai
+          if (result && !result.accepted && !retried && !keepalive) {
+            resetToken();
+            persistDraftNow(false, true);
+          }
+        })
+        .catch(() => {});
     },
-    [ensureToken]
+    [ensureToken, nextRevision, resetToken]
   );
 
   // Debounced draft save on every form change

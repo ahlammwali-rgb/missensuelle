@@ -129,7 +129,7 @@ export function useCheckoutDraft({ formRef, source, getItems, watchKey, aliases 
     };
   }, [aliases, formRef]);
 
-  const save = useCallback(async (keepalive = false): Promise<SaveDraftResult | null> => {
+  const save = useCallback(async (keepalive = false, retried = false): Promise<SaveDraftResult | null> => {
     if (!consentRef.current) return null;
     const payload = snapshot();
     if (!payload || !hasDraftData(payload)) return null;
@@ -138,10 +138,19 @@ export function useCheckoutDraft({ formRef, source, getItems, watchKey, aliases 
       if (mountedRef.current) { setDraftStatus("error"); setDraftError("La sauvegarde temporaire n'est pas disponible sur cet appareil."); }
       return null;
     }
-    const revision = ++revisionRef.current;
+    // Révision toujours croissante, même après rechargement (sinon le serveur refuse le brouillon)
+    const timeBased = Math.floor((Date.now() - 1_700_000_000_000) / 100);
+    revisionRef.current = Math.max(revisionRef.current + 1, timeBased);
+    const revision = revisionRef.current;
     if (mountedRef.current) { setDraftStatus("saving"); setDraftError(""); }
     try {
       const result = await saveCheckoutDraft({ token, revision, consent: true, payload }, keepalive);
+      if (!result.accepted && !retried && !keepalive) {
+        // Jeton déjà lié à une commande validée/annulée : on repart sur un nouveau jeton
+        tokenRef.current = null;
+        removeStorage(STORAGE_KEY);
+        return save(false, true);
+      }
       if (mountedRef.current && revision === revisionRef.current) setDraftStatus(result.accepted ? "saved" : "error");
       return result;
     } catch (error) {
