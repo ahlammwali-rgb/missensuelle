@@ -139,48 +139,48 @@
   margin: 0 0 14px;
 }
 
-/* Form Section — Pink background like the top + 3D Form + Flashy Gold */
+/* Form Section — Colorful Pink-Gold-Lavender 3D Glam */
 .pq-form-section {
   background: linear-gradient(180deg, #fcdcec 0%, #fde8f2 45%, #fcd3e6 100%);
-  padding: 14px 12px 18px;
+  padding: 16px 12px 20px;
 }
 
 .pq-form {
   margin: 0;
-  background: #ffffff;
-  border: 3px solid #ffffff;
-  border-radius: 28px;
+  background: linear-gradient(180deg, #ffffff 0%, #fff1f8 52%, #ffe4f1 100%);
+  border: 3px solid #ffd53d;
+  border-radius: 30px;
   padding: 0 14px 20px;
   overflow: hidden;
   box-shadow:
-    0 7px 0 #8b0a3a,
-    0 18px 36px rgba(184, 16, 90, 0.32);
+    0 8px 0 #8b0a3a,
+    0 18px 40px rgba(184, 16, 90, 0.34);
 }
 
 .pq-form-header {
   margin: 0 -14px 16px;
-  padding: 14px 14px 14px;
+  padding: 16px 14px 14px;
   text-align: center;
-  background: linear-gradient(90deg, #b8105a 0%, #ec2a8a 50%, #b8105a 100%);
-  border-bottom: 3px solid #ffd23f;
-  box-shadow: 0 4px 0 #7a0a3a;
+  background: linear-gradient(135deg, #9d0b48 0%, #ec2a8a 48%, #a61578 100%);
+  border-bottom: 3px solid #ffd53d;
+  box-shadow: 0 5px 0 #6e0632;
 }
 
 .pq-form-gold-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 7px;
-  padding: 4px 16px;
+  margin-bottom: 8px;
+  padding: 5px 18px;
   border-radius: 999px;
   background: linear-gradient(180deg, #fff7b2 0%, #ffd53d 48%, #e69d00 100%);
   color: #3a1c00;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 900;
-  border: 1.5px solid #fffbe0;
+  border: 2px solid #fffbe0;
   box-shadow:
     0 3px 0 #8a5600,
-    0 0 18px rgba(255, 213, 63, 0.75);
+    0 0 20px rgba(255, 213, 63, 0.85);
 }
 
 .pq-form-gold-old {
@@ -195,7 +195,7 @@
   font-size: 21px;
   font-weight: 900;
   color: #ffffff;
-  text-shadow: 0 2px 0 #7a0a3a;
+  text-shadow: 0 2px 0 #6e0632;
 }
 
 .pq-form-sub {
@@ -210,10 +210,12 @@
 }
 
 .pq-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 800;
-  color: #1c1116;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 900;
+  color: #7a0a3a;
   margin-bottom: 5px;
   padding-right: 4px;
 }
@@ -221,15 +223,15 @@
 .pq-input,
 .pq-select {
   width: 100%;
-  border: 2px solid #f3c0d8;
+  border: 2px solid #f4a4ca;
   border-radius: 30px;
   padding: 12px 16px;
   font: inherit;
   font-size: 14.5px;
   font-weight: 800;
-  color: #1c1116;
-  background: #ffffff;
-  box-shadow: 0 3px 0 #f2bdd6;
+  color: #24101a;
+  background: linear-gradient(180deg, #ffffff 0%, #fff7fb 100%);
+  box-shadow: 0 3px 0 #f2b4d2;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
 }
@@ -237,8 +239,8 @@
 .pq-input:focus,
 .pq-select:focus {
   border-color: #d4147a;
-  box-shadow: 0 3px 0 #d4147a, 0 0 0 3px rgba(255, 210, 63, 0.35);
-  background: #fff;
+  box-shadow: 0 3px 0 #d4147a, 0 0 0 4px rgba(255, 213, 61, 0.42);
+  background: #ffffff;
 }
 
 .pq-grid-2 {
@@ -257,50 +259,56 @@
 .pq-delivery-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 10px;
 }
 
 .pq-delivery-btn {
-  border: 1.5px solid #f2bdd6;
-  border-radius: 14px;
-  padding: 10px 10px;
-  background: #fff7fb;
-  color: #1c1116;
+  border: 2px solid #f4a4ca;
+  border-radius: 20px;
+  padding: 11px 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #ffeef6 100%);
+  color: #5b1235;
   font: inherit;
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 13.5px;
+  font-weight: 900;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  transition: all 0.2s ease;
+  gap: 4px;
+  box-shadow: 0 3px 0 #f2b4d2;
+  transition: all 0.18s ease;
 }
 
 .pq-delivery-btn.is-active {
-  border-color: #f4c430;
-  background: linear-gradient(135deg, #1b0e14 0%, #341626 100%);
+  border-color: #ffd53d;
+  background: linear-gradient(135deg, #b8105a 0%, #ec2a8a 60%, #9b1876 100%);
   color: #ffffff;
-  box-shadow: 0 8px 18px rgba(27, 14, 20, 0.24);
+  box-shadow: 0 4px 0 #7a0a3a, 0 8px 18px rgba(184, 16, 90, 0.28);
 }
 
 .pq-delivery-price {
-  font-size: 11.5px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 900;
   color: #c92567;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 2px 10px;
+  border-radius: 999px;
 }
 
 .pq-delivery-btn.is-active .pq-delivery-price {
-  color: #ffd966;
+  color: #3a1c00;
+  background: linear-gradient(180deg, #fff5a8 0%, #ffd53d 100%);
 }
 
 /* Order Summary */
 .pq-summary {
-  margin: 14px 0;
-  padding: 13px 14px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #fff5fa 0%, #ffe6f2 100%);
-  border: 1.5px dashed #e5b324;
+  margin: 15px 0;
+  padding: 14px 15px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #fff7db 0%, #ffe6f2 55%, #ffd6eb 100%);
+  border: 2px solid #f6c945;
+  box-shadow: 0 4px 0 #e5b324;
 }
 
 .pq-summary-row {
@@ -308,8 +316,8 @@
   justify-content: space-between;
   align-items: center;
   font-size: 13.5px;
-  font-weight: 700;
-  color: #2b1a22;
+  font-weight: 800;
+  color: #4a1730;
   padding: 3px 0;
 }
 
@@ -317,28 +325,32 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 17px;
+  font-size: 17.5px;
   font-weight: 900;
-  color: #160c11;
-  border-top: 1px solid rgba(229, 179, 36, 0.45);
-  margin-top: 7px;
-  padding-top: 8px;
+  color: #4a1730;
+  border-top: 1.5px dashed rgba(184, 16, 90, 0.3);
+  margin-top: 8px;
+  padding-top: 9px;
 }
 
 .pq-summary-total span:last-child {
-  color: #c92567;
+  background: linear-gradient(90deg, #b8105a, #ec2a8a);
+  color: #ffd966;
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: 1.5px solid #ffd53d;
 }
 
 /* Submit Button — 3D Pill + Flashy Gold Trim */
 .pq-submit {
   width: 100%;
-  border: 2px solid #ffd23f;
+  border: 2.5px solid #ffd53d;
   border-radius: 40px;
-  padding: 14px 18px;
-  background: linear-gradient(90deg, #b8105a 0%, #ec2a8a 100%);
+  padding: 15px 18px;
+  background: linear-gradient(90deg, #b8105a 0%, #ff2d8f 50%, #b8105a 100%);
   color: #fff;
   font: inherit;
-  font-size: 18px;
+  font-size: 18.5px;
   font-weight: 900;
   cursor: pointer;
   display: flex;
@@ -347,7 +359,7 @@
   gap: 8px;
   box-shadow:
     0 5px 0 #7a0a3a,
-    0 12px 24px rgba(184, 16, 90, 0.36);
+    0 12px 26px rgba(184, 16, 90, 0.38);
   transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
 

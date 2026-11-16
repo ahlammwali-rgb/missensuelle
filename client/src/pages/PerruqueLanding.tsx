@@ -574,7 +574,7 @@ export default function PerruqueLanding({
 
           <div className="pq-field">
             <label className="pq-label" htmlFor="pq-name">
-              الاسم الكامل
+              <span>👤</span> الاسم الكامل
             </label>
             <input
               id="pq-name"
@@ -589,7 +589,7 @@ export default function PerruqueLanding({
 
           <div className="pq-field">
             <label className="pq-label" htmlFor="pq-phone">
-              رقم الهاتف
+              <span>📱</span> رقم الهاتف
             </label>
             <input
               id="pq-phone"
@@ -611,7 +611,7 @@ export default function PerruqueLanding({
           <div className="pq-grid-2">
             <div className="pq-field">
               <label className="pq-label" htmlFor="pq-wilaya">
-                الولاية
+                <span>📍</span> الولاية
               </label>
               <select
                 id="pq-wilaya"
@@ -634,7 +634,7 @@ export default function PerruqueLanding({
 
             <div className="pq-field">
               <label className="pq-label" htmlFor="pq-commune">
-                البلدية
+                <span>🏘️</span> البلدية
               </label>
               <select
                 id="pq-commune"
@@ -670,7 +670,9 @@ export default function PerruqueLanding({
           )}
 
           <div className="pq-field">
-            <label className="pq-label">نوع التوصيل</label>
+            <label className="pq-label">
+              <span>🚚</span> نوع التوصيل
+            </label>
             <div className="pq-delivery-grid">
               <button
                 type="button"
@@ -697,7 +699,7 @@ export default function PerruqueLanding({
 
           <div className="pq-field">
             <label className="pq-label" htmlFor="pq-color">
-              اللون المختار
+              <span>🎨</span> اللون المختار
             </label>
             <select
               id="pq-color"
