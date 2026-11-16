@@ -3,7 +3,7 @@ import { replaceAnnotatedAbayaPhotos } from "./abaya-gallery";
 
 export type CategoryId = "mode" | "vestes" | "beaute" | "lentilles" | "extensions";
 
-export type LandingTemplateId = "doudoune" | "extensions" | "abaya" | "coat" | "standard";
+export type LandingTemplateId = "doudoune" | "extensions" | "abaya" | "coat" | "perruque" | "standard";
 
 export type ProductVariantImage = {
   name: string;
@@ -291,6 +291,43 @@ export const products: Product[] = [
     accent: "#17307e",
     stock: 25,
   },
+  {
+    id: "p-009",
+    slug: "perruque-longue",
+    name: "Perruque Longue Naturelle",
+    category: "extensions",
+    categoryLabel: "Extensions cheveux",
+    price: 8000,
+    oldPrice: 12000,
+    landingTemplate: "perruque",
+    badge: "Nouveau",
+    description: "Perruque longue soyeuse à effet naturel avec 5 nuances tendance.",
+    details: ["5 couleurs disponibles", "Effet naturel et volume soyeux", "Confortable et facile à poser", "Paiement à la livraison"],
+    colors: ["بلاتيني", "ميلي رويو", "شتلين غامق", "شتلين فاتح", "أسود"],
+    variantImages: [
+      { name: "بلاتيني", image: "/manus-storage/perruque-v1.jpg" },
+      { name: "ميلي رويو", image: "/manus-storage/perruque-v2.jpg" },
+      { name: "شتلين غامق", image: "/manus-storage/perruque-v3.jpg" },
+      { name: "شتلين فاتح", image: "/manus-storage/perruque-v4.jpg" },
+      { name: "أسود", image: "/manus-storage/perruque-v5.jpg" },
+    ],
+    image: "/manus-storage/perruque-hero.jpg",
+    gallery: [
+      "/manus-storage/perruque-hero.jpg",
+      "/manus-storage/perruque-banner.jpg",
+      "/manus-storage/perruque-detail.jpg",
+      "/manus-storage/perruque-v1.jpg",
+      "/manus-storage/perruque-v2.jpg",
+      "/manus-storage/perruque-v3.jpg",
+      "/manus-storage/perruque-v4.jpg",
+      "/manus-storage/perruque-v5.jpg",
+    ],
+    arName: "بيروكه طويلة",
+    arCategoryLabel: "شعر طبيعي",
+    arDescription: "بيروكه طويلة ناعمة بمظهر طبيعي متوفرة بـ 5 ألوان أنيقة.",
+    accent: "#df407f",
+    stock: 30,
+  },
 ];
 
 export const wilayas = [
@@ -370,7 +407,9 @@ export function getCatalogProducts(): Product[] {
     const savedIds = new Set(normalized.map(product => product.id));
     const missingBuiltIns = products.filter(
       product =>
-        (product.id === "p-007" || (normalized.length >= 7 && product.id === "p-008")) &&
+        (product.id === "p-007" ||
+          (normalized.length >= 7 && product.id === "p-008") ||
+          product.id === "p-009") &&
         !savedIds.has(product.id),
     );
     if (missingBuiltIns.length || colorsChanged) {

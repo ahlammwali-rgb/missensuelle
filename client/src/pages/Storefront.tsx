@@ -17,6 +17,7 @@ import CoatLanding from "./CoatLanding";
 import AbayaLanding from "./AbayaLanding";
 import DoudouneLanding from "./DoudouneLanding";
 import ExtensionsLanding from "./ExtensionsLanding";
+import PerruqueLanding from "./PerruqueLanding";
 
 function ProductCard({ product, onAdd, index = 0 }: { product: typeof products[number]; onAdd: (product: typeof products[number]) => void; index?: number }) {
   const { lang } = useLanguage();
@@ -359,6 +360,7 @@ function ProductPage({ onAdd, slugOverride }: { onAdd: (product: typeof products
     product?.id === "p-001" ? "coat" :
     product?.id === "p-007" ? "abaya" :
     (product?.id === "p-008" || product?.slug === "doudoune-hiver-luxe") ? "doudoune" :
+    (product?.id === "p-009" || product?.slug === "perruque-longue") ? "perruque" :
     (product?.id === "p-005" || product?.slug === "extensions-silk-wave" || product?.slug === "extensions-cheveux") ? "extensions" :
     "standard"
   );
@@ -366,6 +368,7 @@ function ProductPage({ onAdd, slugOverride }: { onAdd: (product: typeof products
   const isEmerald = effectiveTemplate === "abaya";
   const isDoudoune = effectiveTemplate === "doudoune";
   const isExtensions = effectiveTemplate === "extensions";
+  const isPerruque = effectiveTemplate === "perruque";
   const [quantity, setQuantity] = useState(1);
   const [selectedColor, setSelectedColor] = useState(product?.colors[0] ?? "");
   const gallery = product?.gallery ?? (product ? [product.image] : []);
@@ -399,6 +402,7 @@ function ProductPage({ onAdd, slugOverride }: { onAdd: (product: typeof products
   if (isEmerald) return <AbayaLanding key={product.id} product={product} quantity={quantity} />;
   if (isDoudoune) return <DoudouneLanding key={product.id} product={product} quantity={quantity} />;
   if (isExtensions) return <ExtensionsLanding key={product.id} product={product} quantity={quantity} />;
+  if (isPerruque) return <PerruqueLanding key={product.id} product={product} />;
   const displayCategory = lang === "ar" && product.arCategoryLabel ? product.arCategoryLabel : product.categoryLabel;
   const displayDescription = lang === "ar" && product.arDescription ? product.arDescription : product.description;
   return <><StoreHeader cartCount={0} onOpenCart={() => window.dispatchEvent(new CustomEvent("open-cart"))} /><main className={`product-page container ${isVest ? "vest-product-page" : ""}`}><Link href="/catalogue" className="back-link"><ArrowLeft size={16} /> Retour à la boutique</Link><div className="product-detail"><div className="detail-visual"><div className="detail-image"><img src={activeImage} alt={displayName} /><span style={{ background: product.accent }} /></div><div className="gallery-heading"><span>{lang === "ar" ? "صور المنتج" : "Photos du produit"}</span><b>{gallery.length} {lang === "ar" ? "صور" : "vues"}</b></div><div className="product-gallery">{gallery.map((image, index) => <button key={`${image}-${index}`} className={activeImage === image ? "active" : ""} onClick={() => setActiveImage(image)} aria-label={`Voir la photo ${index + 1}`}><img src={image} alt="" /></button>)}</div><div className="detail-note"><Sparkles size={16} /> {lang === "ar" ? "قطعة مختارة بحب من ميس سنسويل" : "Pièce choisie avec amour par Miss Sensuelle"}</div><a className="button button-gradient start-now-button start-now-under-gallery" href="#order" onClick={() => trackPixelEvent("InitiateCheckout", { content_ids: [product.id], value: product.price, currency: "DZD" })}>{lang === "ar" ? "ابدئي الآن" : "Commencer maintenant"} <ArrowRight size={18} /></a></div><div className="detail-copy"><span className="product-category">{displayCategory}</span><div className="detail-title-row"><h1>{displayName}</h1><button className="heart-button static"><Heart size={20} /></button></div><div className="detail-rating"><span><Star size={14} fill="currentColor" /> 4.9</span><small>·</small><span>{lang === "ar" ? "18 تقييم" : "18 avis"}</span></div><div className="detail-price"><strong>{formatDZD(product.price)}</strong>{product.oldPrice && <del>{formatDZD(product.oldPrice)}</del>}</div><p className="detail-description">{displayDescription}</p><div className="detail-option"><span>{lang === "ar" ? "اللون" : "Couleur"} <b>{selectedColor}</b></span><div className="color-options">{product.colors.map((color, index) => <button key={color} className={selectedColor === color ? "selected" : ""} onClick={() => setSelectedColor(color)}><i style={{ background: ["#9B82F6", "#F2E7D7", "#79B5FF", "#1D2433", "#C87B5B", "#F7DC5A"][index % 6] }} />{color}</button>)}</div></div><div className="detail-option"><span>{lang === "ar" ? "الكمية" : "Quantité"}</span><div className="quantity-control"><button onClick={() => setQuantity(value => Math.max(1, value - 1))}><Minus size={16} /></button><b>{quantity}</b><button onClick={() => setQuantity(value => value + 1)}><Plus size={16} /></button></div></div><div className="delivery-card"><div><Truck size={18} /><span><b>{lang === "ar" ? "توصيل في كل الجزائر" : "Livraison partout en Algérie"}</b>{lang === "ar" ? "نتصل بك للتأكيد" : "On te contacte pour confirmer"}</span></div><div><ShieldCheck size={18} /><span><b>{lang === "ar" ? "الدفع عند الاستلام" : "Paiement à la livraison"}</b>{lang === "ar" ? "ادفعي عند استلام طلبك" : "Tu paies à la réception"}</span></div></div><div className="detail-accordion"><details open><summary>{lang === "ar" ? "عن هذه القطعة" : "À propos de cette pièce"} <ChevronDown size={16} /></summary><ul>{product.details.map(detail => <li key={detail}><Check size={15} />{detail}</li>)}</ul></details><details><summary>{lang === "ar" ? "التوصيل والاسترجاع" : "Livraison & retours"} <ChevronDown size={16} /></summary><p>{lang === "ar" ? "نتواصل معك بعد تأكيد الطلب لتنظيم التوصيل حسب ولايتك." : "La livraison est organisée avec toi après confirmation téléphonique. On t'indique le délai selon ta wilaya."}</p></details></div></div></div>{isVest && <VestSalesSections product={product} />}<ProductOrderFlow product={product} quantity={quantity} /><ProductFAQ product={product} /></main><StoreFooter /></>;
