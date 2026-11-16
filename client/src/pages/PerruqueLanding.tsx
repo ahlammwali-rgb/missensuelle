@@ -528,36 +528,25 @@ export default function PerruqueLanding({
         {/* Hero Image */}
         <img src={heroImg} alt={productTitle} />
 
-        {/* Redesigned Variant Selector Frame */}
-        <section className="pq-variants-box" aria-label="اختيار اللون">
-          <div className="pq-variants-head">
-            <span className="pq-variants-badge">اختاري لون البيروكه 👇</span>
-            <span className="pq-variants-selected-pill">
-              اللون: {selectedColor}
-            </span>
-          </div>
-
-          <div className="pq-track" ref={trackRef}>
-            {variants.map(variant => {
-              const isSelected = selectedColor === variant.name;
-              return (
-                <figure
-                  key={variant.name}
-                  className={`pq-card${isSelected ? " is-selected" : ""}`}
-                  onClick={() => handleSelectVariant(variant.name)}
-                >
-                  <div className="pq-card-img-wrap">
-                    <img src={variant.image} alt={variant.name} />
-                    <span className="pq-card-check" aria-hidden="true">
-                      ✔
-                    </span>
-                  </div>
-                  <figcaption className="pq-card-name">{variant.name}</figcaption>
-                </figure>
-              );
-            })}
-          </div>
-        </section>
+        {/* Original-style Variant Selector with Golden Frame */}
+        <div className="pq-vr">اختاري لون البيروكه 👇</div>
+        <div className="pq-track" ref={trackRef}>
+          {variants.map(variant => {
+            const isSelected = selectedColor === variant.name;
+            return (
+              <figure
+                key={variant.name}
+                className={`pq-card${isSelected ? " is-selected" : ""}`}
+                onClick={() => handleSelectVariant(variant.name)}
+              >
+                <img src={variant.image} alt={variant.name} />
+                <i className="pq-card-check" aria-hidden="true">
+                  ✔
+                </i>
+              </figure>
+            );
+          })}
+        </div>
 
         {/* Promo Banner */}
         <div className="pq-banner-wrap">
