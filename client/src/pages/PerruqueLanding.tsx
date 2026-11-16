@@ -559,11 +559,16 @@ export default function PerruqueLanding({
         </div>
 
         {/* Complete Order Form */}
-        <form id="f" ref={formRef} className="pq-form" onSubmit={handleSubmit}>
-          <div className="pq-form-header">
-            <h2 className="pq-form-title">للطلب يرجى ملء الاستمارة 👇</h2>
-            <p className="pq-form-sub">الدفع عند الاستلام • توصيل سريع لجميع الولايات (58 ولاية)</p>
-          </div>
+        <div className="pq-form-section">
+          <form id="f" ref={formRef} className="pq-form" onSubmit={handleSubmit}>
+            <div className="pq-form-header">
+              <div className="pq-form-gold-badge">
+                <span>{formatPrice(unitPrice)}</span>
+                <span className="pq-form-gold-old">{formatPrice(oldPrice)}</span>
+              </div>
+              <h2 className="pq-form-title">للطلب يرجى ملء الاستمارة 👇</h2>
+              <p className="pq-form-sub">الدفع عند الاستلام • توصيل سريع لجميع الولايات (58 ولاية)</p>
+            </div>
 
           {formError && <div className="pq-error">{formError}</div>}
 
@@ -729,23 +734,20 @@ export default function PerruqueLanding({
           <button type="submit" className="pq-submit" disabled={submitting}>
             {submitting ? "جاري تسجيل الطلب..." : "اطلب الآن • الدفع عند الاستلام"}
           </button>
-        </form>
+          </form>
+        </div>
 
         {/* Bottom Guarantee Image */}
         <img src={footerImg} alt="ضمان الجودة والتوصيل" />
       </div>
 
-      {/* Redesigned Sticky Floating Bottom CTA */}
+      {/* Original Rounded Sticky Bottom CTA */}
       <div className={`pq-sticky${hideSticky ? " is-hidden" : ""}`}>
-        <div className="pq-sticky-price">
-          <span className="pq-sticky-now">{formatPrice(unitPrice)}</span>
-          <span className="pq-sticky-old">{formatPrice(oldPrice)}</span>
-        </div>
-        <button type="button" className="pq-sticky-cta" onClick={handleScrollToForm}>
-          <span>اطلبي الآن</span>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2S15.9 22 17 22s2-.9 2-2-.9-2-2-2zM7.17 14.75l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0 0 20 4H5.21l-.94-2H1v2h2l3.6 7.59-1.35 2.44C4.52 15.37 5.48 17 7 17h12v-2H7.42c-.14 0-.25-.11-.25-.25z" />
-          </svg>
+        <button type="button" className="pq-sticky-btn" onClick={handleScrollToForm}>
+          <b>اطلب الآن 🛒</b>
+          <span>
+            {formatPrice(unitPrice)} • الدفع عند الاستلام
+          </span>
         </button>
       </div>
 
