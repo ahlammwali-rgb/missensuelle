@@ -100,7 +100,9 @@ function AdminPageContent() {
   };
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [searchPopupQuery, setSearchPopupQuery] = useState("");
+  const staffDataQuery = trpc.admin.staffData.useQuery(undefined, { retry: false, refetchOnWindowFocus: false });
   const ordersQuery = trpc.admin.orders.useQuery(undefined, { refetchInterval: 10000, refetchIntervalInBackground: true, refetchOnWindowFocus: true, retry: false });
   const abandonedQuery = trpc.admin.abandonedOrders.useQuery(undefined, { refetchInterval: 10000, refetchIntervalInBackground: true, refetchOnWindowFocus: true, retry: false });
   const utils = trpc.useUtils();
@@ -445,6 +447,18 @@ function AdminPageContent() {
           }
           notify(`🚨 ALERTE RETOUR : Colis ${orderId || tracking} en retour (${customerName}) !`, "urgent");
         }
+        // 5. Tout autre changement de situation dans la société de livraison
+        else {
+          if (pushEnabled) {
+            showPushNotification(
+              `📦 Changement colis ${orderId || tracking}`,
+              `${customerName} (${wilaya}) : ${data.situation}`,
+              `sit-${tracking}-${currentSit}`,
+              "urgent_issue"
+            );
+          }
+          notify(`📦 Colis ${orderId || tracking} : ${data.situation}`);
+        }
       } else if (!prevSit) {
         knownSituationsRef.current.set(tracking, currentSit);
       }
@@ -688,7 +702,7 @@ function AdminPageContent() {
   const activePostponeOrder = postponeOrderId ? orderById.get(postponeOrderId) ?? null : null;
   const activeCancelOrder = cancelOrderId ? orderById.get(cancelOrderId) ?? null : null;
 
-  return <div className="admin-shell"><aside className="admin-sidebar"><div className="admin-brand-mobile-row"><Link href="/" className="wordmark admin-wordmark"><span className="wordmark-star">✦</span><span>miss</span><em>sensuelle</em></Link><div className="admin-mobile-quick-top"><button type="button" className="neo-darkmode-btn mobile-top-theme-btn" onClick={toggleTheme} title={theme === "dark" ? "Passer en Mode Clair" : "Passer en Mode Sombre"} aria-label="Basculer Mode Clair / Sombre">{theme === "dark" ? (<><Sun size={15} className="neo-sun-glow" /><span>Clair</span></>) : (<><Moon size={15} className="neo-moon-glow" /><span>Dark</span></>)}</button><button type="button" className="neo-darkmode-btn mobile-top-create-btn" onClick={() => setIsCreatingOrder(true)} title="Créer une nouvelle commande"><Plus size={15} /><span>Commande</span></button></div></div><nav className="admin-mobile-nav" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={17} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={17} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge">{transferredCount}</span>}</button><button type="button" className={section === "catalogue" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => { go("catalogue"); setIsMoreMenuOpen(false); }}><Package size={17} /><span>Produits</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={17} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><MoreHorizontal size={17} /><span>Menu</span></button></nav><div className="admin-user"><div className="admin-avatar">{currentActorName.slice(0, 2).toUpperCase()}</div><div><strong>{currentActorName}</strong><span>{isOwner ? "Administratrice" : "Confirmateur"}</span></div></div><nav className="admin-nav"><span className="admin-nav-label">Workspace</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{orders.filter(order => order.status !== "transferee" && order.status === "nouvelle").length}</b></button><button className={section === "staff" ? "active" : ""} onClick={() => go("staff")}><Users size={18} />Confirmateurs & Salaires</button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com Delivery <b>{orders.filter(order => order.status === "confirmee").length}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue & Landing <b>{getCatalogProducts().length}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button onClick={() => go("staff")}><BarChart3 size={18} />Rapports & Performances</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "staff" ? "Confirmateurs, Salaires & Journal d'Activité" : section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Studio Produits & Landing Pages" : section === "ecom" ? "E-com Delivery" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : `Bonjour, ${currentActorName}`} <span>✦</span></h1></div><div className="admin-top-actions">
+  return <div className="admin-shell"><aside className="admin-sidebar"><div className="admin-brand-mobile-row"><Link href="/" className="wordmark admin-wordmark"><span className="wordmark-star">✦</span><span>miss</span><em>sensuelle</em></Link><div className="admin-mobile-quick-top"><button type="button" className="neo-darkmode-btn mobile-top-theme-btn" onClick={toggleTheme} title={theme === "dark" ? "Passer en Mode Clair" : "Passer en Mode Sombre"} aria-label="Basculer Mode Clair / Sombre">{theme === "dark" ? (<><Sun size={15} className="neo-sun-glow" /><span>Clair</span></>) : (<><Moon size={15} className="neo-moon-glow" /><span>Dark</span></>)}</button><button type="button" className="neo-darkmode-btn mobile-top-create-btn" onClick={() => setIsCreatingOrder(true)} title="Créer une nouvelle commande"><Plus size={15} /><span>Commande</span></button><button type="button" onClick={() => setIsProfileModalOpen(true)} title="Mon profil, salaire & commissions" aria-label="Mon profil et commissions" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "50%", border: "2px solid #a855f7", background: "linear-gradient(135deg, #9b82f6, #f472b6)", color: "#fff", fontSize: 11, fontWeight: 900, cursor: "pointer", flexShrink: 0 }}>{currentActorName.slice(0, 2).toUpperCase()}</button></div></div><nav className="admin-mobile-nav" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={17} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={17} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge">{transferredCount}</span>}</button><button type="button" className={section === "catalogue" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => { go("catalogue"); setIsMoreMenuOpen(false); }}><Package size={17} /><span>Produits</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={17} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><MoreHorizontal size={17} /><span>Menu</span></button></nav><button type="button" className="admin-user" onClick={() => setIsProfileModalOpen(true)} style={{ background: "transparent", border: 0, width: "100%", textAlign: "left", cursor: "pointer" }} title="Voir mon salaire, évolution & commissions"><div className="admin-avatar">{currentActorName.slice(0, 2).toUpperCase()}</div><div><strong>{currentActorName}</strong><span>{isOwner ? "Administratrice" : "Confirmateur • Voir salaire"}</span></div></button><nav className="admin-nav"><span className="admin-nav-label">Workspace</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{orders.filter(order => order.status !== "transferee" && order.status === "nouvelle").length}</b></button><button className={section === "staff" ? "active" : ""} onClick={() => go("staff")}><Users size={18} />Confirmateurs & Salaires</button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com Delivery <b>{orders.filter(order => order.status === "confirmee").length}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue & Landing <b>{getCatalogProducts().length}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button onClick={() => go("staff")}><BarChart3 size={18} />Rapports & Performances</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "staff" ? "Confirmateurs, Salaires & Journal d'Activité" : section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Studio Produits & Landing Pages" : section === "ecom" ? "E-com Delivery" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : `Bonjour, ${currentActorName}`} <span>✦</span></h1></div><div className="admin-top-actions">
   <button type="button" className="neo-darkmode-btn" onClick={toggleTheme} title={theme === "dark" ? "Mode Clair" : "Mode Sombre Neo Waw"} aria-label="Basculer Mode Sombre Neo">
   {theme === "dark" ? (
     <>
@@ -743,7 +757,7 @@ function AdminPageContent() {
     <Smartphone size={14} style={{ color: "#a855f7" }} />
     <span className="neo-btn-label" style={{ color: "#a855f7", fontWeight: 600 }}>App Mobile</span>
   </button>
-  <button className="icon-button" aria-label="Notifications"><Bell size={19} />{orders.some(order => order.status === "nouvelle") && <i />}</button><div className="admin-profile"><div className="admin-avatar small">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></div></div></header><div className="admin-content">{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} stockPanel={<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} />} />}</div></main>{isSearchOpen && (
+  <button className="icon-button" aria-label="Notifications"><Bell size={19} />{orders.some(order => order.status === "nouvelle") && <i />}</button><button type="button" className="admin-profile" onClick={() => setIsProfileModalOpen(true)} title="Voir mon profil, salaire & commissions" style={{ background: "transparent", border: 0, cursor: "pointer" }}><div className="admin-avatar small">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></button></div></header><div className="admin-content">{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} stockPanel={<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} />} />}</div></main>{isSearchOpen && (
   <div className="admin-search-modal-overlay" onClick={() => setIsSearchOpen(false)}>
     <div className="admin-search-modal" onClick={e => e.stopPropagation()}>
       <div className="admin-search-modal-head">
@@ -1034,7 +1048,111 @@ function AdminPageContent() {
       setCancelOrderId(null);
     }}
   />
-)}{duePostponedOrders.length > 0 && (
+)}{isProfileModalOpen && (() => {
+  const staffList = staffDataQuery.data?.staff ?? [];
+  const staffId = String(meQuery.data?.email || meQuery.data?.openId || "").replace(/^staff:/, "");
+  const myProfile =
+    staffList.find(s => s.id === staffId) ||
+    staffList.find(s => s.name.toLowerCase() === currentActorName.toLowerCase());
+  const baseSalary = myProfile?.baseSalary ?? (isOwner ? 0 : 25000);
+  const defaultComm = myProfile?.commissionPerDelivered ?? 150;
+  const prodComms = myProfile?.productCommissions ?? {};
+  const upsellBonus = myProfile?.upsellBonusPerDelivered ?? 50;
+
+  // Évolution quotidienne du salaire de base sur un cycle de 30 jours
+  const startStr = myProfile?.salaryStartDate || myProfile?.createdAt?.slice(0, 10);
+  const nowDate = new Date();
+  const startDate = startStr ? new Date(`${startStr}T00:00:00`) : new Date(nowDate.getFullYear(), nowDate.getMonth(), 1);
+  const diffDays = Math.floor((nowDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const daysElapsed = Math.max(1, Math.min(30, Number.isFinite(diffDays) ? diffDays : 1));
+  const dailySalary = Math.round(baseSalary / 30);
+  const evolvedSalary = daysElapsed >= 30 ? baseSalary : Math.round((baseSalary / 30) * daysElapsed);
+  const progressPct = Math.round((daysElapsed / 30) * 100);
+
+  const isMine = (o: CheckoutOrder) =>
+    (myProfile && (o.confirmedById === myProfile.id || o.confirmedByName?.toLowerCase() === myProfile.name.toLowerCase())) ||
+    (!myProfile && o.confirmedByName?.toLowerCase() === currentActorName.toLowerCase());
+
+  const calcOrderComm = (o: CheckoutOrder) => {
+    const unit = (o.productId && typeof prodComms[o.productId] === "number" ? prodComms[o.productId] : defaultComm);
+    const qty = Math.max(1, o.quantity || 1);
+    const hasUpsell = (o.upsellById && myProfile && o.upsellById === myProfile.id) || (qty >= 2 && String(o.product || "").includes("+"));
+    return unit * qty + (hasUpsell ? upsellBonus : 0);
+  };
+
+  const myConfirmedPending = serverOrders.filter(
+    o => isMine(o) && (o.status === "confirmee" || o.status === "transferee") && !o.isDelivered && !o.returnReceived
+  );
+  const myDelivered = serverOrders.filter(
+    o => isMine(o) && Boolean(o.isDelivered) && !o.returnReceived
+  );
+
+  const virtualCommission = myConfirmedPending.reduce((sum, o) => sum + calcOrderComm(o), 0);
+  const realCommission = myDelivered.reduce((sum, o) => sum + calcOrderComm(o), 0);
+  const totalAcquis = evolvedSalary + realCommission;
+
+  return (
+    <div className="modal-backdrop" onClick={() => setIsProfileModalOpen(false)} style={{ zIndex: 120 }}>
+      <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 460, width: "94%", borderRadius: 24, padding: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 46, height: 46, borderRadius: "50%", background: myProfile?.avatarColor || "linear-gradient(135deg, #9b82f6, #ec4899)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 16 }}>
+              {currentActorName.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900 }}>{currentActorName}</h3>
+              <span style={{ fontSize: 12, color: "#8b5cf6", fontWeight: 700 }}>
+                {isOwner ? "Administratrice" : "Confirmateur • Suivi Salaire & Commissions"}
+              </span>
+            </div>
+          </div>
+          <button type="button" onClick={() => setIsProfileModalOpen(false)} style={{ background: "transparent", border: 0, cursor: "pointer", padding: 4 }} aria-label="Fermer">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Salaire de base & Évolution quotidienne */}
+        <div style={{ background: "linear-gradient(135deg, rgba(139,92,246,0.12), rgba(236,72,153,0.10))", border: "1px solid rgba(139,92,246,0.28)", borderRadius: 16, padding: 14, marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: "#6d28d9" }}>💼 Salaire de base mensuel</span>
+            <strong style={{ fontSize: 15, fontWeight: 900 }}>{formatDZD(baseSalary)}</strong>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, marginBottom: 8 }}>
+            <span>📈 Évolution chaque jour (+{formatDZD(dailySalary)} / jour)</span>
+            <strong style={{ color: "#059669" }}>Jour {daysElapsed}/30 · {formatDZD(evolvedSalary)}</strong>
+          </div>
+          <div style={{ height: 8, borderRadius: 999, background: "rgba(148,163,184,0.25)", overflow: "hidden" }}>
+            <div style={{ width: `${progressPct}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg, #8b5cf6, #ec4899)" }} />
+          </div>
+        </div>
+
+        {/* Commissions Virtuelle & Réelle */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div style={{ background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: 16, padding: 12 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 800, color: "#b45309", marginBottom: 4 }}>⏳ Commission virtuelle</div>
+            <div style={{ fontSize: 19, fontWeight: 900, color: "#d97706" }}>{formatDZD(virtualCommission)}</div>
+            <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>{myConfirmedPending.length} cmd confirmée(s)</div>
+          </div>
+
+          <div style={{ background: "rgba(16,185,129,0.10)", border: "1px solid rgba(16,185,129,0.35)", borderRadius: 16, padding: 12 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 800, color: "#047857", marginBottom: 4 }}>✅ Commission réelle</div>
+            <div style={{ fontSize: 19, fontWeight: 900, color: "#059669" }}>{formatDZD(realCommission)}</div>
+            <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>{myDelivered.length} cmd livrée(s)</div>
+          </div>
+        </div>
+
+        {/* Total Acquis */}
+        <div style={{ background: "linear-gradient(135deg, #1e1b4b, #4c1d95)", color: "#fff", borderRadius: 16, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 11.5, opacity: 0.85 }}>Total acquis à ce jour (Salaire + Réelle)</div>
+            <div style={{ fontSize: 11, color: "#fcd34d", marginTop: 2 }}>Avec virtuelle : {formatDZD(totalAcquis + virtualCommission)}</div>
+          </div>
+          <strong style={{ fontSize: 20, fontWeight: 900, color: "#fde047" }}>{formatDZD(totalAcquis)}</strong>
+        </div>
+      </div>
+    </div>
+  );
+})()}{duePostponedOrders.length > 0 && (
   <PostponedReminderPopup
     orders={duePostponedOrders}
     onCall={handleCallOrder}

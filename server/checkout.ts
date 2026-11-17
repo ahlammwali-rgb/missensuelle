@@ -356,53 +356,6 @@ export function updateMemoryOrderStatus(
     );
 
     saveStore();
-
-    if (prevStatus !== status || (status === "ne_repond_pas" && prevNrpLevel !== nextNrpLevel)) {
-      const statusKey = String(status);
-      const prefs = getNotificationPreferences();
-
-      if (statusKey === "ne_repond_pas" && prefs.notifyNeRepondPas) {
-        void sendAdminPushNotification({
-          title: `🚨 ALERTE COLIS : Ne répond pas (NRP ${nextNrpLevel || 1}) !`,
-          body: `Colis #${found.id} (${found.customer} - ${found.phone}) marqué NRP ${nextNrpLevel || 1} par ${actorName}`,
-          icon: "/icons/icon-192x192.png",
-          badge: "/icons/icon-192x192.png",
-          tag: `alert-${found.id}`,
-          type: "urgent_alert",
-          data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert" },
-        });
-      } else if (statusKey === "annulee" && prefs.notifyAnnulee) {
-        void sendAdminPushNotification({
-          title: "🚨 ALERTE COLIS : Annulée !",
-          body: `Colis #${found.id} (${found.customer} - ${found.phone}) annulé par ${actorName}${found.cancelReason ? ` (${found.cancelReason})` : ""}`,
-          icon: "/icons/icon-192x192.png",
-          badge: "/icons/icon-192x192.png",
-          tag: `alert-${found.id}`,
-          type: "urgent_alert",
-          data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert" },
-        });
-      } else if (statusKey === "reportee" && prefs.notifyReportee) {
-        void sendAdminPushNotification({
-          title: "⚠️ ALERTE COLIS : Reportée !",
-          body: `Colis #${found.id} (${found.customer} - ${found.phone}) reporté par ${actorName}${found.postponedNote ? ` : ${found.postponedNote}` : ""}`,
-          icon: "/icons/icon-192x192.png",
-          badge: "/icons/icon-192x192.png",
-          tag: `alert-${found.id}`,
-          type: "urgent_alert",
-          data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert" },
-        });
-      } else if ((statusKey === "livre" || statusKey === "livree") && prefs.notifyLivre) {
-        void sendAdminPushNotification({
-          title: "🎉 COLIS LIVRÉ : Succès !",
-          body: `Colis #${found.id} pour ${found.customer} (${found.total.toLocaleString("fr-DZ")} DZD) a été livré ! Encaissement validé.`,
-          icon: "/icons/icon-192x192.png",
-          badge: "/icons/icon-192x192.png",
-          tag: `victory-${found.id}`,
-          type: "victory",
-          data: { url: "/admin", sound: "/sounds/victory-delivered.wav", type: "victory" },
-        });
-      }
-    }
   }
   return found ? [found] : [];
 }
@@ -469,18 +422,6 @@ export async function markOrderDelivered(
       actorName: actor?.actorName || "Système / Livraison",
       summary: `🎉 Colis Livré et encaissé (${found.total.toLocaleString("fr-DZ")} DA)${found.confirmedByName ? ` — Commission validée pour ${found.confirmedByName}` : ""}`,
     });
-    const prefs = getNotificationPreferences();
-    if (prefs.notifyLivre) {
-      void sendAdminPushNotification({
-        title: "🎉 COLIS LIVRÉ : Succès !",
-        body: `Colis #${found.id} pour ${found.customer} (${found.total.toLocaleString("fr-DZ")} DZD) a été livré !`,
-        icon: "/icons/icon-192x192.png",
-        badge: "/icons/icon-192x192.png",
-        tag: `victory-${found.id}`,
-        type: "victory",
-        data: { url: "/admin", sound: "/sounds/victory-delivered.wav", type: "victory" },
-      });
-    }
   } else if (!isDelivered) {
     found.deliveredAt = undefined;
   }
@@ -601,15 +542,6 @@ export function startPostponedReminderScheduler(intervalMs = 25000) {
           if (Number.isFinite(targetMs) && targetMs <= now) {
             order.postponedNotified = true;
             updatedAny = true;
-            void sendAdminPushNotification({
-              title: "⏰ RAPPEL CLIENT À APPELER MAINTENANT !",
-              body: `Commande #${order.id} — ${order.customer} (${order.phone})${order.postponedNote ? ` · Note : ${order.postponedNote}` : ""}`,
-              icon: "/icons/icon-192x192.png",
-              badge: "/icons/icon-192x192.png",
-              tag: `reminder-${order.id}-${targetMs}`,
-              type: "urgent_alert",
-              data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert", orderId: order.id },
-            });
           }
         }
       }
