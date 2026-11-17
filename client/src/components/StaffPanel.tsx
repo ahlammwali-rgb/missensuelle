@@ -3,8 +3,6 @@ import {
   AlertTriangle,
   Calendar,
   CheckCircle2,
-  ChevronDown,
-  Copy,
   DollarSign,
   FileText,
   History,
@@ -18,7 +16,6 @@ import {
   Users,
   X,
 } from "lucide-react";
-import "./staff-app.css";
 import type {
   CheckoutOrder,
   StaffMember,
@@ -428,26 +425,6 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
       const upsellBonusTotal = deliveredUpsellOrders.length * (member.upsellBonusPerDelivered || 0);
       const totalPay = member.baseSalary + commissionTotal + upsellBonusTotal;
 
-      // Virtual commissions on confirmed orders pending delivery
-      const pendingConfirmedOrders = confirmedOrders.filter(o => !o.isDelivered && !o.returnReceived);
-      let virtualCommissionTotal = 0;
-      pendingConfirmedOrders.forEach(order => {
-        const orderProds = resolveOrderProducts(order);
-        orderProds.forEach(prod => {
-          virtualCommissionTotal += getMemberProductCommission(member, prod.id);
-        });
-      });
-
-      // Daily base salary evolution (30-day cycle)
-      const startDt = new Date(`${effectiveStart}T00:00:00`);
-      const nowDt = new Date();
-      const rawDays = Math.floor((nowDt.getTime() - startDt.getTime()) / 86400000) + 1;
-      const daysElapsed = Math.max(1, Math.min(30, Number.isFinite(rawDays) ? rawDays : 1));
-      const dailySalary = Math.round(member.baseSalary / 30);
-      const evolvedSalary = daysElapsed >= 30 ? member.baseSalary : Math.round((member.baseSalary / 30) * daysElapsed);
-      const progressPct = Math.round((daysElapsed / 30) * 100);
-      const evolvedTotalPay = evolvedSalary + commissionTotal + upsellBonusTotal;
-
       return {
         member,
         effectiveStart,
@@ -458,7 +435,6 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
         warningsCount,
         totalHandled,
         confirmedCount: confirmedOrders.length,
-        pendingConfirmedCount: pendingConfirmedOrders.length,
         deliveredCount: deliveredOrders.length,
         upsellCount: upsellOrders.length,
         deliveredUpsellCount: deliveredUpsellOrders.length,
@@ -468,13 +444,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
         confirmationRate,
         deliveryRate,
         commissionTotal,
-        virtualCommissionTotal,
         upsellBonusTotal,
-        daysElapsed,
-        dailySalary,
-        evolvedSalary,
-        progressPct,
-        evolvedTotalPay,
         totalPay,
         productBreakdown,
         deliveredOrderDetails,
@@ -826,42 +796,45 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
     return orders.filter(o => o.status === "confirmee" || o.status === "transferee" || o.isDelivered);
   }, [orders]);
 
-  const teamTotals = useMemo(() => {
-    const nonOwners = staffStats.filter(s => !s.member.isOwnerProfile);
-    const totalAcquired = nonOwners.reduce((sum, s) => sum + s.evolvedTotalPay, 0);
-    const totalVirtual = nonOwners.reduce((sum, s) => sum + s.virtualCommissionTotal, 0);
-    const totalDelivered = nonOwners.reduce((sum, s) => sum + s.deliveredCount, 0);
-    const totalConfirmed = nonOwners.reduce((sum, s) => sum + s.confirmedCount, 0);
-    const avgDeliveryRate = totalConfirmed > 0 ? Math.round((totalDelivered / totalConfirmed) * 100) : 0;
-    return {
-      totalAcquired,
-      totalVirtual,
-      totalDelivered,
-      avgDeliveryRate,
-      activeCount: nonOwners.filter(s => s.member.active).length,
-      totalCount: nonOwners.length,
-    };
-  }, [staffStats]);
-
   return (
-    <section className="admin-panel sp-shell">
+    <section className="admin-panel" style={{ display: "grid", gap: "20px" }}>
       {/* Header */}
-      <div className="sp-header">
-        <div className="sp-header-title">
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "14px",
+          paddingBottom: "14px",
+          borderBottom: "1px solid var(--border, #e2e8f0)",
+        }}
+      >
+        <div>
           <span className="eyebrow" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-            <Users size={14} /> Gestion Salaires & Équipe
+            <Users size={14} /> Call-Center COD & Gestion d'Équipe
           </span>
-          <h2>Confirmateurs & Paie</h2>
-          <p>Évolution quotidienne, commissions virtuelles & réelles et fiches PDF.</p>
+          <h2 style={{ marginTop: "4px" }}>Confirmateurs, Commissions par Produit & Fiches de Paie PDF</h2>
+          <p style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>
+            Définissez la commission de chaque produit, choisissez les dates de début/fin de mois de chaque salarié, relancez un nouveau comptage en fin de mois et téléchargez la fiche de paie PDF.
+          </p>
         </div>
 
-        <div className="sp-controls">
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px" }}>
           <select
-            className="sp-period-select"
             value={period}
             onChange={e => setPeriod(e.target.value as PeriodFilter)}
+            style={{
+              height: "40px",
+              borderRadius: "10px",
+              padding: "0 12px",
+              fontWeight: 700,
+              fontSize: "13px",
+              border: "1px solid #ec4899",
+              background: period === "salary_period" ? "rgba(236, 72, 153, 0.08)" : undefined,
+            }}
           >
-            <option value="salary_period">📆 Mois du salarié (Début ➔ Fin)</option>
+            <option value="salary_period">📆 Période du mois du salarié (Début ➔ Fin)</option>
             <option value="today">📅 Aujourd'hui</option>
             <option value="yesterday">📅 Hier</option>
             <option value="7days">📅 7 derniers jours</option>
@@ -873,7 +846,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
             <button
               type="button"
               className="button button-gradient"
-              style={{ height: "40px", padding: "0 16px", fontSize: "13px", fontWeight: 800, borderRadius: "12px" }}
+              style={{ height: "40px", padding: "0 16px", fontSize: "13px", fontWeight: 800 }}
               onClick={openCreateForm}
             >
               <UserPlus size={16} /> + Ajouter un Confirmateur
@@ -882,56 +855,66 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
         </div>
       </div>
 
-      {/* Global Team KPI Strip */}
-      {staffList.length > 0 && (
-        <div className="sp-global-kpis">
-          <div className="sp-kpi-card is-highlight">
-            <span className="sp-kpi-label">💰 Acquis équipe (à ce jour)</span>
-            <strong className="sp-kpi-value">{formatDZD(teamTotals.totalAcquired)}</strong>
-            <span className="sp-kpi-sub">Salaires évolués + réelles</span>
-          </div>
-          <div className="sp-kpi-card">
-            <span className="sp-kpi-label">⏳ Commissions virtuelles</span>
-            <strong className="sp-kpi-value" style={{ color: "#d97706" }}>{formatDZD(teamTotals.totalVirtual)}</strong>
-            <span className="sp-kpi-sub">Sur confirmées en cours</span>
-          </div>
-          <div className="sp-kpi-card">
-            <span className="sp-kpi-label">📦 Colis livrés</span>
-            <strong className="sp-kpi-value" style={{ color: "#059669" }}>{teamTotals.totalDelivered}</strong>
-            <span className="sp-kpi-sub">Taux livraison : {teamTotals.avgDeliveryRate}%</span>
-          </div>
-          <div className="sp-kpi-card">
-            <span className="sp-kpi-label">👥 Confirmateurs</span>
-            <strong className="sp-kpi-value">{teamTotals.activeCount} / {teamTotals.totalCount}</strong>
-            <span className="sp-kpi-sub">Actifs en poste</span>
-          </div>
-        </div>
-      )}
-
-      {/* Segmented Sub-navigation Tabs */}
-      <div className="sp-tabs">
+      {/* Sub-navigation Tabs */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
         <button
           type="button"
-          className={`sp-tab${activeTab === "performance" ? " is-active" : ""}`}
           onClick={() => setActiveTab("performance")}
+          style={{
+            padding: "10px 16px",
+            borderRadius: "12px",
+            border: activeTab === "performance" ? "2px solid #ec4899" : "1px solid #cbd5e1",
+            background: activeTab === "performance" ? "rgba(236, 72, 153, 0.1)" : "var(--surface, #fff)",
+            color: activeTab === "performance" ? "#db2777" : "#475569",
+            fontWeight: 800,
+            fontSize: "13px",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
         >
-          <DollarSign size={15} /> Équipe & Paie ({staffList.length})
+          <DollarSign size={16} /> Salaires, Commissions par Produit & Paie PDF ({staffList.length} confirmateur{staffList.length > 1 ? "s" : ""})
         </button>
 
         <button
           type="button"
-          className={`sp-tab${activeTab === "journal" ? " is-active" : ""}`}
           onClick={() => setActiveTab("journal")}
+          style={{
+            padding: "10px 16px",
+            borderRadius: "12px",
+            border: activeTab === "journal" ? "2px solid #2563eb" : "1px solid #cbd5e1",
+            background: activeTab === "journal" ? "rgba(37, 99, 235, 0.1)" : "var(--surface, #fff)",
+            color: activeTab === "journal" ? "#1d4ed8" : "#475569",
+            fontWeight: 800,
+            fontSize: "13px",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
         >
-          <History size={15} /> Journal ({filteredLogs.length})
+          <History size={16} /> Journal d'Activité en Direct ({filteredLogs.length} actions)
         </button>
 
         <button
           type="button"
-          className={`sp-tab${activeTab === "deliveries" ? " is-active" : ""}`}
           onClick={() => setActiveTab("deliveries")}
+          style={{
+            padding: "10px 16px",
+            borderRadius: "12px",
+            border: activeTab === "deliveries" ? "2px solid #10b981" : "1px solid #cbd5e1",
+            background: activeTab === "deliveries" ? "rgba(16, 185, 129, 0.1)" : "var(--surface, #fff)",
+            color: activeTab === "deliveries" ? "#059669" : "#475569",
+            fontWeight: 800,
+            fontSize: "13px",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
         >
-          <PackageCheck size={15} /> Livrés ({shippableOrConfirmedOrders.filter(o => o.isDelivered).length})
+          <PackageCheck size={16} /> Validation Colis Livrés & Commissions ({shippableOrConfirmedOrders.filter(o => o.isDelivered).length} livrés)
         </button>
       </div>
 
@@ -961,7 +944,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
             </div>
           )}
 
-          <div className="sp-cards-grid">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))", gap: "16px" }}>
             {staffStats.map(st => {
               const m = st.member;
               if (m.isOwnerProfile && st.callsCount === 0 && st.confirmedCount === 0 && st.editsCount === 0 && staffList.length > 0) {
@@ -970,47 +953,63 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
               const archivedMonths = Array.isArray(m.payrollHistory) ? m.payrollHistory : [];
 
               return (
-                <div key={m.id} className="sp-card">
-                  {/* Card Top: Identity + Copy Code + Edit/Delete */}
-                  <div className="sp-card-head">
-                    <div className="sp-identity">
-                      <div className="sp-avatar" style={{ background: m.avatarColor || "#ec4899" }}>
+                <div
+                  key={m.id}
+                  style={{
+                    borderRadius: "18px",
+                    background: "var(--surface, #fff)",
+                    border: "1px solid var(--border, #e2e8f0)",
+                    padding: "18px",
+                    boxShadow: "0 4px 16px rgba(15, 23, 42, 0.04)",
+                    display: "grid",
+                    gap: "14px",
+                  }}
+                >
+                  {/* Card Top: Identity + Edit/Delete */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      <div
+                        style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "12px",
+                          background: m.avatarColor || "#ec4899",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: 900,
+                          fontSize: "16px",
+                        }}
+                      >
                         {m.name.slice(0, 2).toUpperCase()}
                       </div>
-                      <div style={{ minWidth: 0 }}>
-                        <div className="sp-name-row">
-                          <strong>{m.name}</strong>
-                          <span className={`sp-status-pill ${m.active ? "is-active" : "is-suspended"}`}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <strong style={{ fontSize: "16px" }}>{m.name}</strong>
+                          <span
+                            style={{
+                              fontSize: "10px",
+                              fontWeight: 800,
+                              padding: "2px 7px",
+                              borderRadius: "999px",
+                              background: m.active ? "rgba(16, 185, 129, 0.14)" : "rgba(239, 68, 68, 0.14)",
+                              color: m.active ? "#059669" : "#dc2626",
+                            }}
+                          >
                             {m.isOwnerProfile ? "👑 Patron" : m.active ? "Actif" : "Suspendu"}
                           </span>
                         </div>
-                        <div className="sp-code-row">
-                          {m.isOwnerProfile ? (
-                            <span>Accès propriétaire complet</span>
-                          ) : (
-                            <>
-                              {isOwner && (
-                                <button
-                                  type="button"
-                                  className="sp-code-btn"
-                                  onClick={() => {
-                                    void navigator.clipboard?.writeText(m.code);
-                                    notify(`Code de ${m.name} copié : ${m.code}`);
-                                  }}
-                                  title="Copier le code de connexion"
-                                >
-                                  🔑 {m.code} <Copy size={11} />
-                                </button>
-                              )}
-                              {m.phone && <span>📞 {m.phone}</span>}
-                            </>
-                          )}
-                        </div>
+                        <small style={{ color: "#64748b", fontSize: "12px", display: "block" }}>
+                          {m.isOwnerProfile
+                            ? "Accès propriétaire complet"
+                            : `Code connexion : ${isOwner ? m.code : "••••"} ${m.phone ? `· 📞 ${m.phone}` : ""}`}
+                        </small>
                       </div>
                     </div>
 
                     {isOwner && !m.isOwnerProfile && (
-                      <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                      <div style={{ display: "flex", gap: "6px" }}>
                         <button
                           type="button"
                           className="icon-button"
@@ -1036,104 +1035,30 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                     )}
                   </div>
 
-                  {/* Daily Salary Evolution Progress */}
+                  {/* Salary Month Period Box (Start Date -> End Date + Direct Edit & New Month Reset) */}
                   {!m.isOwnerProfile && (
-                    <div className="sp-evolution-box">
-                      <div className="sp-evo-top">
-                        <span>💼 Salaire base : {formatDZD(m.baseSalary)}</span>
-                        <span style={{ color: "#059669" }}>Acquis : {formatDZD(st.evolvedSalary)}</span>
-                      </div>
-                      <div className="sp-evo-sub">
-                        <span>📈 +{formatDZD(st.dailySalary)} / jour</span>
-                        <span>Jour {st.daysElapsed} / 30</span>
-                      </div>
-                      <div className="sp-progress-track">
-                        <div className="sp-progress-fill" style={{ width: `${st.progressPct}%` }} />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Virtual vs Real Commission Split */}
-                  {!m.isOwnerProfile && (
-                    <div className="sp-comm-split">
-                      <div className="sp-comm-box is-virtual">
-                        <span className="sp-comm-label">⏳ Comm. Virtuelle</span>
-                        <strong className="sp-comm-amount">{formatDZD(st.virtualCommissionTotal)}</strong>
-                        <span className="sp-comm-sub">{st.pendingConfirmedCount} confirmée(s)</span>
-                      </div>
-                      <div className="sp-comm-box is-real">
-                        <span className="sp-comm-label">✅ Comm. Réelle</span>
-                        <strong className="sp-comm-amount">{formatDZD(st.commissionTotal + st.upsellBonusTotal)}</strong>
-                        <span className="sp-comm-sub">{st.deliveredCount} livrée(s)</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 4 Counters Strip */}
-                  <div className="sp-counters">
-                    <div className="sp-counter-item">
-                      <strong style={{ color: "#2563eb" }}>{st.callsCount}</strong>
-                      <span>📞 Appels</span>
-                    </div>
-                    <div className="sp-counter-item">
-                      <strong style={{ color: "#059669" }}>{st.confirmedCount}</strong>
-                      <span>🟢 Conf. ({st.confirmationRate}%)</span>
-                    </div>
-                    <div className="sp-counter-item">
-                      <strong style={{ color: "#4f46e5" }}>{st.deliveredCount}</strong>
-                      <span>📦 Livrés ({st.deliveryRate}%)</span>
-                    </div>
-                    <div className="sp-counter-item">
-                      <strong style={{ color: "#db2777" }}>{st.upsellCount}</strong>
-                      <span>🔥 Pack Duo</span>
-                    </div>
-                  </div>
-
-                  {/* Secondary Status Breakdown */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", fontSize: "11px" }}>
-                    <span style={{ padding: "3px 8px", borderRadius: "999px", background: "rgba(245, 158, 11, 0.12)", color: "#b45309", fontWeight: 700 }}>
-                      ⏳ NRP : {st.nrpCount}
-                    </span>
-                    <span style={{ padding: "3px 8px", borderRadius: "999px", background: "rgba(139, 92, 246, 0.12)", color: "#6d28d9", fontWeight: 700 }}>
-                      📅 Reportées : {st.postponedCount}
-                    </span>
-                    <span style={{ padding: "3px 8px", borderRadius: "999px", background: "rgba(239, 68, 68, 0.12)", color: "#dc2626", fontWeight: 700 }}>
-                      ❌ Annulées : {st.cancelledCount}
-                    </span>
-                    <span style={{ padding: "3px 8px", borderRadius: "999px", background: "rgba(16, 185, 129, 0.12)", color: "#059669", fontWeight: 700 }}>
-                      💬 WA : {st.whatsappCount}
-                    </span>
-                  </div>
-
-                  {st.warningsCount > 0 && (
                     <div
                       style={{
-                        padding: "8px 12px",
-                        borderRadius: "10px",
-                        background: "rgba(239, 68, 68, 0.1)",
-                        border: "1px solid rgba(239, 68, 68, 0.3)",
-                        color: "#dc2626",
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
+                        padding: "10px 12px",
+                        borderRadius: "12px",
+                        background: "rgba(236, 72, 153, 0.06)",
+                        border: "1px solid rgba(236, 72, 153, 0.25)",
+                        display: "grid",
+                        gap: "8px",
                       }}
                     >
-                      <AlertTriangle size={14} /> {st.warningsCount} alerte(s) anti-triche détectée(s)
-                    </div>
-                  )}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
+                        <span style={{ fontSize: "11.5px", fontWeight: 800, color: "#be185d", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                          <Calendar size={13} /> Période du mois salarié :
+                        </span>
+                        <span style={{ fontSize: "12px", fontWeight: 900, color: "#0f172a" }}>
+                          Du {formatDateFr(st.effectiveStart)} au {formatDateFr(st.effectiveEnd)}
+                        </span>
+                      </div>
 
-                  {/* Collapsible Month Period Box */}
-                  {!m.isOwnerProfile && (
-                    <details className="sp-accordion">
-                      <summary>
-                        <span>📅 Mois : {formatDateFr(st.effectiveStart)} ➔ {formatDateFr(st.effectiveEnd)}</span>
-                        <ChevronDown size={14} />
-                      </summary>
                       {isOwner && (
-                        <div className="sp-accordion-body" style={{ gridTemplateColumns: "1fr 1fr" }}>
-                          <label style={{ fontSize: "11px", fontWeight: 700 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", alignItems: "center" }}>
+                          <label style={{ fontSize: "10.5px", color: "#475569", fontWeight: 700 }}>
                             Début du mois :
                             <input
                               type="date"
@@ -1157,10 +1082,18 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                                   active: m.active,
                                 });
                               }}
-                              style={{ width: "100%", height: "32px", fontSize: "12px", padding: "0 6px", borderRadius: "8px", border: "1px solid #cbd5e1", marginTop: "3px" }}
+                              style={{
+                                width: "100%",
+                                height: "30px",
+                                fontSize: "11.5px",
+                                padding: "0 6px",
+                                borderRadius: "8px",
+                                border: "1px solid #cbd5e1",
+                                marginTop: "2px",
+                              }}
                             />
                           </label>
-                          <label style={{ fontSize: "11px", fontWeight: 700 }}>
+                          <label style={{ fontSize: "10.5px", color: "#475569", fontWeight: 700 }}>
                             Fin du mois :
                             <input
                               type="date"
@@ -1184,31 +1117,131 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                                   active: m.active,
                                 });
                               }}
-                              style={{ width: "100%", height: "32px", fontSize: "12px", padding: "0 6px", borderRadius: "8px", border: "1px solid #cbd5e1", marginTop: "3px" }}
+                              style={{
+                                width: "100%",
+                                height: "30px",
+                                fontSize: "11.5px",
+                                padding: "0 6px",
+                                borderRadius: "8px",
+                                border: "1px solid #cbd5e1",
+                                marginTop: "2px",
+                              }}
                             />
                           </label>
                         </div>
                       )}
-                    </details>
+                    </div>
                   )}
 
-                  {/* Collapsible Product Commissions */}
+                  {/* Counters Grid */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", textAlign: "center" }}>
+                    <div style={{ padding: "8px 6px", borderRadius: "10px", background: "rgba(37, 99, 235, 0.08)" }}>
+                      <strong style={{ fontSize: "17px", color: "#2563eb", display: "block" }}>{st.callsCount}</strong>
+                      <span style={{ fontSize: "10.5px", color: "#475569", fontWeight: 700 }}>📞 Appels</span>
+                    </div>
+                    <div style={{ padding: "8px 6px", borderRadius: "10px", background: "rgba(16, 185, 129, 0.08)" }}>
+                      <strong style={{ fontSize: "17px", color: "#059669", display: "block" }}>{st.confirmedCount}</strong>
+                      <span style={{ fontSize: "10.5px", color: "#475569", fontWeight: 700 }}>🟢 Confirmées</span>
+                    </div>
+                    <div style={{ padding: "8px 6px", borderRadius: "10px", background: "rgba(99, 102, 241, 0.08)" }}>
+                      <strong style={{ fontSize: "17px", color: "#4f46e5", display: "block" }}>{st.deliveredCount}</strong>
+                      <span style={{ fontSize: "10.5px", color: "#475569", fontWeight: 700 }}>📦 Livrées</span>
+                    </div>
+                    <div style={{ padding: "8px 6px", borderRadius: "10px", background: "rgba(236, 72, 153, 0.08)" }}>
+                      <strong style={{ fontSize: "17px", color: "#db2777", display: "block" }}>{st.upsellCount}</strong>
+                      <span style={{ fontSize: "10.5px", color: "#475569", fontWeight: 700 }}>🔥 Pack Duo</span>
+                    </div>
+                  </div>
+
+                  {/* Secondary Status Breakdown */}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "6px",
+                      fontSize: "11.5px",
+                      color: "#475569",
+                      justifyContent: "space-between",
+                      padding: "8px 10px",
+                      borderRadius: "10px",
+                      background: "rgba(248, 250, 252, 0.9)",
+                    }}
+                  >
+                    <span>🟠 NRP : <strong>{st.nrpCount}</strong></span>
+                    <span>🔵 Reportées : <strong>{st.postponedCount}</strong></span>
+                    <span>🔴 Annulées : <strong>{st.cancelledCount}</strong></span>
+                    <span>✏️ Modifs : <strong>{st.editsCount}</strong></span>
+                    <span>💬 WhatsApp : <strong>{st.whatsappCount}</strong></span>
+                  </div>
+
+                  {/* Confirmation & Delivery Rates */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "12px" }}>
+                    <div style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                      <span style={{ color: "#64748b", display: "block", fontSize: "11px" }}>Taux de confirmation</span>
+                      <strong style={{ fontSize: "15px", color: "#059669" }}>{st.confirmationRate}%</strong>
+                    </div>
+                    <div style={{ padding: "8px 10px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+                      <span style={{ color: "#64748b", display: "block", fontSize: "11px" }}>Taux de livraison</span>
+                      <strong style={{ fontSize: "15px", color: "#2563eb" }}>{st.deliveryRate}%</strong>
+                    </div>
+                  </div>
+
+                  {/* Anti-Cheat Alert Badge if any */}
+                  {st.warningsCount > 0 && (
+                    <div
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "10px",
+                        background: "rgba(239, 68, 68, 0.1)",
+                        border: "1px solid rgba(239, 68, 68, 0.3)",
+                        color: "#dc2626",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <AlertTriangle size={14} /> {st.warningsCount} alerte(s) anti-triche détectée(s)
+                    </div>
+                  )}
+
+                  {/* Per-Product Commission Barème & Breakdown */}
                   {!m.isOwnerProfile && (
-                    <details className="sp-accordion">
-                      <summary>
-                        <span>🛍️ Détail commissions par produit ({catalogProducts.length})</span>
-                        <ChevronDown size={14} />
-                      </summary>
-                      <div className="sp-accordion-body">
+                    <div
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: "12px",
+                        background: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        display: "grid",
+                        gap: "6px",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "11.5px", fontWeight: 800, color: "#334155" }}>
+                          🛍️ Commissions par Produit (Livrées) :
+                        </span>
                         {isOwner && (
                           <button
                             type="button"
                             onClick={() => openEditForm(m)}
-                            style={{ border: "none", background: "transparent", color: "#db2777", fontSize: "11.5px", fontWeight: 800, cursor: "pointer", textAlign: "left", padding: 0, textDecoration: "underline" }}
+                            style={{
+                              border: "none",
+                              background: "transparent",
+                              color: "#db2777",
+                              fontSize: "11px",
+                              fontWeight: 800,
+                              cursor: "pointer",
+                              textDecoration: "underline",
+                            }}
                           >
-                            ✏️ Modifier le barème des produits
+                            Modifier barème
                           </button>
                         )}
+                      </div>
+
+                      <div style={{ display: "grid", gap: "4px", fontSize: "11.5px" }}>
                         {catalogProducts.map(prod => {
                           const unitComm = getMemberProductCommission(m, prod.id);
                           const statRow = st.productBreakdown.find(b => b.productId === prod.id);
@@ -1221,42 +1254,76 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                                 display: "flex",
                                 justifyContent: "space-between",
                                 alignItems: "center",
-                                fontSize: "11.5px",
                                 padding: "4px 6px",
-                                borderRadius: "8px",
-                                background: qty > 0 ? "rgba(16, 185, 129, 0.1)" : "transparent",
+                                borderRadius: "6px",
+                                background: qty > 0 ? "rgba(16, 185, 129, 0.08)" : "transparent",
                               }}
                             >
-                              <span>
-                                {prod.name} <small style={{ opacity: 0.7 }}>({formatDZD(unitComm)})</small>
+                              <span style={{ color: "#1e293b", fontWeight: qty > 0 ? 700 : 500 }}>
+                                {prod.name} <small style={{ color: "#64748b" }}>({formatDZD(unitComm)}/livré)</small>
                               </span>
-                              <strong style={{ color: qty > 0 ? "#059669" : undefined }}>
+                              <strong style={{ color: qty > 0 ? "#059669" : "#94a3b8" }}>
                                 {qty} livré{qty > 1 ? "s" : ""} = {formatDZD(subTotal)}
                               </strong>
                             </div>
                           );
                         })}
                       </div>
-                    </details>
-                  )}
-
-                  {/* Total Banner */}
-                  {!m.isOwnerProfile && (
-                    <div className="sp-total-banner">
-                      <div>
-                        <small>💰 Acquis à ce jour (Évolution + Réelles)</small>
-                        <small style={{ color: "#a7f3d0" }}>Fin de mois complet : {formatDZD(st.totalPay)}</small>
-                      </div>
-                      <strong>{formatDZD(st.evolvedTotalPay)}</strong>
                     </div>
                   )}
 
-                  {/* Action Buttons */}
+                  {/* Payroll Box (Salaire de base + Commissions par produit) */}
                   {!m.isOwnerProfile && (
-                    <div className="sp-actions">
+                    <div
+                      style={{
+                        padding: "12px 14px",
+                        borderRadius: "14px",
+                        background: "linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05))",
+                        border: "1px solid rgba(16, 185, 129, 0.3)",
+                        display: "grid",
+                        gap: "6px",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#334155" }}>
+                        <span>Salaire de base fixe :</span>
+                        <strong>{formatDZD(m.baseSalary)}</strong>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#334155" }}>
+                        <span>Commissions Produits Livrés ({st.deliveredCount} colis) :</span>
+                        <strong style={{ color: "#059669" }}>+ {formatDZD(st.commissionTotal)}</strong>
+                      </div>
+                      {(m.upsellBonusPerDelivered > 0 || st.deliveredUpsellCount > 0) && (
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#334155" }}>
+                          <span>
+                            Bonus Pack Duo Livrés ({st.deliveredUpsellCount} × {formatDZD(m.upsellBonusPerDelivered)}) :
+                          </span>
+                          <strong style={{ color: "#db2777" }}>+ {formatDZD(st.upsellBonusTotal)}</strong>
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          paddingTop: "6px",
+                          marginTop: "2px",
+                          borderTop: "1px dashed rgba(16, 185, 129, 0.35)",
+                          fontSize: "14px",
+                        }}
+                      >
+                        <strong style={{ color: "#065f46" }}>💰 TOTAL À PAYER :</strong>
+                        <strong style={{ fontSize: "17px", color: "#059669", fontWeight: 900 }}>
+                          {formatDZD(st.totalPay)}
+                        </strong>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action Buttons: PDF Payslip + End of Month New Count + Activity Log */}
+                  {!m.isOwnerProfile && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                       <button
                         type="button"
-                        className="sp-btn sp-btn-pdf"
                         onClick={() =>
                           handleDownloadPayslipPdf(m, {
                             startDate: st.effectiveStart,
@@ -1278,68 +1345,136 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                             deliveredOrderDetails: st.deliveredOrderDetails,
                           })
                         }
+                        style={{
+                          height: "38px",
+                          borderRadius: "10px",
+                          border: "1px solid #2563eb",
+                          background: "rgba(37, 99, 235, 0.08)",
+                          color: "#1d4ed8",
+                          fontWeight: 800,
+                          fontSize: "12px",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px",
+                        }}
                       >
-                        <FileText size={14} /> Fiche Paie PDF
+                        <FileText size={14} /> 📄 Télécharger PDF Paie
                       </button>
 
                       {isOwner && (
                         <button
                           type="button"
-                          className="sp-btn sp-btn-close-month"
                           onClick={() => handleStartNewMonthCycle(st)}
+                          style={{
+                            height: "38px",
+                            borderRadius: "10px",
+                            border: "1px solid #059669",
+                            background: "rgba(16, 185, 129, 0.1)",
+                            color: "#047857",
+                            fontWeight: 800,
+                            fontSize: "12px",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "6px",
+                          }}
                         >
-                          <RefreshCw size={14} /> Clôturer Mois
+                          <RefreshCw size={14} /> 🔄 Fin du mois / Nouveau comptage
                         </button>
                       )}
                     </div>
                   )}
 
-                  {/* Archived Payroll History */}
+                  {/* Archived Payroll History Accordion */}
                   {!m.isOwnerProfile && archivedMonths.length > 0 && (
-                    <details className="sp-accordion">
-                      <summary>
+                    <div
+                      style={{
+                        borderRadius: "10px",
+                        border: "1px solid #e2e8f0",
+                        padding: "8px 10px",
+                        background: "#f8fafc",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedHistoryStaffId(expandedHistoryStaffId === m.id ? null : m.id)
+                        }
+                        style={{
+                          width: "100%",
+                          border: "none",
+                          background: "transparent",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          fontSize: "12px",
+                          fontWeight: 800,
+                          color: "#334155",
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                      >
                         <span>📚 Mois clôturés archivés ({archivedMonths.length})</span>
-                        <ChevronDown size={14} />
-                      </summary>
-                      <div className="sp-accordion-body">
-                        {archivedMonths.map(rec => (
-                          <div
-                            key={rec.id}
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              flexWrap: "wrap",
-                              gap: "6px",
-                              padding: "6px 8px",
-                              borderRadius: "8px",
-                              border: "1px solid var(--app-border, #e2e8f0)",
-                              fontSize: "11.5px",
-                            }}
-                          >
-                            <div>
-                              <strong>{formatDateFr(rec.startDate)} ➔ {formatDateFr(rec.endDate)}</strong>
-                              <div style={{ opacity: 0.75, fontSize: "11px" }}>
-                                {rec.confirmedCount} conf. · {rec.deliveredCount} livrés · <strong style={{ color: "#059669" }}>{formatDZD(rec.totalPay)}</strong>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadPayslipPdf(m, rec)}
-                              style={{ padding: "4px 10px", borderRadius: "8px", border: "1px solid #2563eb", background: "rgba(37, 99, 235, 0.08)", color: "#2563eb", fontWeight: 800, fontSize: "11px", cursor: "pointer" }}
+                        <span>{expandedHistoryStaffId === m.id ? "▲ Masquer" : "▼ Voir & Télécharger PDF"}</span>
+                      </button>
+
+                      {expandedHistoryStaffId === m.id && (
+                        <div style={{ display: "grid", gap: "6px", marginTop: "8px" }}>
+                          {archivedMonths.map(rec => (
+                            <div
+                              key={rec.id}
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                flexWrap: "wrap",
+                                gap: "6px",
+                                padding: "6px 8px",
+                                borderRadius: "8px",
+                                background: "#fff",
+                                border: "1px solid #e2e8f0",
+                                fontSize: "11.5px",
+                              }}
                             >
-                              📄 PDF
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
+                              <div>
+                                <strong>
+                                  {formatDateFr(rec.startDate)} ➔ {formatDateFr(rec.endDate)}
+                                </strong>
+                                <div style={{ color: "#64748b", fontSize: "11px" }}>
+                                  {rec.confirmedCount} conf. · {rec.deliveredCount} livrés · Payé :{" "}
+                                  <strong style={{ color: "#059669" }}>{formatDZD(rec.totalPay)}</strong>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDownloadPayslipPdf(m, rec)}
+                                style={{
+                                  padding: "4px 10px",
+                                  borderRadius: "8px",
+                                  border: "1px solid #2563eb",
+                                  background: "rgba(37, 99, 235, 0.08)",
+                                  color: "#1d4ed8",
+                                  fontWeight: 800,
+                                  fontSize: "11px",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                📄 PDF
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   <button
                     type="button"
                     className="button button-outline full"
-                    style={{ height: "36px", fontSize: "12px", fontWeight: 700, borderRadius: "12px" }}
+                    style={{ height: "36px", fontSize: "12px", fontWeight: 700 }}
                     onClick={() => {
                       setSelectedStaffFilter(m.id);
                       setActiveTab("journal");
