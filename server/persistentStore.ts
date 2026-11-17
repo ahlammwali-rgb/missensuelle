@@ -323,11 +323,14 @@ async function pushCloudState(state: PersistedState): Promise<void> {
   if (isTestEnv()) return;
   try {
     const existing = await fetchCloudState();
-    // Safety guard: never overwrite an existing non-empty cloud store if initial boot failed to load cloud state
+    // Safety guard: never overwrite an existing non-empty cloud store if initial boot failed to load cloud state,
+    // or if an old/stale container with <50% orders or 0 staff tries to wipe out orders/staff
     if (
-      !cloudLoadSucceeded &&
       existing.state &&
-      ((existing.state.orders?.length ?? 0) > 0 || (existing.state.staffMembers?.length ?? 0) > 0)
+      ((!cloudLoadSucceeded &&
+        ((existing.state.orders?.length ?? 0) > 0 || (existing.state.staffMembers?.length ?? 0) > 0)) ||
+        ((existing.state.orders?.length ?? 0) >= 50 && state.orders.length < existing.state.orders.length * 0.5) ||
+        ((existing.state.staffMembers?.length ?? 0) > 0 && (state.staffMembers?.length ?? 0) === 0))
     ) {
       return;
     }
