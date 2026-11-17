@@ -282,31 +282,55 @@ async function fetchCloudState(): Promise<{
   sha: string | null;
 }> {
   if (isTestEnv()) return { state: null, sha: null };
-  try {
-    const res = await fetch(CLOUD_API_URL, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${getCloudToken()}`,
-        "User-Agent": "missensuelle-store",
-        Accept: "application/vnd.github+json",
-      },
-    });
-    if (res.status === 404) return { state: null, sha: null };
-    if (!res.ok) return { state: null, sha: null };
-    const json = (await res.json()) as { content?: string; sha?: string };
-    if (!json.content) return { state: null, sha: json.sha ?? null };
-    const decoded = Buffer.from(json.content.replace(/\n/g, ""), "base64").toString("utf8");
-    const parsed = JSON.parse(decoded) as PersistedState;
-    return { state: parsed, sha: json.sha ?? null };
-  } catch {
-    return { state: null, sha: null };
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(CLOUD_API_URL, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${getCloudToken()}`,
+          "User-Agent": "missensuelle-store",
+          Accept: "application/vnd.github+json",
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res.status === 404) return { state: null, sha: null };
+      if (!res.ok) {
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, 1200 * attempt));
+          continue;
+        }
+        return { state: null, sha: null };
+      }
+      const json = (await res.json()) as { content?: string; sha?: string };
+      if (!json.content) return { state: null, sha: json.sha ?? null };
+      const decoded = Buffer.from(json.content.replace(/\n/g, ""), "base64").toString("utf8");
+      const parsed = JSON.parse(decoded) as PersistedState;
+      return { state: parsed, sha: json.sha ?? null };
+    } catch {
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1200 * attempt));
+        continue;
+      }
+      return { state: null, sha: null };
+    }
   }
+  return { state: null, sha: null };
 }
+
+let cloudLoadSucceeded = false;
 
 async function pushCloudState(state: PersistedState): Promise<void> {
   if (isTestEnv()) return;
   try {
     const existing = await fetchCloudState();
+    // Safety guard: never overwrite an existing non-empty cloud store if initial boot failed to load cloud state
+    if (
+      !cloudLoadSucceeded &&
+      existing.state &&
+      ((existing.state.orders?.length ?? 0) > 0 || (existing.state.staffMembers?.length ?? 0) > 0)
+    ) {
+      return;
+    }
     // In-memory state is authoritative for orders; do not resurrect orders that were deleted
     const finalOrders = [...state.orders].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -474,6 +498,7 @@ export async function ensurePersistentStoreLoaded(
       }
       const cloud = await fetchCloudState();
       if (cloud.state) {
+        cloudLoadSucceeded = true;
         mergeStateIntoMemory(cloud.state, memoryOrders, memorySessions, setCounters, getCounters);
         const counters = getCounters();
         writeLocalState({

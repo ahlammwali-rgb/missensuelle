@@ -468,31 +468,6 @@ function AdminPageContent() {
   useEffect(() => {
     if (ordersQuery.isLoading || ordersQuery.error) return;
     try {
-      const serverIds = new Set(serverOrders.map(o => o.id));
-      const localOrders = loadRealOrders();
-      const backupRaw = JSON.parse(
-        localStorage.getItem("miss-sensuelle-admin-orders-backup") || "[]",
-      ) as Order[];
-      const combined = [...localOrders, ...(Array.isArray(backupRaw) ? backupRaw : [])];
-      const uniqueMissing = new Map<string, Order>();
-      for (const item of combined) {
-        if (item && item.id && !serverIds.has(item.id) && !uniqueMissing.has(item.id)) {
-          uniqueMissing.set(item.id, item);
-        }
-      }
-      if (uniqueMissing.size > 0 && !restoredOnceRef.current) {
-        restoredOnceRef.current = true;
-        restoreOrders.mutate(
-          { orders: Array.from(uniqueMissing.values()) },
-          {
-            onSuccess: async res => {
-              if (res.restored > 0) {
-                await utils.admin.orders.invalidate();
-              }
-            },
-          },
-        );
-      }
       if (serverOrders.length > 0) {
         localStorage.setItem(
           "miss-sensuelle-admin-orders-backup",
@@ -643,10 +618,24 @@ function AdminPageContent() {
     });
   };
   const handleDeleteOrder = (dbId: number) => {
+    const deletedOrder = serverOrders.find(o => o.dbId === dbId);
     deleteOrderMutation.mutate(
       { id: dbId },
       {
         onSuccess: async () => {
+          try {
+            if (deletedOrder?.id) {
+              const localOrders = loadRealOrders().filter(o => o.id !== deletedOrder.id);
+              localStorage.setItem("miss-sensuelle-orders", JSON.stringify(localOrders));
+              const backupRaw = JSON.parse(localStorage.getItem("miss-sensuelle-admin-orders-backup") || "[]") as Order[];
+              if (Array.isArray(backupRaw)) {
+                localStorage.setItem(
+                  "miss-sensuelle-admin-orders-backup",
+                  JSON.stringify(backupRaw.filter(o => o.id !== deletedOrder.id)),
+                );
+              }
+            }
+          } catch {}
           await utils.admin.orders.invalidate();
           setSelected(null);
           notify("Commande supprimée du tableau de bord");
