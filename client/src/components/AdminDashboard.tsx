@@ -655,7 +655,7 @@ export function AdminDashboard({
                           .join(" + ")
                       : "";
                     const displayTitle = isExt
-                      ? "Extensions Cheveux Naturels"
+                      ? cleanExtVariants || "Extensions Cheveux"
                       : order.product;
                     const hideAutoExtNote =
                       isExt &&
@@ -673,16 +673,9 @@ export function AdminDashboard({
                               <strong className="aoc-prod-title">{displayTitle}</strong>
                               <div className="aoc-prod-meta-tags">
                                 {isExt ? (
-                                  <>
-                                    {cleanExtVariants && (
-                                      <span className="aoc-chip aoc-chip-color">
-                                        <b>{cleanExtVariants}</b>
-                                      </span>
-                                    )}
-                                    <span className="aoc-chip aoc-chip-qty">
-                                      <b>1 achetée + 2ème gratuite</b>
-                                    </span>
-                                  </>
+                                  <span className="aoc-chip aoc-chip-qty">
+                                    <b>1 achetée + 2ème gratuite</b>
+                                  </span>
                                 ) : (
                                   <>
                                     <span className="aoc-chip aoc-chip-qty">

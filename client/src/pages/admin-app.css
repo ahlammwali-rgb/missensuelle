@@ -1292,9 +1292,9 @@ html.dark .badge-status-annulee, .dark .badge-status-annulee {
 
   .admin-shell .admin-mobile-nav {
     position: fixed !important;
-    left: 10px !important;
-    right: 10px !important;
-    bottom: 10px !important;
+    left: 12px !important;
+    right: 12px !important;
+    bottom: 12px !important;
     height: 64px !important;
     border-radius: 22px !important;
     background: color-mix(in srgb, var(--app-surface) 92%, transparent) !important;
@@ -1302,14 +1302,13 @@ html.dark .badge-status-annulee, .dark .badge-status-annulee {
     border: 1px solid var(--app-border) !important;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3) !important;
     display: grid !important;
-    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
-    gap: 2px !important;
-    padding: 6px 4px !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    gap: 4px !important;
+    padding: 6px !important;
     z-index: 45 !important;
   }
   
   .admin-shell .admin-mobile-nav button {
-    min-width: 0 !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
@@ -1319,11 +1318,11 @@ html.dark .badge-status-annulee, .dark .badge-status-annulee {
     background: transparent !important;
     border: 0 !important;
     color: var(--app-text-muted) !important;
-    font-size: 9.5px !important;
+    font-size: 10px !important;
     font-weight: 700 !important;
     cursor: pointer !important;
     min-height: 0 !important;
-    padding: 4px 2px !important;
+    padding: 0 !important;
   }
   
   .admin-shell .admin-mobile-nav button.active {
@@ -2385,20 +2384,12 @@ html.dark .trans-modal-footer {
    ========================================================================== */
 
 @media (max-width: 720px) {
-  .admin-shell .admin-top-actions {
-    display: none !important;
-  }
-
-  .admin-shell .admin-topbar {
-    padding: 10px 14px 8px !important;
-  }
-
   .admin-shell .admin-mobile-nav {
     display: grid !important;
     grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
-    gap: 2px !important;
+    gap: 4px !important;
     margin-top: 8px !important;
-    padding: 6px 4px !important;
+    padding-top: 8px !important;
     border-top: 1px solid rgba(148, 163, 184, 0.2) !important;
   }
 
@@ -2410,7 +2401,7 @@ html.dark .trans-modal-footer {
     min-width: 0 !important;
     min-height: 48px !important;
     gap: 2px !important;
-    padding: 4px 2px !important;
+    padding: 5px 2px !important;
     border: 1px solid transparent !important;
     border-radius: 12px !important;
     color: #85808a !important;
@@ -2748,9 +2739,6 @@ html.dark .src-bottom {
   background: var(--app-surface, #ffffff);
   width: 100%;
   max-width: 520px;
-  max-height: 82vh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   border-radius: 26px 26px 0 0;
   border-top: 1px solid rgba(168, 85, 247, 0.35);
   box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);

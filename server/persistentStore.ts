@@ -302,8 +302,27 @@ async function fetchCloudState(): Promise<{
         return { state: null, sha: null };
       }
       const json = (await res.json()) as { content?: string; sha?: string };
-      if (!json.content) return { state: null, sha: json.sha ?? null };
-      const decoded = Buffer.from(json.content.replace(/\n/g, ""), "base64").toString("utf8");
+      let base64Content = json.content;
+      if (!base64Content && json.sha) {
+        const blobRes = await fetch(
+          `https://api.github.com/repos/ahlammwali-rgb/missensuelle-db/git/blobs/${json.sha}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${getCloudToken()}`,
+              "User-Agent": "missensuelle-store",
+              Accept: "application/vnd.github+json",
+            },
+            signal: AbortSignal.timeout(15000),
+          },
+        );
+        if (blobRes.ok) {
+          const blobJson = (await blobRes.json()) as { content?: string };
+          base64Content = blobJson.content;
+        }
+      }
+      if (!base64Content) return { state: null, sha: json.sha ?? null };
+      const decoded = Buffer.from(base64Content.replace(/\n/g, ""), "base64").toString("utf8");
       const parsed = JSON.parse(decoded) as PersistedState;
       return { state: parsed, sha: json.sha ?? null };
     } catch {

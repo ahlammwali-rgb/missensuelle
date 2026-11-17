@@ -73,8 +73,6 @@ import {
 import { triggerStoreSave } from "./checkout";
 import { z } from "zod";
 
-const lastEcomParcelSituation = new Map<string, string>();
-
 function isOwnerUser(user: { openId?: string | null; loginMethod?: string | null } | null | undefined): boolean {
   if (!user) return false;
   return user.loginMethod !== "staff_code" && !String(user.openId || "").startsWith("staff:");
@@ -477,40 +475,12 @@ export const appRouter = router({
               const shipments = ecomStatus.shipments || {};
               const orders = await listCheckoutOrders();
               for (const order of orders) {
+                if (order.isDelivered) continue;
                 const sh = shipments[order.id];
                 if (!sh?.tracking) continue;
                 const trkData = batch[sh.tracking];
                 if (!trkData) continue;
-                const rawSituation = String(trkData.situation || "").trim();
-                const sit = rawSituation.toLowerCase();
-                if (rawSituation) {
-                  const prevSit = lastEcomParcelSituation.get(sh.tracking);
-                  if (prevSit && prevSit !== rawSituation) {
-                    lastEcomParcelSituation.set(sh.tracking, rawSituation);
-                    const isDeliveredSit =
-                      sit.includes("livr") ||
-                      sit.includes("encaiss") ||
-                      sit.includes("recouvr");
-                    void sendAdminPushNotification({
-                      title: isDeliveredSit
-                        ? `🎉 Colis #${order.id} Livré !`
-                        : `📦 Situation colis #${order.id} modifiée`,
-                      body: `${order.customer} (${order.wilaya}) · ${prevSit} ➜ ${rawSituation}`,
-                      icon: "/icons/icon-192x192.png",
-                      badge: "/icons/icon-192x192.png",
-                      tag: `ecom-sit-${sh.tracking}-${rawSituation}`,
-                      type: isDeliveredSit ? "victory" : "urgent_alert",
-                      data: {
-                        url: "/admin",
-                        sound: isDeliveredSit ? "/sounds/victory-delivered.wav" : "/sounds/alert-urgent.wav",
-                        type: isDeliveredSit ? "victory" : "urgent_alert",
-                      },
-                    });
-                  } else if (!prevSit) {
-                    lastEcomParcelSituation.set(sh.tracking, rawSituation);
-                  }
-                }
-                if (order.isDelivered) continue;
+                const sit = (trkData.situation || "").toLowerCase();
                 if (
                   sit.includes("livr") ||
                   sit.includes("encaiss") ||
