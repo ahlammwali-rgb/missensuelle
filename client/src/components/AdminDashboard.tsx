@@ -637,43 +637,81 @@ export function AdminDashboard({
                   </div>
 
                   {/* Order Content / Variants */}
-                  <div className="aoc-product-row">
-                    <div className="aoc-prod-main">
-                      <div className="aoc-prod-badge">
-                        <Package size={15} />
-                      </div>
-                      <div className="aoc-prod-name-wrap">
-                        <strong className="aoc-prod-title">{order.product}</strong>
-                        <div className="aoc-prod-meta-tags">
-                          <span className="aoc-chip aoc-chip-qty">
-                            Qté : <b>{order.quantity}</b>
-                          </span>
-                          {order.color && (
-                            <span className="aoc-chip aoc-chip-color">
-                              Couleur : <b>{order.color}</b>
-                            </span>
-                          )}
-                          {order.size && order.size.trim() !== "" && (
-                            <span className="aoc-chip aoc-chip-size">
-                              Taille : <b>{order.size}</b>
-                            </span>
-                          )}
+                  {(() => {
+                    const isExt =
+                      order.productId === "p-005" ||
+                      order.product.toLowerCase().includes("extension");
+                    const cleanExtVariants = isExt && order.color
+                      ? order.color
+                          .split("+")
+                          .map(part =>
+                            part
+                              .replace(/^\s*\d+\s*(\([^)]*\))?\s*:\s*/u, "")
+                              .replace(/^\s*\[Art\.\d+\]\s*/i, "")
+                              .trim()
+                          )
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .join(" + ")
+                      : "";
+                    const displayTitle = isExt
+                      ? cleanExtVariants || "Extensions Cheveux"
+                      : order.product;
+                    const hideAutoExtNote =
+                      isExt &&
+                      Boolean(order.note) &&
+                      (order.note!.includes("عرض قطعتين") || order.note!.includes("1 achetée + 2ème gratuite"));
+
+                    return (
+                      <>
+                        <div className="aoc-product-row">
+                          <div className="aoc-prod-main">
+                            <div className="aoc-prod-badge">
+                              <Package size={15} />
+                            </div>
+                            <div className="aoc-prod-name-wrap">
+                              <strong className="aoc-prod-title">{displayTitle}</strong>
+                              <div className="aoc-prod-meta-tags">
+                                {isExt ? (
+                                  <span className="aoc-chip aoc-chip-qty">
+                                    <b>1 achetée + 2ème gratuite</b>
+                                  </span>
+                                ) : (
+                                  <>
+                                    <span className="aoc-chip aoc-chip-qty">
+                                      Qté : <b>{order.quantity}</b>
+                                    </span>
+                                    {order.color && (
+                                      <span className="aoc-chip aoc-chip-color">
+                                        Couleur : <b>{order.color}</b>
+                                      </span>
+                                    )}
+                                    {order.size && order.size.trim() !== "" && (
+                                      <span className="aoc-chip aoc-chip-size">
+                                        Taille : <b>{order.size}</b>
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="aoc-price-tag">
+                            <small>Total à encaisser</small>
+                            <strong>{formatDZD(order.total)}</strong>
+                          </div>
                         </div>
-                      </div>
-                    </div>
 
-                    <div className="aoc-price-tag">
-                      <small>Total à encaisser</small>
-                      <strong>{formatDZD(order.total)}</strong>
-                    </div>
-                  </div>
-
-                  {order.note && (
-                    <div className="aoc-note-banner">
-                      <span className="aoc-note-label">📝 Note :</span>
-                      <span className="aoc-note-content">{order.note}</span>
-                    </div>
-                  )}
+                        {order.note && !hideAutoExtNote && (
+                          <div className="aoc-note-banner">
+                            <span className="aoc-note-label">📝 Note :</span>
+                            <span className="aoc-note-content">{order.note}</span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
 
                   {/* Complete 1-Tap Confirmation Actions Bar with ALL buttons: Confirmer, NRP 1/2/3, Reporter, Annuler, Modifier, Historique */}
                   <div className="aoc-actions-bar">

@@ -139,7 +139,7 @@
   margin: 0 0 14px;
 }
 
-/* Form Section — Colorful Pink-Gold-Lavender 3D Glam */
+/* Form Section — Hero Style (Glossy Pink, Black, White & Metallic 3D Gold) */
 .pq-form-section {
   background: linear-gradient(180deg, #fcdcec 0%, #fde8f2 45%, #fcd3e6 100%);
   padding: 16px 12px 20px;
@@ -147,40 +147,41 @@
 
 .pq-form {
   margin: 0;
-  background: linear-gradient(180deg, #ffffff 0%, #fff1f8 52%, #ffe4f1 100%);
+  background: linear-gradient(180deg, #fff8fb 0%, #ffeaf4 55%, #ffd9eb 100%);
   border: 3px solid #ffd53d;
   border-radius: 30px;
   padding: 0 14px 20px;
   overflow: hidden;
   box-shadow:
-    0 8px 0 #8b0a3a,
-    0 18px 40px rgba(184, 16, 90, 0.34);
+    0 8px 0 #1f0a14,
+    0 18px 40px rgba(31, 10, 20, 0.34);
 }
 
 .pq-form-header {
   margin: 0 -14px 16px;
   padding: 16px 14px 14px;
   text-align: center;
-  background: linear-gradient(135deg, #9d0b48 0%, #ec2a8a 48%, #a61578 100%);
+  background: radial-gradient(circle at top, #4d0d2c 0%, #1b0711 72%, #12040b 100%);
   border-bottom: 3px solid #ffd53d;
-  box-shadow: 0 5px 0 #6e0632;
+  box-shadow: 0 5px 0 #8a5600;
 }
 
 .pq-form-gold-badge {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 8px;
-  padding: 5px 18px;
+  padding: 5px 20px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #fff7b2 0%, #ffd53d 48%, #e69d00 100%);
-  color: #3a1c00;
-  font-size: 17px;
+  background: linear-gradient(180deg, #fff9c4 0%, #ffd53d 48%, #d98a00 100%);
+  color: #2b1300;
+  font-size: 20px;
   font-weight: 900;
-  border: 2px solid #fffbe0;
+  border: 2px solid #fffbe6;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
   box-shadow:
-    0 3px 0 #8a5600,
-    0 0 20px rgba(255, 213, 63, 0.85);
+    0 4px 0 #7a4900,
+    0 0 24px rgba(255, 213, 63, 0.9);
 }
 
 .pq-form-gold-old {

@@ -524,10 +524,8 @@ export default function ExtensionsLanding({
     triggerInitiateCheckoutOnce();
 
     try {
-      const finalColor = `1: ${c1} + 2 (مجاناً): ${c2}`;
-      const finalNote = `عرض قطعتين (${finalColor}) — ${
-        delivery === "office" ? "المكتب Stop Desk" : "توصيل للمنزل"
-      } — الإجمالي: ${grandTotal} دج`;
+      const finalColor = `${c1} + ${c2}`;
+      const finalNote = `1 achetée + 2ème gratuite`;
       const finalCommune = resolvedCommune;
       const token = ensureToken();
 
