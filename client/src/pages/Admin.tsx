@@ -1092,8 +1092,33 @@ function AdminPageContent() {
   const totalAcquis = evolvedSalary + realCommission;
 
   return (
-    <div className="modal-backdrop" onClick={() => setIsProfileModalOpen(false)} style={{ zIndex: 120 }}>
-      <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 460, width: "94%", borderRadius: 24, padding: 20 }}>
+    <div
+      onClick={() => setIsProfileModalOpen(false)}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        background: "rgba(10, 14, 26, 0.68)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        className="order-modal"
+        onClick={e => e.stopPropagation()}
+        style={{
+          maxWidth: 440,
+          width: "100%",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          borderRadius: 24,
+          padding: 20,
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 46, height: 46, borderRadius: "50%", background: myProfile?.avatarColor || "linear-gradient(135deg, #9b82f6, #ec4899)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 16 }}>

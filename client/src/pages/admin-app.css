@@ -1301,25 +1301,15 @@ html.dark .badge-status-annulee, .dark .badge-status-annulee {
     backdrop-filter: blur(24px) !important;
     border: 1px solid var(--app-border) !important;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3) !important;
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    scroll-snap-type: x proximity !important;
-    -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: none !important;
-    gap: 6px !important;
-    padding: 6px 8px !important;
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 2px !important;
+    padding: 6px 4px !important;
     z-index: 45 !important;
-  }
-
-  .admin-shell .admin-mobile-nav::-webkit-scrollbar {
-    display: none;
   }
   
   .admin-shell .admin-mobile-nav button {
-    flex: 0 0 auto !important;
-    min-width: 72px !important;
-    scroll-snap-align: center !important;
+    min-width: 0 !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
@@ -1329,11 +1319,11 @@ html.dark .badge-status-annulee, .dark .badge-status-annulee {
     background: transparent !important;
     border: 0 !important;
     color: var(--app-text-muted) !important;
-    font-size: 10px !important;
+    font-size: 9.5px !important;
     font-weight: 700 !important;
     cursor: pointer !important;
     min-height: 0 !important;
-    padding: 4px 8px !important;
+    padding: 4px 2px !important;
   }
   
   .admin-shell .admin-mobile-nav button.active {
@@ -2395,33 +2385,32 @@ html.dark .trans-modal-footer {
    ========================================================================== */
 
 @media (max-width: 720px) {
+  .admin-shell .admin-top-actions {
+    display: none !important;
+  }
+
+  .admin-shell .admin-topbar {
+    padding: 10px 14px 8px !important;
+  }
+
   .admin-shell .admin-mobile-nav {
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    scroll-snap-type: x proximity !important;
-    -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: none !important;
-    gap: 6px !important;
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 2px !important;
     margin-top: 8px !important;
-    padding: 6px 8px !important;
+    padding: 6px 4px !important;
     border-top: 1px solid rgba(148, 163, 184, 0.2) !important;
   }
 
-  .admin-shell .admin-mobile-nav::-webkit-scrollbar {
-    display: none;
-  }
-
   .admin-shell .admin-mobile-nav button {
-    flex: 0 0 auto !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    min-width: 70px !important;
+    min-width: 0 !important;
     min-height: 48px !important;
     gap: 2px !important;
-    padding: 5px 8px !important;
+    padding: 4px 2px !important;
     border: 1px solid transparent !important;
     border-radius: 12px !important;
     color: #85808a !important;
