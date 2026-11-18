@@ -250,16 +250,22 @@ async function ecoRequest<T>(
 }
 
 async function validateToken(creds: { baseUrl: string; token: string }) {
-  const resp = await ecoRequest<{ success?: boolean; message?: string }>(
-    "/api/v1/validate/token",
-    { creds, query: { api_token: creds.token } }
-  );
-  if (resp && (resp.success === true || String(resp.message || "").includes("VALID"))) {
-    return true;
+  try {
+    const resp = await ecoRequest<{ success?: boolean; message?: string }>(
+      "/api/v1/validate/token",
+      { creds, query: { api_token: creds.token } }
+    );
+    if (resp && (resp.success === true || String(resp.message || "").includes("VALID"))) {
+      return true;
+    }
+  } catch (err) {
+    if (err instanceof EcoTrackError && err.status === 401) {
+      throw err;
+    }
   }
   // Fallback test: try /api/v1/get/wilayas with Bearer token if validate/token shape differs
   const w = await ecoRequest<unknown>("/api/v1/get/wilayas", { creds });
-  if (Array.isArray(w)) return true;
+  if (Array.isArray(w) || (w && typeof w === "object")) return true;
   throw new EcoTrackError("Token EcoTrack refusé par la plateforme.", 401);
 }
 

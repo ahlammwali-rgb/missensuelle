@@ -221,7 +221,7 @@ export function EcomDeliveryPanel({
             boxShadow: carrierTab === "ecotrack" ? "0 4px 12px rgba(139, 92, 246, 0.28)" : "none",
           }}
         >
-          📦 EcoTrack API ({linkedEcoTrackCount})
+          📦 DHD / EcoTrack API ({linkedEcoTrackCount})
         </button>
       </div>
 

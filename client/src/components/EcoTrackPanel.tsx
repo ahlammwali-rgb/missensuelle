@@ -16,6 +16,7 @@ type EcoRowState = {
 };
 
 const QUICK_PLATFORMS = [
+  { label: "DHD Livraison", url: "https://platform.dhd-dz.com" },
   { label: "EcoTrack App", url: "https://app.ecotrack.dz" },
   { label: "Anderson", url: "https://anderson.ecotrack.dz" },
   { label: "Yalitec", url: "https://yalitec.ecotrack.dz" },
@@ -48,9 +49,9 @@ export function EcoTrackPanel({
   const ship = trpc.ecotrack.ship.useMutation();
   const validateOrder = trpc.ecotrack.validateOrder.useMutation();
 
-  const [baseUrl, setBaseUrl] = useState("https://app.ecotrack.dz");
+  const [baseUrl, setBaseUrl] = useState("https://platform.dhd-dz.com");
   const [token, setToken] = useState("");
-  const [label, setLabel] = useState("");
+  const [label, setLabel] = useState("DHD Livraison");
   const [editing, setEditing] = useState(false);
   const [showAllConfirmed, setShowAllConfirmed] = useState(false);
   const [rows, setRows] = useState<Record<string, EcoRowState>>({});
@@ -208,11 +209,11 @@ export function EcoTrackPanel({
                 <button
                   key={p.url}
                   type="button"
-                  className="button button-outline"
+                  className={baseUrl.replace(/\/+$/, "") === p.url ? "button button-gradient" : "button button-outline"}
                   style={{ padding: "4px 10px", fontSize: 11.5 }}
                   onClick={() => {
                     setBaseUrl(p.url);
-                    if (!label) setLabel(p.label);
+                    setLabel(p.label);
                   }}
                 >
                   {p.label}
@@ -225,21 +226,21 @@ export function EcoTrackPanel({
                 className="ecom-delivery-field"
                 value={baseUrl}
                 onChange={e => setBaseUrl(e.target.value)}
-                placeholder="URL EcoTrack (ex: https://anderson.ecotrack.dz)"
+                placeholder="URL DHD / EcoTrack (ex: https://platform.dhd-dz.com)"
                 dir="ltr"
               />
               <input
                 className="ecom-delivery-field"
                 value={token}
                 onChange={e => setToken(e.target.value)}
-                placeholder="Token API Bearer"
+                placeholder="Token API Bearer DHD"
                 dir="ltr"
               />
               <input
                 className="ecom-delivery-field"
                 value={label}
                 onChange={e => setLabel(e.target.value)}
-                placeholder="Nom du transporteur (optionnel, ex: Anderson)"
+                placeholder="Nom du transporteur (ex: DHD Livraison)"
               />
               <button
                 className="button button-gradient"

@@ -74,6 +74,7 @@ export function TransferredOrdersPanel({
   });
   const ecomShipments = useMemo(() => ecomStatusQuery.data?.shipments || {}, [ecomStatusQuery.data]);
   const ecoShipments = useMemo(() => ecotrackStatusQuery.data?.shipments || {}, [ecotrackStatusQuery.data]);
+  const ecoCarrierName = ecotrackStatusQuery.data?.label || "DHD (EcoTrack)";
   const shipments = useMemo(() => ({ ...ecomShipments, ...ecoShipments }), [ecomShipments, ecoShipments]);
 
   // Filter transferred orders
@@ -471,7 +472,7 @@ export function TransferredOrdersPanel({
                       }
                     >
                       <Truck size={12} />
-                      {isEcoTrack ? "EcoTrack" : "E-com Delivery"}
+                      {isEcoTrack ? ecoCarrierName : "E-com Delivery"}
                     </span>
                     {tracking && (
                       <button
