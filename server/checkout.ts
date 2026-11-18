@@ -407,6 +407,30 @@ export function updateMemoryOrderStatus(
   return found ? [found] : [];
 }
 
+export async function setMemoryOrderCarrier(
+  dbId: number,
+  carrier: "ecom" | "ecotrack",
+  actor?: { actorId: string; actorName: string }
+) {
+  await loadStore();
+  const found = memoryOrders.find(order => order.dbId === dbId);
+  if (!found) throw new CheckoutValidationError("Commande introuvable");
+  if (found.carrier !== carrier) {
+    const prevLabel = found.carrier === "ecotrack" ? "EcoTrack" : "E-com Delivery";
+    const nextLabel = carrier === "ecotrack" ? "EcoTrack" : "E-com Delivery";
+    found.carrier = carrier;
+    appendOrderHistory(found, {
+      type: "edit",
+      actorId: actor?.actorId || "owner",
+      actorName: actor?.actorName || "Admin",
+      summary: `🚚 Transporteur lié : ${nextLabel}`,
+      changes: [{ field: "carrier", label: "Société de livraison", before: prevLabel, after: nextLabel }],
+    });
+    saveStore();
+  }
+  return found;
+}
+
 export async function recordOrderInteraction(
   input: RecordOrderInteractionInput,
   fallbackActor?: { actorId: string; actorName: string }

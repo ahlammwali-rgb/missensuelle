@@ -6,6 +6,7 @@ import { abayaWilayas } from "@/lib/abaya-communes";
 import { trpc } from "@/lib/trpc";
 import { adjustProductStock, formatDZD } from "@/lib/store-data";
 import { ParcelScannerModal } from "./ParcelScannerModal";
+import { EcoTrackPanel } from "./EcoTrackPanel";
 
 type RowState = {
   selected: boolean;
@@ -34,6 +35,8 @@ export function EcomDeliveryPanel({
   const [apiKey, setApiKey] = useState("");
   const [apiToken, setApiToken] = useState("");
   const [editing, setEditing] = useState(false);
+  const [carrierTab, setCarrierTab] = useState<"ecom" | "ecotrack">("ecom");
+  const [showAllEcomConfirmed, setShowAllEcomConfirmed] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [lastErrors, setLastErrors] = useState<Record<string, string>>({});
@@ -42,9 +45,17 @@ export function EcomDeliveryPanel({
   const shipments = status?.shipments ?? {};
   const connected = Boolean(status?.configured && status.account);
   const stockAccount = Boolean(status?.configured && status.account?.stock);
-  const toShip = useMemo(
-    () => orders.filter(o => o.status === "confirmee" && !shipments[o.id]),
+  const linkedEcom = useMemo(
+    () => orders.filter(o => o.status === "confirmee" && !shipments[o.id] && o.carrier !== "ecotrack"),
     [orders, shipments]
+  );
+  const linkedEcoTrackCount = useMemo(
+    () => orders.filter(o => o.status === "confirmee" && o.carrier === "ecotrack").length,
+    [orders]
+  );
+  const toShip = useMemo(
+    () => (showAllEcomConfirmed ? orders.filter(o => o.status === "confirmee" && !shipments[o.id]) : linkedEcom),
+    [orders, shipments, showAllEcomConfirmed, linkedEcom]
   );
   const inPreparation = useMemo(
     () => orders.filter(o => shipments[o.id] && !shipments[o.id].readyToShip),
@@ -163,6 +174,61 @@ export function EcomDeliveryPanel({
 
   return (
     <section className="ecom-delivery-panel">
+      {/* Switcher Transporteurs : E-com Delivery | EcoTrack API */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 8,
+          padding: 6,
+          borderRadius: 16,
+          background: "var(--app-surface-alt, rgba(148,163,184,0.14))",
+          border: "1px solid var(--app-border, rgba(148,163,184,0.25))",
+          marginBottom: 14,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setCarrierTab("ecom")}
+          style={{
+            border: 0,
+            borderRadius: 12,
+            padding: "10px 12px",
+            font: "inherit",
+            fontWeight: 900,
+            fontSize: 13,
+            cursor: "pointer",
+            background: carrierTab === "ecom" ? "linear-gradient(135deg, #2563eb, #1d4ed8)" : "transparent",
+            color: carrierTab === "ecom" ? "#ffffff" : "inherit",
+            boxShadow: carrierTab === "ecom" ? "0 4px 12px rgba(37, 99, 235, 0.28)" : "none",
+          }}
+        >
+          🚚 E-com Delivery ({linkedEcom.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setCarrierTab("ecotrack")}
+          style={{
+            border: 0,
+            borderRadius: 12,
+            padding: "10px 12px",
+            font: "inherit",
+            fontWeight: 900,
+            fontSize: 13,
+            cursor: "pointer",
+            background: carrierTab === "ecotrack" ? "linear-gradient(135deg, #8b5cf6, #7c3aed)" : "transparent",
+            color: carrierTab === "ecotrack" ? "#ffffff" : "inherit",
+            boxShadow: carrierTab === "ecotrack" ? "0 4px 12px rgba(139, 92, 246, 0.28)" : "none",
+          }}
+        >
+          📦 EcoTrack API ({linkedEcoTrackCount})
+        </button>
+      </div>
+
+      {carrierTab === "ecotrack" ? (
+        <EcoTrackPanel orders={orders} notify={notify} onShipped={onShipped} />
+      ) : (
+        <>
       <div className="ecom-delivery-card">
         <div className="ecom-card-head">
           <KeyRound size={20} className="ecom-head-icon" />
@@ -434,6 +500,8 @@ export function EcomDeliveryPanel({
         notify={notify}
         onRefreshOrders={onShipped}
       />
+        </>
+      )}
     </section>
   );
 }

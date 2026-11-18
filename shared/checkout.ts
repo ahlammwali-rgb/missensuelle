@@ -29,6 +29,8 @@ export const submitOrderSchema = z.object({ token: z.string().uuid(), payload: c
 export const discardDraftSchema = z.object({ token: z.string().uuid(), revision: z.number().int().min(1).max(2147483647) });
 export const recoveryStatusSchema = z.enum(["new", "called", "ignored"]);
 export const checkoutOrderStatusSchema = z.enum(["nouvelle", "confirmee", "annulee", "reportee", "ne_repond_pas", "transferee"]);
+export const orderCarrierSchema = z.enum(["ecom", "ecotrack"]);
+export type OrderCarrier = z.infer<typeof orderCarrierSchema>;
 
 export const updateOrderDetailsSchema = z.object({
   id: z.number().int().positive(),
@@ -223,6 +225,7 @@ export type CheckoutOrder = {
   dbId: number; id: string; createdAt: string; customer: string; phone: string; product: string;
   quantity: number; total: number; wilaya: string; commune: string; address: string; note: string;
   productId?: string; color?: string; size?: string; delivery?: "home" | "office";
+  carrier?: OrderCarrier;
   status: z.infer<typeof checkoutOrderStatusSchema>;
   returnReceived?: boolean;
   returnReceivedAt?: string;

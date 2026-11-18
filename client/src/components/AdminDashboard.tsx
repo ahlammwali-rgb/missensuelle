@@ -46,6 +46,7 @@ type Props = {
   onExport: () => void;
   onCreateOrder?: () => void;
   onUpdateStatus?: (id: string, status: OrderStatus) => void;
+  onSetCarrier?: (id: string, carrier: "ecom" | "ecotrack") => void;
   stockPanel: ReactNode;
 };
 
@@ -113,6 +114,7 @@ export function AdminDashboard({
   onExport,
   onCreateOrder,
   onUpdateStatus,
+  onSetCarrier,
   stockPanel,
 }: Props) {
   const stats = getOrderStats(orders);
@@ -838,6 +840,58 @@ export function AdminDashboard({
                       </button>
                     )}
                   </div>
+
+                  {order.status === "confirmee" && onSetCarrier && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        flexWrap: "wrap",
+                        marginTop: "6px",
+                        padding: "6px 10px",
+                        borderRadius: "10px",
+                        background: "rgba(15, 23, 42, 0.03)",
+                        border: "1px dashed rgba(100, 116, 139, 0.25)",
+                      }}
+                    >
+                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#475569" }}>
+                        🚚 Société de livraison liée :
+                      </span>
+                      <button
+                        type="button"
+                        className="aoc-btn"
+                        onClick={() => onSetCarrier(order.id, "ecom")}
+                        style={{
+                          padding: "4px 10px",
+                          fontSize: "11px",
+                          fontWeight: 800,
+                          borderRadius: "8px",
+                          background: (!order.carrier || order.carrier === "ecom") ? "#0f766e" : "rgba(255,255,255,0.85)",
+                          color: (!order.carrier || order.carrier === "ecom") ? "#fff" : "#334155",
+                          border: (!order.carrier || order.carrier === "ecom") ? "1px solid #0f766e" : "1px solid rgba(148,163,184,0.35)",
+                        }}
+                      >
+                        🚚 E-com Delivery
+                      </button>
+                      <button
+                        type="button"
+                        className="aoc-btn"
+                        onClick={() => onSetCarrier(order.id, "ecotrack")}
+                        style={{
+                          padding: "4px 10px",
+                          fontSize: "11px",
+                          fontWeight: 800,
+                          borderRadius: "8px",
+                          background: order.carrier === "ecotrack" ? "#2563eb" : "rgba(255,255,255,0.85)",
+                          color: order.carrier === "ecotrack" ? "#fff" : "#334155",
+                          border: order.carrier === "ecotrack" ? "1px solid #2563eb" : "1px solid rgba(148,163,184,0.35)",
+                        }}
+                      >
+                        📦 EcoTrack
+                      </button>
+                    </div>
+                  )}
 
                   {/* Panneau d'options « Pas de réponse » affiché au clic sur le bouton */}
                   {onSetNrpLevel && openNrpMenuOrderId === order.id && (() => {

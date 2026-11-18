@@ -57,6 +57,7 @@ export type Order = {
   color?: string;
   size?: string;
   delivery?: "home" | "office";
+  carrier?: "ecom" | "ecotrack";
   status: OrderStatus;
   nrpLevel?: 1 | 2 | 3;
   postponedUntil?: string | null;

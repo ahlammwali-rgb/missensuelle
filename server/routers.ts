@@ -14,6 +14,7 @@ import {
 import {
   adminCreateOrderSchema,
   discardDraftSchema,
+  orderCarrierSchema,
   recordOrderInteractionSchema,
   recoveryStatusSchema,
   saveDraftSchema,
@@ -38,6 +39,7 @@ import {
   updateAbandonedCheckout,
   updateCheckoutOrderDetails,
   updateMemoryOrderStatus,
+  setMemoryOrderCarrier,
   markMemoryOrderReturn,
   markOrderDelivered,
   recordOrderInteraction,
@@ -58,6 +60,18 @@ import {
   saveEcomCredentials,
   shipOrders,
 } from "./ecomDelivery";
+import {
+  clearEcoTrackCredentials,
+  EcoTrackError,
+  getEcoTrackFees,
+  getEcoTrackLocations,
+  getEcoTrackProducts,
+  getEcoTrackStatus,
+  getEcoTrackTrackingBatch,
+  saveEcoTrackCredentials,
+  shipEcoTrackOrders,
+  validateEcoTrackOrder,
+} from "./ecotrackDelivery";
 import { VAPID_PUBLIC_KEY, sendAdminPushNotification } from "./webPush";
 import {
   appendStaffActivityLog,
@@ -106,6 +120,7 @@ async function ecomGuard<T>(fn: () => Promise<T>): Promise<T> {
     return await fn();
   } catch (error) {
     if (error instanceof EcomError) throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+    if (error instanceof EcoTrackError) throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
     throw error;
   }
 }
@@ -212,6 +227,12 @@ export const appRouter = router({
       .mutation(({ ctx, input }) => {
         const actor = resolveActor(ctx.user);
         return markOrderDelivered(input.id, input.isDelivered, actor);
+      }),
+    setOrderCarrier: adminProcedure
+      .input(z.object({ id: z.number().int().positive(), carrier: orderCarrierSchema }))
+      .mutation(({ ctx, input }) => {
+        const actor = resolveActor(ctx.user);
+        return setMemoryOrderCarrier(input.id, input.carrier, actor);
       }),
     markReturnReceived: adminProcedure
       .input(z.object({ id: z.number().int().positive(), returnReceived: z.boolean().default(true) }))
@@ -500,6 +521,99 @@ export const appRouter = router({
             return batch;
           })
         ),
+  }),
+  ecotrack: router({
+    status: adminProcedure.query(() => getEcoTrackStatus()),
+    saveCredentials: adminProcedure
+      .input(
+        z.object({
+          baseUrl: z.string().min(3).max(512),
+          token: z.string().min(1).max(512),
+          label: z.string().max(120).optional(),
+        })
+      )
+      .mutation(({ input }) => ecomGuard(() => saveEcoTrackCredentials(input.baseUrl, input.token, input.label))),
+    clearCredentials: adminProcedure.mutation(() => clearEcoTrackCredentials()),
+    fees: adminProcedure.query(() => ecomGuard(() => getEcoTrackFees())),
+    products: adminProcedure.query(() => ecomGuard(() => getEcoTrackProducts())),
+    locations: adminProcedure
+      .input(z.object({ wilayaId: z.number().int().min(1).max(58) }))
+      .query(({ input }) => ecomGuard(() => getEcoTrackLocations(input.wilayaId))),
+    ship: adminProcedure
+      .input(
+        z.object({
+          confirmee: z.boolean().default(false),
+          items: z
+            .array(
+              z.object({
+                orderId: z.string().min(1).max(64),
+                wilayaId: z.number().int().min(1).max(58).optional(),
+                stopdesk: z.boolean(),
+                commune: z.string().max(120).optional(),
+                deskCommune: z.string().max(120).optional(),
+                refArticle: z.string().max(64).optional(),
+              })
+            )
+            .min(1)
+            .max(100),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        ecomGuard(async () => {
+          const actor = resolveActor(ctx.user);
+          const orders = await listCheckoutOrders();
+          const results = await shipEcoTrackOrders(orders, input.items, input.confirmee);
+          const db = await getDb();
+          for (const result of results) {
+            if (!result.ok) continue;
+            const order = orders.find(o => o.id === result.orderId);
+            if (!order) continue;
+            await setMemoryOrderCarrier(order.dbId, "ecotrack", actor).catch(() => null);
+            if (order.status === "transferee") continue;
+            if (!db) updateMemoryOrderStatus(order.dbId, "transferee", actor);
+            else await updateStoreOrderStatus(order.dbId, "transferee");
+          }
+          return results;
+        })
+      ),
+    validateOrder: adminProcedure
+      .input(z.object({ tracking: z.string().min(1).max(100) }))
+      .mutation(({ input }) => ecomGuard(() => validateEcoTrackOrder(input.tracking))),
+    trackBatch: adminProcedure
+      .input(z.object({ trackings: z.array(z.string()).max(100) }))
+      .query(({ input }) =>
+        ecomGuard(async () => {
+          const batch = await getEcoTrackTrackingBatch(input.trackings);
+          try {
+            const ecoStatus = await getEcoTrackStatus();
+            const shipments = ecoStatus.shipments || {};
+            const orders = await listCheckoutOrders();
+            for (const order of orders) {
+              if (order.isDelivered) continue;
+              const sh = shipments[order.id];
+              if (!sh?.tracking) continue;
+              const trkData = batch[sh.tracking];
+              if (!trkData) continue;
+              const sit = `${trkData.situation || ""} ${trkData.etat_logistique || ""}`.toLowerCase();
+              if (
+                sit.includes("livr") ||
+                sit.includes("encaiss") ||
+                sit.includes("paye") ||
+                Boolean(trkData.encaisser) ||
+                Boolean(trkData.recouvert)
+              ) {
+                await markOrderDelivered(order.dbId, true, {
+                  actorId: "system",
+                  actorName: "EcoTrack (Auto)",
+                });
+              }
+            }
+          } catch {
+            // Ignore auto-delivery sync error
+          }
+          return batch;
+        })
+      ),
   }),
   googleSheet: router({
     getConfig: adminProcedure.query(async () => {

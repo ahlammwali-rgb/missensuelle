@@ -63,12 +63,18 @@ export function TransferredOrdersPanel({
     tracking?: TrackingData;
   } | null>(null);
 
-  // E-com status to get shipments map
+  // E-com & EcoTrack status to get shipments maps
   const ecomStatusQuery = trpc.ecom.status.useQuery(undefined, {
     refetchOnWindowFocus: false,
     staleTime: 30000,
   });
-  const shipments = ecomStatusQuery.data?.shipments || {};
+  const ecotrackStatusQuery = trpc.ecotrack.status.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    staleTime: 30000,
+  });
+  const ecomShipments = useMemo(() => ecomStatusQuery.data?.shipments || {}, [ecomStatusQuery.data]);
+  const ecoShipments = useMemo(() => ecotrackStatusQuery.data?.shipments || {}, [ecotrackStatusQuery.data]);
+  const shipments = useMemo(() => ({ ...ecomShipments, ...ecoShipments }), [ecomShipments, ecoShipments]);
 
   // Filter transferred orders
   const transferredOrders = useMemo(() => {
@@ -77,27 +83,46 @@ export function TransferredOrdersPanel({
     );
   }, [orders, shipments]);
 
-  // Extract all tracking numbers
-  const trackingNumbers = useMemo(() => {
-    const list: string[] = [];
+  // Extract tracking numbers split per carrier
+  const { ecomTrackings, ecoTrackings } = useMemo(() => {
+    const ecomList: string[] = [];
+    const ecoList: string[] = [];
     for (const o of transferredOrders) {
-      const sh = shipments[o.id];
-      if (sh?.tracking) list.push(sh.tracking);
+      const ecoSh = ecoShipments[o.id];
+      const ecomSh = ecomShipments[o.id];
+      if (ecoSh?.tracking) ecoList.push(ecoSh.tracking);
+      else if (ecomSh?.tracking) ecomList.push(ecomSh.tracking);
     }
-    return list;
-  }, [transferredOrders, shipments]);
+    return { ecomTrackings: ecomList, ecoTrackings: ecoList };
+  }, [transferredOrders, ecomShipments, ecoShipments]);
 
-  // Batch tracking query
+  // Batch tracking queries (E-com + EcoTrack)
   const trackingQuery = trpc.ecom.trackBatch.useQuery(
-    { trackings: trackingNumbers },
+    { trackings: ecomTrackings },
     {
-      enabled: trackingNumbers.length > 0,
-      refetchInterval: 60000, // Auto refresh tracking every 60s
+      enabled: ecomTrackings.length > 0,
+      refetchInterval: 60000,
+      refetchOnWindowFocus: false,
+    }
+  );
+  const ecotrackTrackingQuery = trpc.ecotrack.trackBatch.useQuery(
+    { trackings: ecoTrackings },
+    {
+      enabled: ecoTrackings.length > 0,
+      refetchInterval: 60000,
       refetchOnWindowFocus: false,
     }
   );
 
-  const trackingMap = (trackingQuery.data || {}) as Record<string, TrackingData>;
+  const trackingMap = useMemo(
+    () =>
+      ({
+        ...(trackingQuery.data || {}),
+        ...(ecotrackTrackingQuery.data || {}),
+      }) as Record<string, TrackingData>,
+    [trackingQuery.data, ecotrackTrackingQuery.data]
+  );
+  const isTrackingFetching = trackingQuery.isFetching || ecotrackTrackingQuery.isFetching;
 
   const copyText = async (text: string, label: string, id: string) => {
     try {
@@ -121,11 +146,11 @@ export function TransferredOrdersPanel({
     }
   };
 
-  const copyParcelSlip = (order: CheckoutOrder, tracking?: string) => {
+  const copyParcelSlip = (order: CheckoutOrder, tracking?: string, isEcoTrack?: boolean) => {
     const text = [
       `📦 COLIS MISS SENSUELLE`,
       `N° Commande: ${order.id}`,
-      tracking ? `N° Suivi E-com: ${tracking}` : null,
+      tracking ? `N° Suivi ${isEcoTrack ? "EcoTrack" : "E-com"}: ${tracking}` : null,
       `Destinataire: ${order.customer}`,
       `Téléphone: ${order.phone}`,
       `Wilaya/Commune: ${order.wilaya} - ${order.commune}`,
@@ -313,14 +338,16 @@ export function TransferredOrdersPanel({
             className="trans-btn trans-btn-refresh"
             onClick={() => {
               void ecomStatusQuery.refetch();
+              void ecotrackStatusQuery.refetch();
               void trackingQuery.refetch();
+              void ecotrackTrackingQuery.refetch();
               if (onRefreshOrders) onRefreshOrders();
               notify("Actualisation des statuts de livraison…");
             }}
-            disabled={trackingQuery.isFetching}
+            disabled={isTrackingFetching}
           >
-            <RefreshCw size={15} className={trackingQuery.isFetching ? "animate-spin" : ""} />
-            <span>{trackingQuery.isFetching ? "Actualisation…" : "Actualiser Suivis"}</span>
+            <RefreshCw size={15} className={isTrackingFetching ? "animate-spin" : ""} />
+            <span>{isTrackingFetching ? "Actualisation…" : "Actualiser Suivis"}</span>
           </button>
 
           <button
@@ -419,7 +446,8 @@ export function TransferredOrdersPanel({
       ) : (
         <div className="transferred-cards-grid">
           {filteredOrders.map(order => {
-            const sh = shipments[order.id];
+            const isEcoTrack = Boolean(ecoShipments[order.id]) || order.carrier === "ecotrack";
+            const sh = isEcoTrack ? (ecoShipments[order.id] || shipments[order.id]) : shipments[order.id];
             const tracking = sh?.tracking;
             const trk = tracking ? trackingMap[tracking] : null;
             const badge = getStatusBadge(trk?.situation, trk?.etat_logistique);
@@ -430,9 +458,20 @@ export function TransferredOrdersPanel({
                 <div className="trans-card-header">
                   <div className="trans-card-ids">
                     <span className="trans-order-id">{order.id}</span>
-                    <span className="trans-carrier-pill">
+                    <span
+                      className="trans-carrier-pill"
+                      style={
+                        isEcoTrack
+                          ? {
+                              background: "rgba(37, 99, 235, 0.1)",
+                              color: "#1d4ed8",
+                              borderColor: "rgba(37, 99, 235, 0.25)",
+                            }
+                          : undefined
+                      }
+                    >
                       <Truck size={12} />
-                      E-com Delivery
+                      {isEcoTrack ? "EcoTrack" : "E-com Delivery"}
                     </span>
                     {tracking && (
                       <button
@@ -526,7 +565,7 @@ export function TransferredOrdersPanel({
                   <button
                     type="button"
                     className="trans-act-btn trans-act-copy"
-                    onClick={() => copyParcelSlip(order, tracking)}
+                    onClick={() => copyParcelSlip(order, tracking, isEcoTrack)}
                     title="Copier les détails du bordereau"
                   >
                     <Copy size={14} />
