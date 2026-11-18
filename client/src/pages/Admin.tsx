@@ -1347,6 +1347,21 @@ const LANDING_TEMPLATES: {
     hasPackOffer: false,
   },
   {
+    id: "badil",
+    title: "Template · Beauté RTL Rose & Or",
+    subtitle: "Landing mobile haute conversion avec offres 1+1 / 2+1",
+    inspiredBy: "Modèle Badil Microblading",
+    previewImage: "/images/badil/01-badil.jpg",
+    accentColor: "#e0145f",
+    bgGradient: "linear-gradient(135deg, #fbe3ea 0%, #ffc2d4 100%)",
+    features: [
+      "Visuels promo pleine largeur + bannière formulaire dorée",
+      "Cartes d'offres duo (1 pièce vs Pack 2+1 gratuit)",
+      "Formulaire COD rapide + capture paniers abandonnés + pixels Meta/TikTok",
+    ],
+    hasPackOffer: true,
+  },
+  {
     id: "standard",
     title: "Template 5 · Fiche Boutique Classique",
     subtitle: "Page produit e-commerce standard bilingue FR / AR",
@@ -1369,6 +1384,8 @@ function resolveProductTemplate(product: Product): LandingTemplateId {
   if (product.id === "p-005" || product.slug === "extensions-silk-wave" || product.slug === "extensions-cheveux") return "extensions";
   if (product.id === "p-007" || product.slug === "abaya-royal-emerald") return "abaya";
   if (product.id === "p-001" || product.slug === "blazer-lilac-dream") return "coat";
+  if (product.id === "p-009" || product.slug === "perruque-longue") return "perruque";
+  if (product.id === "p-010" || product.slug === "badil-microblading") return "badil";
   return "standard";
 }
 
@@ -1407,11 +1424,11 @@ function CatalogPanel({ notify }: { notify: (message: string) => void }) {
       ...emptyProduct,
       landingTemplate: templateId,
       accent: tpl.accentColor,
-      category: templateId === "extensions" ? "extensions" : templateId === "doudoune" || templateId === "coat" ? "vestes" : "mode",
-      categoryLabel: templateId === "extensions" ? "Extensions cheveux" : templateId === "doudoune" || templateId === "coat" ? "Vestes & ensembles" : "Mode femme",
-      price: templateId === "extensions" ? 2700 : templateId === "doudoune" ? 7600 : templateId === "abaya" ? 7500 : 8500,
-      oldPrice: templateId === "extensions" ? 3500 : templateId === "doudoune" ? 9000 : templateId === "abaya" ? 14000 : 11000,
-      packPrice: templateId === "extensions" ? 4500 : templateId === "doudoune" ? 12900 : undefined,
+      category: templateId === "extensions" ? "extensions" : templateId === "doudoune" || templateId === "coat" ? "vestes" : templateId === "badil" ? "beaute" : "mode",
+      categoryLabel: templateId === "extensions" ? "Extensions cheveux" : templateId === "doudoune" || templateId === "coat" ? "Vestes & ensembles" : templateId === "badil" ? "Beauté & Maquillage" : "Mode femme",
+      price: templateId === "extensions" ? 2700 : templateId === "doudoune" ? 7600 : templateId === "abaya" ? 7500 : templateId === "badil" ? 1800 : 8500,
+      oldPrice: templateId === "extensions" ? 3500 : templateId === "doudoune" ? 9000 : templateId === "abaya" ? 14000 : templateId === "badil" ? 2800 : 11000,
+      packPrice: templateId === "extensions" ? 4500 : templateId === "doudoune" ? 12900 : templateId === "badil" ? 3000 : undefined,
     });
     setShowForm(true);
   };

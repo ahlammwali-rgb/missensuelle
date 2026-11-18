@@ -184,6 +184,9 @@ export async function importGoogleSheetToOrders(
     } else if (prodLower.includes("manteau") || prodLower.includes("blazer") || prodLower.includes("coat") || prodLower.includes("p-001")) {
       productId = "p-001";
       if (!idxProd || !row[idxProd]) product = "Manteau Icon";
+    } else if (prodLower.includes("badil") || prodLower.includes("microblading") || prodLower.includes("حواجب") || prodLower.includes("بديل") || prodLower.includes("p-010")) {
+      productId = "p-010";
+      if (!idxProd || !row[idxProd]) product = "Badil Microblading";
     }
 
     const newOrder: CheckoutOrder = {

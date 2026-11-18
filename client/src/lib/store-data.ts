@@ -3,7 +3,7 @@ import { replaceAnnotatedAbayaPhotos } from "./abaya-gallery";
 
 export type CategoryId = "mode" | "vestes" | "beaute" | "lentilles" | "extensions";
 
-export type LandingTemplateId = "doudoune" | "extensions" | "abaya" | "coat" | "perruque" | "standard";
+export type LandingTemplateId = "doudoune" | "extensions" | "abaya" | "coat" | "perruque" | "badil" | "standard";
 
 export type ProductVariantImage = {
   name: string;
@@ -329,6 +329,42 @@ export const products: Product[] = [
     accent: "#df407f",
     stock: 30,
   },
+  {
+    id: "p-010",
+    slug: "badil-microblading",
+    name: "Badil Microblading",
+    category: "beaute",
+    categoryLabel: "Beauté & Maquillage",
+    price: 1800,
+    oldPrice: 2800,
+    packPrice: 3000,
+    landingTemplate: "badil",
+    badge: "2 + 1 مجاناً",
+    description: "Stickers sourcils effet microblading naturel, résistants à l'eau jusqu'à 6 jours.",
+    details: [
+      "نتيجة طبيعية ومذهلة تدوم حتى 6 أيام",
+      "مقاوم للماء والعرق وخفيف على الجلد",
+      "عرض خاص: لوحة بـ 1800 DA أو لوحتين + الثالثة مجاناً بـ 3000 DA",
+      "توصيل سريع 58 ولاية مع الدفع عند الاستلام",
+    ],
+    colors: ["لوحة واحدة", "لوحتان + الثالثة مجانا"],
+    image: "/images/badil/01-badil.jpg",
+    gallery: [
+      "/images/badil/01-badil.jpg",
+      "/images/badil/02-badil.jpg",
+      "/images/badil/03-badil.jpg",
+      "/images/badil/04-badil.jpg",
+      "/images/badil/05-badil.jpg",
+      "/images/badil/06-badil.jpg",
+      "/images/badil/07-badil.jpg",
+      "/images/badil/08-badil.jpg",
+    ],
+    arName: "بديل الميكروبلايدينغ",
+    arCategoryLabel: "جمال ومكياج",
+    arDescription: "بديل الميكروبلايدينغ لحواجب طبيعية ومثالية في ثوانٍ، مقاوم للماء ويدوم حتى 6 أيام.",
+    accent: "#e0145f",
+    stock: 50,
+  },
 ];
 
 export const wilayas = [
@@ -410,7 +446,8 @@ export function getCatalogProducts(): Product[] {
       product =>
         (product.id === "p-007" ||
           (normalized.length >= 7 && product.id === "p-008") ||
-          product.id === "p-009") &&
+          product.id === "p-009" ||
+          product.id === "p-010") &&
         !savedIds.has(product.id),
     );
     if (missingBuiltIns.length || colorsChanged) {
