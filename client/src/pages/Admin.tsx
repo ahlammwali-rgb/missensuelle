@@ -1369,6 +1369,21 @@ const LANDING_TEMPLATES: {
     hasPackOffer: true,
   },
   {
+    id: "pyjama",
+    title: "Template · Pyjama RTL Rose & Or (Multi-couleurs)",
+    subtitle: "Landing mobile haute conversion avec couleurs multiples & tailles",
+    inspiredBy: "Modèle Pyjama Été Sensuelle",
+    previewImage: "/images/pyjama/01-pyjama.jpg",
+    accentColor: "#e0145f",
+    bgGradient: "linear-gradient(135deg, #fbe3ea 0%, #ffc2d4 100%)",
+    features: [
+      "Visuels promo pleine largeur + bannière formulaire dorée",
+      "Sélection multi-couleurs + tailles S à XL + offres 1 pièce / 2+1 gratuit",
+      "Liste déroulante wilayas & communes + pixels Meta/TikTok + paniers abandonnés",
+    ],
+    hasPackOffer: true,
+  },
+  {
     id: "standard",
     title: "Template 5 · Fiche Boutique Classique",
     subtitle: "Page produit e-commerce standard bilingue FR / AR",
@@ -1393,6 +1408,7 @@ function resolveProductTemplate(product: Product): LandingTemplateId {
   if (product.id === "p-001" || product.slug === "blazer-lilac-dream") return "coat";
   if (product.id === "p-009" || product.slug === "perruque-longue") return "perruque";
   if (product.id === "p-010" || product.slug === "badil-microblading") return "badil";
+  if (product.id === "p-011" || product.slug === "pyjama-ete") return "pyjama";
   return "standard";
 }
 
@@ -1432,10 +1448,10 @@ function CatalogPanel({ notify }: { notify: (message: string) => void }) {
       landingTemplate: templateId,
       accent: tpl.accentColor,
       category: templateId === "extensions" ? "extensions" : templateId === "doudoune" || templateId === "coat" ? "vestes" : templateId === "badil" ? "beaute" : "mode",
-      categoryLabel: templateId === "extensions" ? "Extensions cheveux" : templateId === "doudoune" || templateId === "coat" ? "Vestes & ensembles" : templateId === "badil" ? "Beauté & Maquillage" : "Mode femme",
-      price: templateId === "extensions" ? 2700 : templateId === "doudoune" ? 7600 : templateId === "abaya" ? 7500 : templateId === "badil" ? 1800 : 8500,
-      oldPrice: templateId === "extensions" ? 3500 : templateId === "doudoune" ? 9000 : templateId === "abaya" ? 14000 : templateId === "badil" ? 2800 : 11000,
-      packPrice: templateId === "extensions" ? 4500 : templateId === "doudoune" ? 12900 : templateId === "badil" ? 3000 : undefined,
+      categoryLabel: templateId === "extensions" ? "Extensions cheveux" : templateId === "doudoune" || templateId === "coat" ? "Vestes & ensembles" : templateId === "badil" ? "Beauté & Maquillage" : templateId === "pyjama" ? "Pyjamas & Détente" : "Mode femme",
+      price: templateId === "extensions" ? 2700 : templateId === "doudoune" ? 7600 : templateId === "abaya" ? 7500 : templateId === "badil" || templateId === "pyjama" ? 1800 : 8500,
+      oldPrice: templateId === "extensions" ? 3500 : templateId === "doudoune" ? 9000 : templateId === "abaya" ? 14000 : templateId === "badil" || templateId === "pyjama" ? 2800 : 11000,
+      packPrice: templateId === "extensions" ? 4500 : templateId === "doudoune" ? 12900 : templateId === "badil" || templateId === "pyjama" ? 3000 : undefined,
     });
     setShowForm(true);
   };
@@ -2539,6 +2555,10 @@ function findMatchingCatalogProduct(catalog: Product[], orderProductId?: string,
     if (raw.includes("badil") || raw.includes("microblading") || raw.includes("حواجب") || raw.includes("بديل")) {
       const b = catalog.find(p => p.id === "p-010" || p.slug.includes("badil"));
       if (b) return b;
+    }
+    if (raw.includes("pyjama") || raw.includes("بيجام")) {
+      const py = catalog.find(p => p.id === "p-011" || p.slug.includes("pyjama"));
+      if (py) return py;
     }
     for (const p of catalog) {
       if (raw.includes(p.slug.toLowerCase())) return p;

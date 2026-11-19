@@ -187,6 +187,9 @@ export async function importGoogleSheetToOrders(
     } else if (prodLower.includes("badil") || prodLower.includes("microblading") || prodLower.includes("حواجب") || prodLower.includes("بديل") || prodLower.includes("p-010")) {
       productId = "p-010";
       if (!idxProd || !row[idxProd]) product = "Badil Microblading";
+    } else if (prodLower.includes("pyjama") || prodLower.includes("بيجام") || prodLower.includes("p-011")) {
+      productId = "p-011";
+      if (!idxProd || !row[idxProd]) product = "Pyjama Été Sensuelle";
     }
 
     const newOrder: CheckoutOrder = {

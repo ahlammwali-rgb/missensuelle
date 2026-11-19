@@ -3,7 +3,7 @@ import { replaceAnnotatedAbayaPhotos } from "./abaya-gallery";
 
 export type CategoryId = "mode" | "vestes" | "beaute" | "lentilles" | "extensions";
 
-export type LandingTemplateId = "doudoune" | "extensions" | "abaya" | "coat" | "perruque" | "badil" | "standard";
+export type LandingTemplateId = "doudoune" | "extensions" | "abaya" | "coat" | "perruque" | "badil" | "pyjama" | "standard";
 
 export type ProductVariantImage = {
   name: string;
@@ -365,6 +365,41 @@ export const products: Product[] = [
     accent: "#e0145f",
     stock: 50,
   },
+  {
+    id: "p-011",
+    slug: "pyjama-ete",
+    name: "Pyjama Été Sensuelle",
+    category: "mode",
+    categoryLabel: "Pyjamas & Détente",
+    price: 1800,
+    oldPrice: 2800,
+    packPrice: 3000,
+    landingTemplate: "pyjama",
+    badge: "2 + 1 مجاناً",
+    description: "Pyjama d'été femme coupe confortable, tissu léger et respirant disponible en 5 couleurs tendance (S à XL).",
+    details: [
+      "قماش صيفي خفيف وبارد مريح جداً للبيت",
+      "متوفرة بـ 5 ألوان أنيقة: أبيض، أصفر، وردي، موف، خوخي",
+      "مقاسات متعددة: S (45-55Kg) • M (55-65Kg) • L (65-75Kg) • XL (75-85Kg)",
+      "عرض خاص: قطعة بـ 1800 DA أو قطعتين + الثالثة مجاناً بـ 3000 DA",
+      "توصيل سريع 58 ولاية مع الدفع عند الاستلام",
+    ],
+    colors: ["أبيض", "أصفر", "وردي", "موف", "خوخي"],
+    image: "/images/pyjama/01-pyjama.jpg",
+    gallery: [
+      "/images/pyjama/01-pyjama.jpg",
+      "/images/pyjama/02-pyjama.jpg",
+      "/images/pyjama/03-pyjama.jpg",
+      "/images/pyjama/04-pyjama.jpg",
+      "/images/pyjama/05-pyjama.jpg",
+      "/images/pyjama/06-pyjama.jpg",
+    ],
+    arName: "بيجامة صيفية سنسويل",
+    arCategoryLabel: "بيجامات وملابس منزلية",
+    arDescription: "بيجامة صيفية خفيفة ومريحة بألوان جذابة وعرض 2+1 مجاناً.",
+    accent: "#e0145f",
+    stock: 60,
+  },
 ];
 
 export const wilayas = [
@@ -447,7 +482,8 @@ export function getCatalogProducts(): Product[] {
         (product.id === "p-007" ||
           (normalized.length >= 7 && product.id === "p-008") ||
           product.id === "p-009" ||
-          product.id === "p-010") &&
+          product.id === "p-010" ||
+          product.id === "p-011") &&
         !savedIds.has(product.id),
     );
     if (missingBuiltIns.length || colorsChanged) {
