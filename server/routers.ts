@@ -199,7 +199,7 @@ export const appRouter = router({
       .input(z.object({ query: z.string().optional() }).optional())
       .query(async () => {
         const all = await listCheckoutOrders();
-        return all.map(({ history, ...rest }) => ({
+        return all.map(({ history, ...rest }): typeof all[number] => ({
           ...rest,
           historyCount: Array.isArray(history) && history.length > 0 ? history.length : 1,
         }));
