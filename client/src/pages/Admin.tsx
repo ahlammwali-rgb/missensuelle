@@ -6,7 +6,7 @@ import { AbandonedOrders } from "@/components/AbandonedOrders";
 import { trpc } from "@/lib/trpc";
 import type { CheckoutOrder } from "@shared/checkout";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
-import { shippingFeeFor } from "@shared/shipping";
+import { shippingFeeFor, WILAYA_FRENCH_NAMES, wilayaIdFromName } from "@shared/shipping";
 import { categories, getCatalogProducts, getProductVariantOptions, saveCatalogProducts, formatDZD, wilayas, type LandingTemplateId, type Order, type OrderStatus, type Product, type ProductVariantImage } from "@/lib/store-data";
 import { StatusPill } from "@/components/StoreLayout";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -639,19 +639,26 @@ function AdminPageContent() {
     }
   }, [duePostponedOrders]);
 
-  const saveOrderDetails = (dbId: number, updates: Omit<Parameters<typeof updateOrderDetails.mutate>[0], "id">) => {
-    updateOrderDetails.mutate(
-      { id: dbId, ...updates },
-      {
-        onSuccess: async updated => {
-          await utils.admin.orders.invalidate();
-          await utils.admin.staffData.invalidate();
-          if (updated) setSelected(updated);
-          notify("Modifications de la commande enregistrées ✦");
-        },
-        onError: error => notify(error.message || "Impossible d'enregistrer les modifications"),
+  const saveOrderDetails = async (dbId: number, updates: Omit<Parameters<typeof updateOrderDetails.mutate>[0], "id">): Promise<CheckoutOrder | null> => {
+    try {
+      const updated = await updateOrderDetails.mutateAsync({ id: dbId, ...updates });
+      if (updated) {
+        utils.admin.orders.setData(undefined, prev =>
+          prev ? prev.map(o => (o.id === updated.id || o.dbId === updated.dbId ? updated : o)) : prev
+        );
+        setSelected(updated);
       }
-    );
+      await Promise.all([
+        utils.admin.orders.invalidate(),
+        utils.admin.staffData.invalidate(),
+      ]);
+      notify("Modifications de la commande enregistrées ✦");
+      return updated ?? null;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Impossible d'enregistrer les modifications";
+      notify(msg, "urgent");
+      throw error;
+    }
   };
   const handleCreateOrder = (payload: Parameters<typeof createOrderMutation.mutate>[0]) => {
     createOrderMutation.mutate(payload, {
@@ -1059,7 +1066,7 @@ function AdminPageContent() {
     onClose={() => setIsCreatingOrder(false)}
     onCreate={handleCreateOrder}
   />
-)}{selected && <OrderModal order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={() => handleCallOrder(selected)} onWhatsApp={() => handleWhatsAppOrder(selected)} onOpenHistory={() => setHistoryOrderId(selected.id)} onOpenPostpone={() => setPostponeOrderId(selected.id)} onOpenCancel={() => setCancelOrderId(selected.id)} onSetNrpLevel={lvl => updateStatusWithMeta(selected.id, "ne_repond_pas", { nrpLevel: lvl })} onSetCarrier={carrier => handleSetCarrier(selected.id, carrier)} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onDelete={handleDeleteOrder} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{activeHistoryOrder && (
+)}{selected && <OrderModal key={selected.id} order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={() => handleCallOrder(selected)} onWhatsApp={() => handleWhatsAppOrder(selected)} onOpenHistory={() => setHistoryOrderId(selected.id)} onOpenPostpone={() => setPostponeOrderId(selected.id)} onOpenCancel={() => setCancelOrderId(selected.id)} onSetNrpLevel={lvl => updateStatusWithMeta(selected.id, "ne_repond_pas", { nrpLevel: lvl })} onSetCarrier={carrier => handleSetCarrier(selected.id, carrier)} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onDelete={handleDeleteOrder} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{activeHistoryOrder && (
   <OrderHistoryModal
     order={activeHistoryOrder}
     onClose={() => setHistoryOrderId(null)}
@@ -2449,6 +2456,7 @@ function TrackingSettings({ notify }: { notify: (message: string) => void }) {
 }
 
 type OrderDetailsPayload = {
+  orderId?: string;
   customer: string;
   phone: string;
   productId?: string;
@@ -2463,6 +2471,16 @@ type OrderDetailsPayload = {
   address: string;
   note: string;
 };
+
+function resolveEditableLocation(rawWilaya: string, rawCommune: string): { wilaya: string; commune: string } {
+  const wRaw = (rawWilaya || "").trim();
+  const cRaw = (rawCommune || "").trim();
+  const wid = wilayaIdFromName(wRaw, cRaw);
+  const resolvedWilaya = wid && abayaWilayas[wid - 1] ? abayaWilayas[wid - 1] : (wRaw || abayaWilayas[15] || "الجزائر");
+  const communesForWilaya = abayaCommunesByWilaya[resolvedWilaya] ?? [];
+  const resolvedCommune = cRaw || communesForWilaya[0] || resolvedWilaya;
+  return { wilaya: resolvedWilaya, commune: resolvedCommune };
+}
 
 function findMatchingCatalogProduct(catalog: Product[], orderProductId?: string, orderProductName?: string): Product {
   if (orderProductId) {
@@ -2488,6 +2506,10 @@ function findMatchingCatalogProduct(catalog: Product[], orderProductId?: string,
     if (raw.includes("manteau") || raw.includes("icon") || raw.includes("blazer") || raw.includes("معطف")) {
       const m = catalog.find(p => p.id === "p-001" || p.slug.includes("blazer"));
       if (m) return m;
+    }
+    if (raw.includes("badil") || raw.includes("microblading") || raw.includes("حواجب") || raw.includes("بديل")) {
+      const b = catalog.find(p => p.id === "p-010" || p.slug.includes("badil"));
+      if (b) return b;
     }
     for (const p of catalog) {
       if (raw.includes(p.slug.toLowerCase())) return p;
@@ -2675,12 +2697,13 @@ function OrderModal({
   onSetNrpLevel?: (level: 1 | 2 | 3) => void;
   onSetCarrier?: (carrier: "ecom" | "ecotrack") => void;
   onUpdate: (id: string, status: OrderStatus) => void;
-  onSaveDetails: (dbId: number, updates: OrderDetailsPayload) => void;
+  onSaveDetails: (dbId: number, updates: OrderDetailsPayload) => Promise<CheckoutOrder | null>;
   onDelete: (dbId: number) => void;
   onCopy: () => void;
 }) {
   const catalog = useMemo(() => getCatalogProducts(), []);
   const initialParsed = useMemo(() => parseInitialOrderItems(order, catalog), [order, catalog]);
+  const initialLoc = useMemo(() => resolveEditableLocation(order.wilaya, order.commune), [order.wilaya, order.commune]);
 
   const [customer, setCustomer] = useState(order.customer);
   const [phone, setPhone] = useState(order.phone);
@@ -2698,10 +2721,25 @@ function OrderModal({
 
   const [total, setTotal] = useState(order.total);
   const [delivery, setDelivery] = useState<"home" | "office">(order.delivery || "home");
-  const [wilaya, setWilaya] = useState(order.wilaya);
-  const [commune, setCommune] = useState(order.commune);
+  const [wilaya, setWilaya] = useState(initialLoc.wilaya);
+  const [commune, setCommune] = useState(initialLoc.commune);
+  const [customCommuneMode, setCustomCommuneMode] = useState<boolean>(false);
   const [address, setAddress] = useState(order.address || "");
   const [note, setNote] = useState(order.note || "");
+  const [saveFeedback, setSaveFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    const loc = resolveEditableLocation(order.wilaya, order.commune);
+    setCustomer(order.customer);
+    setPhone(order.phone);
+    setTotal(order.total);
+    setDelivery(order.delivery || "home");
+    setWilaya(loc.wilaya);
+    setCommune(loc.commune);
+    setCustomCommuneMode(false);
+    setAddress(order.address || "");
+    setNote(order.note || "");
+  }, [order.id, order.customer, order.phone, order.wilaya, order.commune, order.address, order.note, order.total, order.delivery]);
 
   const selectedCatalogProduct = catalog.find(p => p.id === productId) || initialParsed.prod1;
   const isDoudoune = selectedCatalogProduct?.id === "p-008" || selectedCatalogProduct?.slug.includes("doudoune") || selectedCatalogProduct?.name.toLowerCase().includes("doudoune");
@@ -2744,8 +2782,15 @@ function OrderModal({
     )
   );
 
-  const allWilayas = useMemo(() => Array.from(new Set([order.wilaya, ...abayaWilayas, ...wilayas].filter(Boolean))), [order.wilaya]);
+  const allWilayas = useMemo(() => {
+    const custom = wilaya && !abayaWilayas.includes(wilaya) ? [wilaya] : [];
+    return [...custom, ...abayaWilayas];
+  }, [wilaya]);
   const arabicCommunes = abayaCommunesByWilaya[wilaya] ?? [];
+  const communeOptions = useMemo(
+    () => Array.from(new Set([commune, ...arabicCommunes].map(c => c.trim()).filter(Boolean))),
+    [commune, arabicCommunes]
+  );
 
   const recomputeCombinedTotal = (
     prod1: Product | undefined,
@@ -2887,8 +2932,20 @@ function OrderModal({
   const secondGoods = hasSecondProduct ? computeProductGoodsPrice(secondCatalogProduct, secondQuantity) : 0;
   const currentGoods = Math.max(0, firstGoods + secondGoods - crossSellDiscount);
 
-  const handleSubmitEdit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmitEdit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setSaveFeedback(null);
+
+    const trimmedCustomer = customer.trim();
+    if (!trimmedCustomer) {
+      setSaveFeedback({ type: "error", text: "Le nom de la cliente est obligatoire." });
+      return;
+    }
+
+    const finalWilaya = wilaya.trim() || order.wilaya?.trim() || "الجزائر";
+    const finalCommune = commune.trim() || arabicCommunes[0] || finalWilaya;
+    const finalPhone = phone.trim() || order.phone?.trim() || "0000";
+
     const activeVariants1 = variants.slice(0, quantity);
     const color1 = quantity === 1
       ? (activeVariants1[0]?.color || availableColors[0] || "")
@@ -2931,21 +2988,32 @@ function OrderModal({
       finalSize = `[Art.1] ${size1} + [Art.2] ${size2}`;
     }
 
-    onSaveDetails(order.dbId, {
-      customer: customer.trim() || order.customer,
-      phone: phone.trim() || order.phone,
-      productId,
-      product: finalProduct,
-      quantity: finalQuantity,
-      total: Number(total) || 0,
-      color: finalColor.trim(),
-      size: finalSize.trim(),
-      delivery,
-      wilaya: wilaya.trim(),
-      commune: commune.trim(),
-      address: address.trim(),
-      note: note.trim(),
-    });
+    const safeDbId = typeof order.dbId === "number" && Number.isInteger(order.dbId) && order.dbId > 0 ? order.dbId : 1;
+
+    try {
+      await onSaveDetails(safeDbId, {
+        orderId: order.id,
+        customer: trimmedCustomer,
+        phone: finalPhone,
+        productId,
+        product: finalProduct.trim() || order.product || "Produit",
+        quantity: finalQuantity,
+        total: Math.max(0, Math.round(Number(total) || 0)),
+        color: finalColor.trim(),
+        size: finalSize.trim(),
+        delivery,
+        wilaya: finalWilaya,
+        commune: finalCommune,
+        address: address.trim(),
+        note: note.trim(),
+      });
+      setSaveFeedback({ type: "success", text: "✅ Modifications enregistrées avec succès !" });
+    } catch (err) {
+      setSaveFeedback({
+        type: "error",
+        text: err instanceof Error ? err.message : "Impossible d'enregistrer les modifications",
+      });
+    }
   };
 
   return (
@@ -3005,7 +3073,7 @@ function OrderModal({
           </div>
         </div>
 
-        <form className="order-edit-form" onSubmit={handleSubmitEdit} style={{ display: "grid", gap: "14px", marginTop: "14px" }}>
+        <form className="order-edit-form" onSubmit={handleSubmitEdit} noValidate style={{ display: "grid", gap: "14px", marginTop: "14px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
             <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Client(e)
@@ -3485,24 +3553,76 @@ function OrderModal({
                   const nextW = e.target.value;
                   setWilaya(nextW);
                   const nextList = abayaCommunesByWilaya[nextW];
-                  if (nextList?.length) setCommune(nextList[0]);
+                  setCommune(nextList?.length ? nextList[0] : nextW);
+                  setCustomCommuneMode(false);
+                  setSaveFeedback(null);
                 }}
               >
-                {allWilayas.map(w => (
-                  <option key={w} value={w}>{w}</option>
-                ))}
+                {allWilayas.map(w => {
+                  const idx = abayaWilayas.indexOf(w);
+                  const fr = idx >= 0 ? WILAYA_FRENCH_NAMES[idx + 1] : "";
+                  const label = idx >= 0 ? `${String(idx + 1).padStart(2, "0")} - ${w}${fr ? ` (${fr})` : ""}` : w;
+                  return (
+                    <option key={w} value={w}>{label}</option>
+                  );
+                })}
               </select>
             </label>
             <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Commune
-              {arabicCommunes.length > 0 ? (
-                <select value={commune} onChange={e => setCommune(e.target.value)}>
-                  {Array.from(new Set([commune, ...arabicCommunes].filter(Boolean))).map(c => (
+              {arabicCommunes.length > 0 && !customCommuneMode ? (
+                <select
+                  value={communeOptions.includes(commune) ? commune : (communeOptions[0] ?? "")}
+                  onChange={e => {
+                    if (e.target.value === "__custom__") {
+                      setCustomCommuneMode(true);
+                    } else {
+                      setCommune(e.target.value);
+                    }
+                    setSaveFeedback(null);
+                  }}
+                >
+                  {communeOptions.map(c => (
                     <option key={c} value={c}>{c}</option>
                   ))}
+                  <option value="__custom__">✏️ Autre commune (saisie libre)…</option>
                 </select>
               ) : (
-                <input value={commune} onChange={e => setCommune(e.target.value)} required />
+                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                  <input
+                    value={commune}
+                    onChange={e => {
+                      setCommune(e.target.value);
+                      setSaveFeedback(null);
+                    }}
+                    placeholder="Nom de la commune"
+                    style={{ flex: 1, minWidth: 0 }}
+                  />
+                  {arabicCommunes.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomCommuneMode(false);
+                        if (!commune.trim() && arabicCommunes[0]) {
+                          setCommune(arabicCommunes[0]);
+                        }
+                      }}
+                      style={{
+                        height: "44px",
+                        padding: "0 10px",
+                        borderRadius: "10px",
+                        border: "1px solid var(--app-border, #cbd5e1)",
+                        background: "var(--app-surface-sub, #f8fafc)",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Liste
+                    </button>
+                  )}
+                </div>
               )}
             </label>
           </div>
@@ -3579,6 +3699,23 @@ function OrderModal({
               <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note client / appel" />
             </label>
           </div>
+
+          {saveFeedback && (
+            <div
+              role={saveFeedback.type === "error" ? "alert" : "status"}
+              style={{
+                padding: "10px 14px",
+                borderRadius: "12px",
+                fontSize: "13px",
+                fontWeight: 800,
+                background: saveFeedback.type === "error" ? "rgba(239, 68, 68, 0.12)" : "rgba(16, 185, 129, 0.14)",
+                color: saveFeedback.type === "error" ? "#b91c1c" : "#047857",
+                border: saveFeedback.type === "error" ? "1px solid rgba(239, 68, 68, 0.35)" : "1px solid rgba(16, 185, 129, 0.35)",
+              }}
+            >
+              {saveFeedback.text}
+            </div>
+          )}
 
           <button type="submit" className="button button-gradient full" disabled={isSaving} style={{ marginTop: "6px", height: "48px", borderRadius: "14px", fontSize: "15px" }}>
             <Save size={17} /> {isSaving ? "Enregistrement…" : "Enregistrer les modifications"}

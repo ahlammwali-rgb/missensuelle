@@ -142,7 +142,19 @@ export function deleteMemoryOrder(id: number): boolean {
 const loadStore = async () => {
   await ensurePersistentStoreLoaded(memoryOrders, memorySessions, getCounters, setCounters);
   let locationNormalized = false;
+  let dbIdRepaired = false;
+  const usedDbIds = new Set<number>();
+  let maxDbId = memoryOrders.reduce(
+    (max, o) => (typeof o.dbId === "number" && Number.isInteger(o.dbId) && o.dbId > max ? o.dbId : max),
+    Math.max(0, nextMemoryOrderId - 1),
+  );
   for (const o of memoryOrders) {
+    if (typeof o.dbId !== "number" || !Number.isInteger(o.dbId) || o.dbId <= 0 || usedDbIds.has(o.dbId)) {
+      maxDbId += 1;
+      o.dbId = maxDbId;
+      dbIdRepaired = true;
+    }
+    usedDbIds.add(o.dbId);
     if (o.size === "L" && (o.product.includes("EXTENTION") || o.id.startsWith("MS-GS-") || o.id.startsWith("MS-TT-"))) {
       o.size = "";
     }
@@ -159,8 +171,11 @@ const loadStore = async () => {
       locationNormalized = true;
     }
   }
+  if (maxDbId >= nextMemoryOrderId) {
+    nextMemoryOrderId = maxDbId + 1;
+  }
   const dedup = autoDeduplicateOrders(memoryOrders);
-  if (dedup.removed > 0 || locationNormalized) {
+  if (dedup.removed > 0 || locationNormalized || dbIdRepaired) {
     saveStore();
   }
 };
@@ -730,7 +745,9 @@ export async function updateCheckoutOrderDetails(
   const db = await getDb();
   if (!db) {
     await loadStore();
-    const found = memoryOrders.find(order => order.dbId === parsed.id);
+    const found =
+      (parsed.orderId ? memoryOrders.find(order => order.id === parsed.orderId) : undefined) ??
+      memoryOrders.find(order => order.dbId === parsed.id);
     if (!found) throw new CheckoutValidationError("Commande introuvable");
 
     const actorId = parsed.actorId || fallbackActor?.actorId || "owner";
@@ -810,7 +827,7 @@ export async function updateCheckoutOrderDetails(
     }
 
     saveStore();
-    return found;
+    return { ...found };
   }
   await db.transaction(async tx => {
     await tx.update(storeOrders).set({

@@ -55,4 +55,40 @@ describe("checkout server contract", () => {
     });
     expect(result).toEqual({ sessionId: 0, accepted: false });
   });
+
+  it("updates customer name, wilaya and commune via updateCheckoutOrderDetails", async () => {
+    const { submitCheckoutOrder, updateCheckoutOrderDetails, listCheckoutOrders } = await import("./checkout");
+    const created = await submitCheckoutOrder({
+      token: "660e8400-e29b-41d4-a716-446655440001",
+      payload: validPayload,
+    });
+    const updated = await updateCheckoutOrderDetails({
+      id: created.orderId,
+      orderId: created.orderNumber,
+      customer: "Amira Mansouri",
+      phone: "0550241862",
+      productId: "p-007",
+      product: "Abaya Royal Emerald",
+      quantity: 1,
+      total: 7500,
+      color: "Emerald",
+      size: "M",
+      delivery: "home",
+      wilaya: "وهران",
+      commune: "بئر الجير",
+      address: "حي السلام",
+      note: "Modifié en test",
+    });
+
+    expect(updated).not.toBeNull();
+    expect(updated?.customer).toBe("Amira Mansouri");
+    expect(updated?.wilaya).toBe("وهران");
+    expect(updated?.commune).toBe("بئر الجير");
+
+    const all = await listCheckoutOrders();
+    const persisted = all.find(o => o.id === created.orderNumber);
+    expect(persisted?.customer).toBe("Amira Mansouri");
+    expect(persisted?.wilaya).toBe("وهران");
+    expect(persisted?.commune).toBe("بئر الجير");
+  });
 });
