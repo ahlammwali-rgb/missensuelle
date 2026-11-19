@@ -6,7 +6,7 @@ import { AbandonedOrders } from "@/components/AbandonedOrders";
 import { trpc } from "@/lib/trpc";
 import type { CheckoutOrder } from "@shared/checkout";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
-import { shippingFeeFor, WILAYA_FRENCH_NAMES, wilayaIdFromName } from "@shared/shipping";
+import { isFreeShippingProduct, type ShippingRate, WILAYA_FRENCH_NAMES, wilayaIdFromName } from "@shared/shipping";
 import { categories, getCatalogProducts, getProductVariantOptions, saveCatalogProducts, formatDZD, wilayas, type LandingTemplateId, type Order, type OrderStatus, type Product, type ProductVariantImage } from "@/lib/store-data";
 import { StatusPill } from "@/components/StoreLayout";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -2472,6 +2472,35 @@ type OrderDetailsPayload = {
   note: string;
 };
 
+type CarrierShippingRates = Record<string, ShippingRate>;
+
+function pickPreferredShippingRates(
+  carrier: "ecom" | "ecotrack" | undefined,
+  ecoRates: CarrierShippingRates | undefined,
+  ecomRates: CarrierShippingRates | undefined,
+): CarrierShippingRates | undefined {
+  const hasEco = Boolean(ecoRates && Object.keys(ecoRates).length > 0);
+  const hasEcom = Boolean(ecomRates && Object.keys(ecomRates).length > 0);
+  if (carrier === "ecom") return hasEcom ? ecomRates : hasEco ? ecoRates : undefined;
+  return hasEco ? ecoRates : hasEcom ? ecomRates : undefined;
+}
+
+function resolveWilayaShippingFee(
+  rates: CarrierShippingRates | undefined,
+  wilaya: string,
+  commune: string,
+  delivery: "home" | "office",
+  productIds: string[],
+): number | null {
+  if (!productIds.length || productIds.every(isFreeShippingProduct)) return 0;
+  if (!rates) return null;
+  const wid = wilayaIdFromName(wilaya, commune);
+  if (!wid) return null;
+  const rate = rates[String(wid)];
+  if (!rate) return null;
+  return delivery === "office" ? rate.stopdesk : rate.domicile;
+}
+
 function resolveEditableLocation(rawWilaya: string, rawCommune: string): { wilaya: string; commune: string } {
   const wRaw = (rawWilaya || "").trim();
   const cRaw = (rawCommune || "").trim();
@@ -2750,7 +2779,23 @@ function OrderModal({
   const availableColors = useMemo(() => getColorsForProduct(selectedCatalogProduct), [selectedCatalogProduct]);
   const secondAvailableColors = useMemo(() => getColorsForProduct(secondCatalogProduct), [secondCatalogProduct]);
 
-  // Conserve le frais de livraison d'origine de la commande
+  // Tarifs de livraison DHD (EcoTrack) et E-com Delivery selon la wilaya
+  const ecotrackFeesQuery = trpc.ecotrack.fees.useQuery(undefined, {
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+  const ecomRatesQuery = trpc.store.shippingRates.useQuery(undefined, {
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+  const preferredRates = useMemo(
+    () => pickPreferredShippingRates(order.carrier, ecotrackFeesQuery.data?.rates, ecomRatesQuery.data?.rates),
+    [order.carrier, ecotrackFeesQuery.data?.rates, ecomRatesQuery.data?.rates]
+  );
+
+  // Conserve le frais de livraison d'origine de la commande à l'ouverture
   const initialShippingFee = useMemo(() => {
     const initialGoods1 = computeProductGoodsPrice(initialParsed.prod1, initialParsed.qty1);
     const initialGoods2 = initialParsed.hasSecond
@@ -2761,6 +2806,31 @@ function OrderModal({
   }, [initialParsed, order.total]);
 
   const [shippingFee, setShippingFee] = useState<number>(initialShippingFee);
+  const [freeShippingForced, setFreeShippingForced] = useState<boolean>(false);
+
+  const computeLiveFee = (
+    targetWilaya = wilaya,
+    targetCommune = commune,
+    targetDelivery = delivery,
+    p1 = productId,
+    withSecond = hasSecondProduct,
+    p2 = secondProductId,
+  ): number | null => {
+    const ids = withSecond ? [p1, p2] : [p1];
+    return resolveWilayaShippingFee(preferredRates, targetWilaya, targetCommune, targetDelivery, ids);
+  };
+
+  const liveWilayaFee = useMemo(
+    () =>
+      resolveWilayaShippingFee(
+        preferredRates,
+        wilaya,
+        commune,
+        delivery,
+        hasSecondProduct ? [productId, secondProductId] : [productId],
+      ),
+    [preferredRates, wilaya, commune, delivery, productId, secondProductId, hasSecondProduct]
+  );
 
   const [variants, setVariants] = useState<PieceVariant[]>(() =>
     parseVariants(
@@ -2820,9 +2890,13 @@ function OrderModal({
         }))
       );
       const isFree = (found.id === "p-007" || found.slug.includes("abaya")) && !hasSecondProduct;
-      const currentShip = isFree ? 0 : shippingFee;
-      if (isFree) setShippingFee(0);
-      setTotal(recomputeCombinedTotal(found, quantity, hasSecondProduct, secondCatalogProduct, secondQuantity, currentShip, crossSellDiscount));
+      const computedNext = isFree
+        ? 0
+        : freeShippingForced
+          ? 0
+          : (computeLiveFee(wilaya, commune, delivery, nextId, hasSecondProduct, secondProductId) ?? shippingFee);
+      setShippingFee(computedNext);
+      setTotal(recomputeCombinedTotal(found, quantity, hasSecondProduct, secondCatalogProduct, secondQuantity, computedNext, crossSellDiscount));
     }
   };
 
@@ -2870,13 +2944,21 @@ function OrderModal({
     setSecondProductName(found.name);
     setSecondQuantity(1);
     setSecondVariants([{ color: cols[0] || "Noir", size: defSize }]);
-    setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, true, found, 1, shippingFee, crossSellDiscount));
+    const nextShip = freeShippingForced
+      ? 0
+      : (computeLiveFee(wilaya, commune, delivery, productId, true, found.id) ?? shippingFee);
+    setShippingFee(nextShip);
+    setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, true, found, 1, nextShip, crossSellDiscount));
   };
 
   const removeSecondProduct = () => {
     setHasSecondProduct(false);
     setCrossSellDiscount(0);
-    setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, false, secondCatalogProduct, secondQuantity, shippingFee, 0));
+    const nextShip = freeShippingForced
+      ? 0
+      : (computeLiveFee(wilaya, commune, delivery, productId, false, secondProductId) ?? shippingFee);
+    setShippingFee(nextShip);
+    setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, false, secondCatalogProduct, secondQuantity, nextShip, 0));
   };
 
   const handleSecondProductChange = (nextId: string) => {
@@ -2892,7 +2974,11 @@ function OrderModal({
           size: nextDefSize === "Standard" ? "Standard" : (v.size === "Standard" ? "M" : v.size || nextDefSize),
         }))
       );
-      setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, true, found, secondQuantity, shippingFee, crossSellDiscount));
+      const nextShip = freeShippingForced
+        ? 0
+        : (computeLiveFee(wilaya, commune, delivery, productId, true, found.id) ?? shippingFee);
+      setShippingFee(nextShip);
+      setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, true, found, secondQuantity, nextShip, crossSellDiscount));
     }
   };
 
@@ -2922,10 +3008,20 @@ function OrderModal({
   };
 
   const applyCrossSellDiscount = (discountAmount: number, freeShip = false) => {
-    const nextShip = freeShip ? 0 : initialShippingFee;
+    const resolvedShip = computeLiveFee() ?? initialShippingFee;
+    const nextShip = freeShip ? 0 : resolvedShip;
+    setFreeShippingForced(freeShip);
     setShippingFee(nextShip);
     setCrossSellDiscount(discountAmount);
     setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, hasSecondProduct, secondCatalogProduct, secondQuantity, nextShip, discountAmount));
+  };
+
+  const handleRecalculateAuto = () => {
+    const resolvedShip = computeLiveFee() ?? shippingFee;
+    setFreeShippingForced(false);
+    setShippingFee(resolvedShip);
+    setTotal(currentGoods + resolvedShip);
+    setSaveFeedback(null);
   };
 
   const firstGoods = computeProductGoodsPrice(selectedCatalogProduct, quantity);
@@ -3519,7 +3615,7 @@ function OrderModal({
                   { label: "-500 DA (Pack Combiné)", discount: 500, freeShip: false },
                   { label: "🚚 Livraison Offerte", discount: 0, freeShip: true },
                 ].map(offer => {
-                  const isSelected = crossSellDiscount === offer.discount && (offer.freeShip ? shippingFee === 0 : shippingFee === initialShippingFee);
+                  const isSelected = crossSellDiscount === offer.discount && (offer.freeShip ? freeShippingForced || shippingFee === 0 : !freeShippingForced && shippingFee === (liveWilayaFee ?? initialShippingFee));
                   return (
                     <button
                       key={offer.label}
@@ -3553,9 +3649,15 @@ function OrderModal({
                   const nextW = e.target.value;
                   setWilaya(nextW);
                   const nextList = abayaCommunesByWilaya[nextW];
-                  setCommune(nextList?.length ? nextList[0] : nextW);
+                  const nextCommune = nextList?.length ? nextList[0] : nextW;
+                  setCommune(nextCommune);
                   setCustomCommuneMode(false);
                   setSaveFeedback(null);
+                  const nextFee = computeLiveFee(nextW, nextCommune, delivery);
+                  if (nextFee !== null && !freeShippingForced) {
+                    setShippingFee(nextFee);
+                    setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, hasSecondProduct, secondCatalogProduct, secondQuantity, nextFee, crossSellDiscount));
+                  }
                 }}
               >
                 {allWilayas.map(w => {
@@ -3630,7 +3732,19 @@ function OrderModal({
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
             <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Type de livraison
-              <select value={delivery} onChange={e => setDelivery(e.target.value as "home" | "office")}>
+              <select
+                value={delivery}
+                onChange={e => {
+                  const nextDelivery = e.target.value as "home" | "office";
+                  setDelivery(nextDelivery);
+                  setSaveFeedback(null);
+                  const nextFee = computeLiveFee(wilaya, commune, nextDelivery);
+                  if (nextFee !== null && !freeShippingForced) {
+                    setShippingFee(nextFee);
+                    setTotal(recomputeCombinedTotal(selectedCatalogProduct, quantity, hasSecondProduct, secondCatalogProduct, secondQuantity, nextFee, crossSellDiscount));
+                  }
+                }}
+              >
                 <option value="home">🏠 À domicile (إلى المنزل)</option>
                 <option value="office">🏢 Au bureau / Stop Desk (إلى المكتب)</option>
               </select>
@@ -3640,7 +3754,7 @@ function OrderModal({
                 <span>Total commande (DA)</span>
                 <button
                   type="button"
-                  onClick={() => setTotal(currentGoods + shippingFee)}
+                  onClick={handleRecalculateAuto}
                   style={{
                     fontSize: "11px",
                     background: "none",
@@ -3651,7 +3765,7 @@ function OrderModal({
                     padding: 0,
                     fontWeight: 600,
                   }}
-                  title="Recalculer selon le tarif catalogue et frais de livraison"
+                  title="Recalculer : prix produit + tarif livraison de la wilaya sélectionnée"
                 >
                   Recalculer auto
                 </button>
@@ -3678,7 +3792,12 @@ function OrderModal({
                 {shippingFee > 0 ? (
                   <> + Livraison : <strong>{formatDZD(shippingFee)}</strong></>
                 ) : (
-                  <> (Livraison incluse / 0 DA)</>
+                  <> + Livraison : <strong>0 DA</strong></>
+                )}
+                {liveWilayaFee !== null && liveWilayaFee !== shippingFee && (
+                  <span style={{ color: "#2563eb", marginLeft: "6px", fontWeight: 700 }}>
+                    (Tarif wilaya : {formatDZD(liveWilayaFee)})
+                  </span>
                 )}
                 {total !== currentGoods + shippingFee && (
                   <span style={{ color: "#d97706", marginLeft: "6px", fontWeight: 600 }}>
@@ -3984,6 +4103,11 @@ function CreateOrderModal({
   const [address, setAddress] = useState<string>("");
   const [note, setNote] = useState<string>("");
 
+  const ecotrackFeesQuery = trpc.ecotrack.fees.useQuery(undefined, {
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
   const ratesQuery = trpc.store.shippingRates.useQuery(undefined, {
     retry: false,
     staleTime: 10 * 60 * 1000,
@@ -3993,8 +4117,9 @@ function CreateOrderModal({
   const computedShippingFee = useMemo(() => {
     if (!wilaya) return 0;
     const ids = hasSecondProduct ? [productId, secondProductId] : [productId];
-    return shippingFeeFor(ratesQuery.data?.rates, wilaya, delivery, ids);
-  }, [wilaya, delivery, productId, secondProductId, hasSecondProduct, ratesQuery.data?.rates]);
+    const rates = pickPreferredShippingRates(undefined, ecotrackFeesQuery.data?.rates, ratesQuery.data?.rates);
+    return resolveWilayaShippingFee(rates, wilaya, commune, delivery, ids) ?? 0;
+  }, [wilaya, commune, delivery, productId, secondProductId, hasSecondProduct, ecotrackFeesQuery.data?.rates, ratesQuery.data?.rates]);
 
   const firstGoods = computeProductGoodsPrice(selectedCatalogProduct, quantity);
   const secondGoods = hasSecondProduct ? computeProductGoodsPrice(secondCatalogProduct, secondQuantity) : 0;
