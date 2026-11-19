@@ -1,8 +1,7 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, Bell, ChevronDown, ClipboardList, Copy, Download, ExternalLink, Facebook, FileSpreadsheet, Filter, History, ImagePlus, LayoutDashboard, Menu, MessageCircle, Moon, MoreHorizontal, Package, PackageCheck, Pencil, Phone, Plus, RefreshCw, RotateCcw, Save, Search, Settings2, Smartphone, Sun, Trash2, Truck, TrendingUp, Upload, UserCheck, Users, X } from "lucide-react";
 import { Link } from "wouter";
 import { AdminAuthGate } from "@/components/AdminAuthGate";
-import { AbandonedOrders } from "@/components/AbandonedOrders";
 import { trpc } from "@/lib/trpc";
 import type { CheckoutOrder } from "@shared/checkout";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
@@ -15,12 +14,6 @@ import "./admin-responsive.css";
 import "./admin-app.css";
 import { PixelDiagnostics } from "@/components/PixelDiagnostics";
 import { AdminDashboard } from "@/components/AdminDashboard";
-import { EcomDeliveryPanel } from "@/components/EcomDelivery";
-import { GoogleSheetPanel } from "@/components/GoogleSheetPanel";
-import { TransferredOrdersPanel } from "@/components/TransferredOrdersPanel";
-import { ReturnsPanel } from "@/components/ReturnsPanel";
-import { StaffPanel } from "@/components/StaffPanel";
-import { OrderHistoryModal } from "@/components/OrderHistoryModal";
 import {
   PostponeOrderModal,
   CancelOrderModal,
@@ -29,6 +22,14 @@ import {
 import { MobileAppCard, showPushNotification } from "@/components/MobileAppCard";
 import { playChaChingSound, playUrgentAlertSound, playVictoryDeliveredSound, playAbandonedAlertSound } from "@/lib/sound";
 import { loadRealOrders, orderMatchesPeriod } from "@/lib/admin-orders";
+
+const AbandonedOrders = lazy(() => import("@/components/AbandonedOrders").then(m => ({ default: m.AbandonedOrders })));
+const EcomDeliveryPanel = lazy(() => import("@/components/EcomDelivery").then(m => ({ default: m.EcomDeliveryPanel })));
+const GoogleSheetPanel = lazy(() => import("@/components/GoogleSheetPanel").then(m => ({ default: m.GoogleSheetPanel })));
+const TransferredOrdersPanel = lazy(() => import("@/components/TransferredOrdersPanel").then(m => ({ default: m.TransferredOrdersPanel })));
+const ReturnsPanel = lazy(() => import("@/components/ReturnsPanel").then(m => ({ default: m.ReturnsPanel })));
+const StaffPanel = lazy(() => import("@/components/StaffPanel").then(m => ({ default: m.StaffPanel })));
+const OrderHistoryModal = lazy(() => import("@/components/OrderHistoryModal").then(m => ({ default: m.OrderHistoryModal })));
 
 const actionLabels: { status: OrderStatus; label: string }[] = [{ status: "confirmee", label: "Confirmer" }, { status: "annulee", label: "Annuler" }, { status: "reportee", label: "Reporter" }, { status: "ne_repond_pas", label: "Pas de réponse" }, { status: "transferee", label: "Transférer" }];
 type AdminSection = "dashboard" | "abandoned" | "catalogue" | "settings" | "ecom" | "sheet" | "transferred" | "returns" | "staff";
@@ -104,8 +105,8 @@ function AdminPageContent() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [searchPopupQuery, setSearchPopupQuery] = useState("");
   const staffDataQuery = trpc.admin.staffData.useQuery(undefined, { enabled: isProfileModalOpen, retry: false, refetchOnWindowFocus: false });
-  const ordersQuery = trpc.admin.orders.useQuery(undefined, { refetchInterval: 10000, refetchIntervalInBackground: true, refetchOnWindowFocus: true, retry: false });
-  const abandonedQuery = trpc.admin.abandonedOrders.useQuery(undefined, { refetchInterval: 10000, refetchIntervalInBackground: true, refetchOnWindowFocus: true, retry: false });
+  const ordersQuery = trpc.admin.orders.useQuery(undefined, { refetchInterval: 15000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false });
+  const abandonedQuery = trpc.admin.abandonedOrders.useQuery(undefined, { refetchInterval: 15000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false });
   const utils = trpc.useUtils();
   const updateOrderStatus = trpc.admin.updateOrderStatus.useMutation();
   const recordOrderInteraction = trpc.admin.recordOrderInteraction.useMutation();
@@ -115,6 +116,7 @@ function AdminPageContent() {
   const setOrderCarrier = trpc.admin.setOrderCarrier.useMutation();
   const restoreOrders = trpc.admin.restoreOrders.useMutation();
   const restoredOnceRef = useRef(false);
+  const backupSignatureRef = useRef("");
   const syncSheetMutation = trpc.googleSheet.syncOrders.useMutation({
     onSuccess: (data) => {
       if (data.added > 0) {
@@ -124,7 +126,10 @@ function AdminPageContent() {
     },
   });
   useEffect(() => {
-    syncSheetMutation.mutate();
+    const timer = window.setTimeout(() => {
+      syncSheetMutation.mutate({ force: false });
+    }, 2500);
+    return () => window.clearTimeout(timer);
   }, []);
   const serverOrders = ordersQuery.data ?? [];
   const orderById = useMemo(() => new Map(serverOrders.map(order => [order.id, order])), [serverOrders]);
@@ -327,15 +332,17 @@ function AdminPageContent() {
 
   // E-com & EcoTrack status & carrier batch tracking query for live parcel events
   const ecomStatusQuery = trpc.ecom.status.useQuery(undefined, {
-    refetchInterval: 30000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
+    staleTime: 60000,
     retry: false,
   });
   const ecotrackStatusQuery = trpc.ecotrack.status.useQuery(undefined, {
-    refetchInterval: 30000,
-    refetchIntervalInBackground: true,
-    refetchOnWindowFocus: true,
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
+    staleTime: 60000,
     retry: false,
   });
   const ecomShipments = useMemo(() => ecomStatusQuery.data?.shipments || {}, [ecomStatusQuery.data]);
@@ -362,9 +369,10 @@ function AdminPageContent() {
     { trackings: activeEcomTrackings },
     {
       enabled: activeEcomTrackings.length > 0,
-      refetchInterval: 30000,
-      refetchIntervalInBackground: true,
-      refetchOnWindowFocus: true,
+      refetchInterval: 60000,
+      refetchIntervalInBackground: false,
+      refetchOnWindowFocus: false,
+      staleTime: 60000,
       retry: false,
     }
   );
@@ -372,9 +380,10 @@ function AdminPageContent() {
     { trackings: activeEcoTrackings },
     {
       enabled: activeEcoTrackings.length > 0,
-      refetchInterval: 30000,
-      refetchIntervalInBackground: true,
-      refetchOnWindowFocus: true,
+      refetchInterval: 60000,
+      refetchIntervalInBackground: false,
+      refetchOnWindowFocus: false,
+      staleTime: 60000,
       retry: false,
     }
   );
@@ -490,46 +499,66 @@ function AdminPageContent() {
 
   useEffect(() => {
     if (ordersQuery.isLoading || ordersQuery.error) return;
-    try {
-      const serverIds = new Set(serverOrders.map(o => o.id));
-      const localOrders = loadRealOrders();
-      const backupRaw = JSON.parse(
-        localStorage.getItem("miss-sensuelle-admin-orders-backup") || "[]",
-      ) as Order[];
-      const combined = [...localOrders, ...(Array.isArray(backupRaw) ? backupRaw : [])];
-      const uniqueMissing = new Map<string, Order>();
-      for (const item of combined) {
-        if (item && item.id && !serverIds.has(item.id) && !uniqueMissing.has(item.id)) {
-          uniqueMissing.set(item.id, item);
+    const sig = `${serverOrders.length}:${serverOrders[0]?.id ?? ""}:${serverOrders[0]?.status ?? ""}:${serverOrders[serverOrders.length - 1]?.id ?? ""}`;
+    if (restoredOnceRef.current && sig === backupSignatureRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      try {
+        if (!restoredOnceRef.current) {
+          restoredOnceRef.current = true;
+          const serverIds = new Set(serverOrders.map(o => o.id));
+          const localOrders = loadRealOrders();
+          const backupRaw = JSON.parse(
+            localStorage.getItem("miss-sensuelle-admin-orders-backup") || "[]",
+          ) as Order[];
+          const combined = [...localOrders, ...(Array.isArray(backupRaw) ? backupRaw : [])];
+          const uniqueMissing = new Map<string, Order>();
+          for (const item of combined) {
+            if (item && item.id && !serverIds.has(item.id) && !uniqueMissing.has(item.id)) {
+              uniqueMissing.set(item.id, item);
+            }
+          }
+          if (uniqueMissing.size > 0) {
+            restoreOrders.mutate(
+              { orders: Array.from(uniqueMissing.values()) },
+              {
+                onSuccess: async res => {
+                  if (res.restored > 0) {
+                    await utils.admin.orders.invalidate();
+                  }
+                },
+              },
+            );
+          }
         }
+        if (serverOrders.length > 0 && sig !== backupSignatureRef.current) {
+          backupSignatureRef.current = sig;
+          localStorage.setItem(
+            "miss-sensuelle-admin-orders-backup",
+            JSON.stringify(serverOrders),
+          );
+        }
+      } catch {
+        // Ignore storage error
       }
-      if (uniqueMissing.size > 0 && !restoredOnceRef.current) {
-        restoredOnceRef.current = true;
-        restoreOrders.mutate(
-          { orders: Array.from(uniqueMissing.values()) },
-          {
-            onSuccess: async res => {
-              if (res.restored > 0) {
-                await utils.admin.orders.invalidate();
-              }
-            },
-          },
-        );
-      }
-      if (serverOrders.length > 0) {
-        localStorage.setItem(
-          "miss-sensuelle-admin-orders-backup",
-          JSON.stringify(serverOrders),
-        );
-      }
-    } catch {
-      // Ignore storage error
-    }
+    }, 250);
+    return () => window.clearTimeout(timer);
   }, [ordersQuery.isLoading, ordersQuery.error, serverOrders]);
   const orders = useMemo(() => serverOrders.map(toDashboardOrder), [serverOrders]);
   const periodOrders = useMemo(() => orders.filter(order => order.status !== "transferee" && orderMatchesPeriod(order, period)), [orders, period]);
   const filtered = useMemo(() => periodOrders.filter(order => order.status !== "transferee" && (activeStatus === "all" || order.status === activeStatus) && `${order.id} ${order.phone} ${order.customer}`.toLowerCase().includes(query.toLowerCase())), [periodOrders, activeStatus, query]);
-  const transferredCount = useMemo(() => serverOrders.filter(order => order.status === "transferee").length, [serverOrders]);
+  const { activeNewCount, confirmedCount, transferredCount } = useMemo(() => {
+    let activeNew = 0;
+    let confirmed = 0;
+    let transferred = 0;
+    for (const order of serverOrders) {
+      if (order.status === "nouvelle") activeNew++;
+      else if (order.status === "confirmee") confirmed++;
+      else if (order.status === "transferee") transferred++;
+    }
+    return { activeNewCount: activeNew, confirmedCount: confirmed, transferredCount: transferred };
+  }, [serverOrders]);
+  const catalogCount = useMemo(() => getCatalogProducts().length, [section]);
   const searchResults = useMemo(() => {
     if (!searchPopupQuery.trim()) return [];
     const q = searchPopupQuery.toLowerCase().trim();
@@ -750,7 +779,7 @@ function AdminPageContent() {
   const activePostponeOrder = postponeOrderId ? orderById.get(postponeOrderId) ?? null : null;
   const activeCancelOrder = cancelOrderId ? orderById.get(cancelOrderId) ?? null : null;
 
-  return <div className="admin-shell"><aside className="admin-sidebar"><div className="admin-brand-mobile-row"><Link href="/" className="wordmark admin-wordmark"><span className="wordmark-star">✦</span><span>miss</span><em>sensuelle</em></Link><div className="admin-mobile-quick-top"><button type="button" className="neo-darkmode-btn mobile-top-theme-btn" onClick={toggleTheme} title={theme === "dark" ? "Passer en Mode Clair" : "Passer en Mode Sombre"} aria-label="Basculer Mode Clair / Sombre">{theme === "dark" ? (<><Sun size={15} className="neo-sun-glow" /><span>Clair</span></>) : (<><Moon size={15} className="neo-moon-glow" /><span>Dark</span></>)}</button><button type="button" className="neo-darkmode-btn mobile-top-create-btn" onClick={() => setIsCreatingOrder(true)} title="Créer une nouvelle commande"><Plus size={15} /><span>Commande</span></button><button type="button" onClick={() => setIsProfileModalOpen(true)} title="Mon profil, salaire & commissions" aria-label="Mon profil et commissions" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "50%", border: "2px solid #a855f7", background: "linear-gradient(135deg, #9b82f6, #f472b6)", color: "#fff", fontSize: 11, fontWeight: 900, cursor: "pointer", flexShrink: 0 }}>{currentActorName.slice(0, 2).toUpperCase()}</button></div></div><nav className="admin-mobile-nav" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={17} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={17} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge">{transferredCount}</span>}</button><button type="button" className={section === "catalogue" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => { go("catalogue"); setIsMoreMenuOpen(false); }}><Package size={17} /><span>Produits</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={17} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><Menu size={17} /><span>Menu</span></button></nav><button type="button" className="admin-user" onClick={() => setIsProfileModalOpen(true)} style={{ background: "transparent", border: 0, width: "100%", textAlign: "left", cursor: "pointer" }} title="Voir mon salaire, évolution & commissions"><div className="admin-avatar">{currentActorName.slice(0, 2).toUpperCase()}</div><div><strong>{currentActorName}</strong><span>{isOwner ? "Administratrice" : "Confirmateur • Voir salaire"}</span></div></button><nav className="admin-nav"><span className="admin-nav-label">Workspace</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{orders.filter(order => order.status !== "transferee" && order.status === "nouvelle").length}</b></button><button className={section === "staff" ? "active" : ""} onClick={() => go("staff")}><Users size={18} />Confirmateurs & Salaires</button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com & DHD <b>{orders.filter(order => order.status === "confirmee").length}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue & Landing <b>{getCatalogProducts().length}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button onClick={() => go("staff")}><BarChart3 size={18} />Rapports & Performances</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "staff" ? "Confirmateurs, Salaires & Journal d'Activité" : section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Studio Produits & Landing Pages" : section === "ecom" ? "E-com Delivery & DHD (EcoTrack)" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : `Bonjour, ${currentActorName}`} <span>✦</span></h1></div><div className="admin-top-actions">
+  return <div className="admin-shell"><aside className="admin-sidebar"><div className="admin-brand-mobile-row"><Link href="/" className="wordmark admin-wordmark"><span className="wordmark-star">✦</span><span>miss</span><em>sensuelle</em></Link><div className="admin-mobile-quick-top"><button type="button" className="neo-darkmode-btn mobile-top-theme-btn" onClick={toggleTheme} title={theme === "dark" ? "Passer en Mode Clair" : "Passer en Mode Sombre"} aria-label="Basculer Mode Clair / Sombre">{theme === "dark" ? (<><Sun size={15} className="neo-sun-glow" /><span>Clair</span></>) : (<><Moon size={15} className="neo-moon-glow" /><span>Dark</span></>)}</button><button type="button" className="neo-darkmode-btn mobile-top-create-btn" onClick={() => setIsCreatingOrder(true)} title="Créer une nouvelle commande"><Plus size={15} /><span>Commande</span></button><button type="button" onClick={() => setIsProfileModalOpen(true)} title="Mon profil, salaire & commissions" aria-label="Mon profil et commissions" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "50%", border: "2px solid #a855f7", background: "linear-gradient(135deg, #9b82f6, #f472b6)", color: "#fff", fontSize: 11, fontWeight: 900, cursor: "pointer", flexShrink: 0 }}>{currentActorName.slice(0, 2).toUpperCase()}</button></div></div><nav className="admin-mobile-nav" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={17} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={17} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge">{transferredCount}</span>}</button><button type="button" className={section === "catalogue" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => { go("catalogue"); setIsMoreMenuOpen(false); }}><Package size={17} /><span>Produits</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={17} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><Menu size={17} /><span>Menu</span></button></nav><button type="button" className="admin-user" onClick={() => setIsProfileModalOpen(true)} style={{ background: "transparent", border: 0, width: "100%", textAlign: "left", cursor: "pointer" }} title="Voir mon salaire, évolution & commissions"><div className="admin-avatar">{currentActorName.slice(0, 2).toUpperCase()}</div><div><strong>{currentActorName}</strong><span>{isOwner ? "Administratrice" : "Confirmateur • Voir salaire"}</span></div></button><nav className="admin-nav"><span className="admin-nav-label">Workspace</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{activeNewCount}</b></button><button className={section === "staff" ? "active" : ""} onClick={() => go("staff")}><Users size={18} />Confirmateurs & Salaires</button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com & DHD <b>{confirmedCount}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue & Landing <b>{catalogCount}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button onClick={() => go("staff")}><BarChart3 size={18} />Rapports & Performances</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "staff" ? "Confirmateurs, Salaires & Journal d'Activité" : section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Studio Produits & Landing Pages" : section === "ecom" ? "E-com Delivery & DHD (EcoTrack)" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : `Bonjour, ${currentActorName}`} <span>✦</span></h1></div><div className="admin-top-actions">
   <button type="button" className="neo-darkmode-btn" onClick={toggleTheme} title={theme === "dark" ? "Mode Clair" : "Mode Sombre Neo Waw"} aria-label="Basculer Mode Sombre Neo">
   {theme === "dark" ? (
     <>
@@ -805,7 +834,7 @@ function AdminPageContent() {
     <Smartphone size={14} style={{ color: "#a855f7" }} />
     <span className="neo-btn-label" style={{ color: "#a855f7", fontWeight: 600 }}>App Mobile</span>
   </button>
-  <button className="icon-button" aria-label="Notifications"><Bell size={19} />{orders.some(order => order.status === "nouvelle") && <i />}</button><button type="button" className="admin-profile" onClick={() => setIsProfileModalOpen(true)} title="Voir mon profil, salaire & commissions" style={{ background: "transparent", border: 0, cursor: "pointer" }}><div className="admin-avatar small">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></button></div></header><div className="admin-content">{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onSetCarrier={handleSetCarrier} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} stockPanel={<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} />} />}</div></main>{isSearchOpen && (
+  <button className="icon-button" aria-label="Notifications"><Bell size={19} />{activeNewCount > 0 && <i />}</button><button type="button" className="admin-profile" onClick={() => setIsProfileModalOpen(true)} title="Voir mon profil, salaire & commissions" style={{ background: "transparent", border: 0, cursor: "pointer" }}><div className="admin-avatar small">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></button></div></header><div className="admin-content"><Suspense fallback={<section className="admin-data-state" role="status"><span className="eyebrow">Administration</span><h2>Chargement du module…</h2></section>}>{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onSetCarrier={handleSetCarrier} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} stockPanel={<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} />} />}</Suspense></div></main>{isSearchOpen && (
   <div className="admin-search-modal-overlay" onClick={() => setIsSearchOpen(false)}>
     <div className="admin-search-modal" onClick={e => e.stopPropagation()}>
       <div className="admin-search-modal-head">
@@ -1067,12 +1096,14 @@ function AdminPageContent() {
     onCreate={handleCreateOrder}
   />
 )}{selected && <OrderModal key={selected.id} order={selected} isSaving={updateOrderDetails.isPending} onClose={() => setSelected(null)} onCall={() => handleCallOrder(selected)} onWhatsApp={() => handleWhatsAppOrder(selected)} onOpenHistory={() => setHistoryOrderId(selected.id)} onOpenPostpone={() => setPostponeOrderId(selected.id)} onOpenCancel={() => setCancelOrderId(selected.id)} onSetNrpLevel={lvl => updateStatusWithMeta(selected.id, "ne_repond_pas", { nrpLevel: lvl })} onSetCarrier={carrier => handleSetCarrier(selected.id, carrier)} onUpdate={updateStatus} onSaveDetails={saveOrderDetails} onDelete={handleDeleteOrder} onCopy={() => { void copyOrderDetails(selected, notify); setSelected(null); }} />}{activeHistoryOrder && (
-  <OrderHistoryModal
-    order={activeHistoryOrder}
-    onClose={() => setHistoryOrderId(null)}
-    onCall={handleCallOrder}
-    onWhatsApp={handleWhatsAppOrder}
-  />
+  <Suspense fallback={null}>
+    <OrderHistoryModal
+      order={activeHistoryOrder}
+      onClose={() => setHistoryOrderId(null)}
+      onCall={handleCallOrder}
+      onWhatsApp={handleWhatsAppOrder}
+    />
+  </Suspense>
 )}{activePostponeOrder && (
   <PostponeOrderModal
     order={activePostponeOrder}
@@ -1258,7 +1289,7 @@ export default function AdminPage() { return <AdminAuthGate><AdminPageContent />
 
 function StockPanel({ onManageCatalog, onOpenSheet }: { onManageCatalog: () => void; onOpenSheet?: () => void }) {
   const catalog = getCatalogProducts();
-  const sheetQuery = trpc.googleSheet.getConfig.useQuery(undefined, { refetchOnWindowFocus: false, retry: false });
+  const sheetQuery = trpc.googleSheet.getConfig.useQuery(undefined, { refetchOnWindowFocus: false, staleTime: 60000, retry: false });
   const isConnected = Boolean(sheetQuery.data?.connected);
 
   return (

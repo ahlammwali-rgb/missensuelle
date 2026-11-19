@@ -67,6 +67,7 @@ const memorySessions = new Map<string, MemorySession>();
 const memoryOrders: CheckoutOrder[] = [];
 let nextMemorySessionId = 1;
 let nextMemoryOrderId = 1;
+let ordersNeedDedup = true;
 
 const getCounters = () => ({
   nextOrderId: nextMemoryOrderId,
@@ -577,6 +578,7 @@ export async function restoreClientBackupOrders(orders: Array<Partial<CheckoutOr
     added++;
   }
   if (added > 0) {
+    ordersNeedDedup = true;
     memoryOrders.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
@@ -585,14 +587,18 @@ export async function restoreClientBackupOrders(orders: Array<Partial<CheckoutOr
   return { restored: added, total: memoryOrders.length };
 }
 
-export async function syncGoogleSheetOrders(sheetUrl?: string) {
+export async function syncGoogleSheetOrders(sheetUrl?: string, force = false) {
   await loadStore();
   const result = await importGoogleSheetToOrders(
     memoryOrders,
     saveStore,
     () => nextMemoryOrderId++,
-    sheetUrl
+    sheetUrl,
+    force
   );
+  if (result.added > 0) {
+    ordersNeedDedup = true;
+  }
   return result;
 }
 
@@ -719,6 +725,7 @@ export async function createAdminOrder(
   };
 
   memoryOrders.unshift(createdOrder);
+  ordersNeedDedup = true;
 
   appendStaffActivityLog({
     at: nowIso,
@@ -1162,6 +1169,7 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
       note: payload.note ?? "",
       status: "nouvelle",
     });
+    ordersNeedDedup = true;
     if (current) {
       current.state = "submitted";
       current.payload = payload;
@@ -1295,8 +1303,11 @@ export async function listCheckoutOrders(): Promise<CheckoutOrder[]> {
   const db = await getDb();
   if (!db) {
     await loadStore();
-    const dedup = autoDeduplicateOrders(memoryOrders);
-    if (dedup.removed > 0) saveStore();
+    if (ordersNeedDedup) {
+      const dedup = autoDeduplicateOrders(memoryOrders);
+      if (dedup.removed > 0) saveStore();
+      ordersNeedDedup = false;
+    }
     return [...memoryOrders];
   }
   const orders = await db.select().from(storeOrders).orderBy(desc(storeOrders.createdAt));
@@ -1339,6 +1350,7 @@ export async function listCheckoutOrders(): Promise<CheckoutOrder[]> {
 }
 
 const hasPhone = (phone: string | undefined | null) => /\d/.test(phone ?? "");
+let lastAutoPurgeAt = 0;
 
 /** Drafts that never received a phone number are useless for recovery: purge them (and hide fresh ones). */
 export async function purgeAbandonedWithoutPhone(maxAgeMs = TEN_MINUTES) {
@@ -1405,6 +1417,7 @@ export async function convertAbandonedToOrder(id: number): Promise<{ orderNumber
       note: [payload.note, "(transférée depuis commande abandonnée)"].filter(Boolean).join(" "),
       status: "nouvelle",
     });
+    ordersNeedDedup = true;
     session.state = "submitted";
     session.orderId = orderId;
     session.updatedAt = now;
@@ -1448,7 +1461,10 @@ export async function convertAbandonedToOrder(id: number): Promise<{ orderNumber
 }
 
 export async function listAbandonedCheckouts(): Promise<AbandonedCheckout[]> {
-  await purgeAbandonedWithoutPhone().catch(() => undefined);
+  if (Date.now() - lastAutoPurgeAt >= 60_000) {
+    lastAutoPurgeAt = Date.now();
+    await purgeAbandonedWithoutPhone().catch(() => undefined);
+  }
   const db = await getDb();
   if (!db) {
     await loadStore();

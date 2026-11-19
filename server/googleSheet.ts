@@ -25,6 +25,9 @@ export function getStoredSheetConfig(): GoogleSheetConfig {
 }
 
 export function setStoredSheetConfig(newConfig: Partial<GoogleSheetConfig>) {
+  if (newConfig.url && newConfig.url !== sheetConfig.url) {
+    sheetRowsCache = null;
+  }
   sheetConfig = {
     ...sheetConfig,
     ...newConfig,
@@ -87,31 +90,54 @@ function cleanPhone(raw: string): string {
   return digits;
 }
 
-export async function fetchSheetRows(sheetUrl = sheetConfig.url): Promise<string[][]> {
+const SHEET_CACHE_TTL_MS = 45 * 1000;
+let sheetRowsCache: { url: string; at: number; rows: string[][] } | null = null;
+const inFlightSheetFetches = new Map<string, Promise<string[][]>>();
+
+export async function fetchSheetRows(sheetUrl = sheetConfig.url, force = false): Promise<string[][]> {
   const id = extractSpreadsheetId(sheetUrl);
   if (!id) throw new Error("Lien Google Sheet invalide (ID introuvable)");
   const csvUrl = `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=0`;
 
-  const res = await fetch(csvUrl, {
-    headers: { "User-Agent": "MissSensuelle-Sync/1.0" },
-    signal: AbortSignal.timeout(15000),
-  });
-
-  if (!res.ok) {
-    throw new Error(`Google Sheet inaccessible (${res.status}). Assurez-vous que le lien est partagé en "Tous les utilisateurs disposant du lien : Lecteur ou Éditeur".`);
+  if (!force && sheetRowsCache && sheetRowsCache.url === csvUrl && Date.now() - sheetRowsCache.at < SHEET_CACHE_TTL_MS) {
+    return sheetRowsCache.rows;
   }
 
-  const text = await res.text();
-  return parseCSV(text);
+  const existing = inFlightSheetFetches.get(csvUrl);
+  if (existing) return existing;
+
+  const task = (async () => {
+    const res = await fetch(csvUrl, {
+      headers: { "User-Agent": "MissSensuelle-Sync/1.0" },
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Google Sheet inaccessible (${res.status}). Assurez-vous que le lien est partagé en "Tous les utilisateurs disposant du lien : Lecteur ou Éditeur".`);
+    }
+
+    const text = await res.text();
+    const rows = parseCSV(text);
+    sheetRowsCache = { url: csvUrl, at: Date.now(), rows };
+    return rows;
+  })();
+
+  inFlightSheetFetches.set(csvUrl, task);
+  try {
+    return await task;
+  } finally {
+    inFlightSheetFetches.delete(csvUrl);
+  }
 }
 
 export async function importGoogleSheetToOrders(
   memoryOrders: CheckoutOrder[],
   saveStore: () => void,
   getNextOrderId: () => number,
-  sheetUrl = sheetConfig.url
+  sheetUrl = sheetConfig.url,
+  force = false
 ): Promise<{ added: number; totalRows: number; skipped: number }> {
-  const rows = await fetchSheetRows(sheetUrl);
+  const rows = await fetchSheetRows(sheetUrl, force);
   if (rows.length < 2) {
     return { added: 0, totalRows: rows.length, skipped: 0 };
   }

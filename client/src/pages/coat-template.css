@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap");
+/* Cairo loaded non-blocking via index.html */
 
 .coat-template{--g:#d9a93a;--p:#ff2e63}
 .coat-template *{box-sizing:border-box}

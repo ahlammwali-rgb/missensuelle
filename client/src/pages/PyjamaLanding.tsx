@@ -439,6 +439,8 @@ export default function PyjamaLanding({ product }: { product?: Product }) {
             src={img.src}
             alt={img.alt}
             loading={img.lazy ? "lazy" : undefined}
+            decoding={idx === 0 ? "sync" : "async"}
+            fetchPriority={idx === 0 ? "high" : "low"}
           />
         ))}
 

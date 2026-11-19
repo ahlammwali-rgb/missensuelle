@@ -1,4 +1,4 @@
-import React, { useState, type ReactNode } from "react";
+import React, { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlarmClock,
   Bell,
@@ -94,6 +94,8 @@ const statusMeta: Record<OrderStatus, { label: string; badgeClass: string; cardC
   },
 };
 
+const PAGE_SIZE = 40;
+
 export function AdminDashboard({
   orders,
   filtered,
@@ -117,10 +119,15 @@ export function AdminDashboard({
   onSetCarrier,
   stockPanel,
 }: Props) {
-  const stats = getOrderStats(orders);
+  const stats = useMemo(() => getOrderStats(orders), [orders]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [nrpSubFilter, setNrpSubFilter] = useState<"all" | 1 | 2 | 3>("all");
   const [openNrpMenuOrderId, setOpenNrpMenuOrderId] = useState<string | null>(null);
+  const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
+
+  useEffect(() => {
+    setVisibleLimit(PAGE_SIZE);
+  }, [activeStatus, query, period, nrpSubFilter]);
 
   const copyId = async (id: string) => {
     try {
@@ -132,10 +139,38 @@ export function AdminDashboard({
     } catch {}
   };
 
-  const displayedOrders =
-    activeStatus === "ne_repond_pas" && nrpSubFilter !== "all"
-      ? filtered.filter(order => (order.nrpLevel ?? 1) === nrpSubFilter)
-      : filtered;
+  const hasUndatedOrders = useMemo(
+    () => orders.some(order => !parseOrderDate(order.createdAt)),
+    [orders],
+  );
+
+  const statusCounts = useMemo(() => {
+    const counts: Record<OrderStatus, number> = {
+      nouvelle: 0,
+      confirmee: 0,
+      transferee: 0,
+      reportee: 0,
+      ne_repond_pas: 0,
+      annulee: 0,
+    };
+    for (const order of orders) {
+      counts[order.status] = (counts[order.status] || 0) + 1;
+    }
+    return counts;
+  }, [orders]);
+
+  const displayedOrders = useMemo(
+    () =>
+      activeStatus === "ne_repond_pas" && nrpSubFilter !== "all"
+        ? filtered.filter(order => (order.nrpLevel ?? 1) === nrpSubFilter)
+        : filtered,
+    [filtered, activeStatus, nrpSubFilter],
+  );
+
+  const visibleOrders = useMemo(
+    () => displayedOrders.slice(0, visibleLimit),
+    [displayedOrders, visibleLimit],
+  );
 
   return (
     <div className="admin-app-dashboard">
@@ -274,7 +309,7 @@ export function AdminDashboard({
             </div>
           </div>
 
-          {orders.some(order => !parseOrderDate(order.createdAt)) && (
+          {hasUndatedOrders && (
             <p className="admin-order-date-note">
               Les anciennes commandes sans date précise sont conservées sous « Toutes les dates ».
             </p>
@@ -291,7 +326,7 @@ export function AdminDashboard({
               <b className="app-tab-count">{orders.length}</b>
             </button>
             {activeDashboardStatuses.map(status => {
-              const count = orders.filter(order => order.status === status).length;
+              const count = statusCounts[status] ?? 0;
               const meta = labels[status];
               return (
                 <button
@@ -384,7 +419,7 @@ export function AdminDashboard({
 
           {/* Orders Stream Cards */}
           <div className="app-orders-stream">
-            {displayedOrders.map(order => {
+            {visibleOrders.map(order => {
               const isNew = order.status === "nouvelle";
               const meta = statusMeta[order.status] ?? statusMeta.nouvelle;
               const statusLabel =
@@ -1036,6 +1071,34 @@ export function AdminDashboard({
                 </article>
               );
             })}
+
+            {displayedOrders.length > visibleOrders.length && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                  padding: "14px 8px",
+                }}
+              >
+                <button
+                  type="button"
+                  className="button button-light"
+                  onClick={() => setVisibleLimit(prev => prev + PAGE_SIZE)}
+                >
+                  Afficher {Math.min(PAGE_SIZE, displayedOrders.length - visibleOrders.length)} commandes de plus ({displayedOrders.length - visibleOrders.length} restantes)
+                </button>
+                <button
+                  type="button"
+                  className="button button-light"
+                  onClick={() => setVisibleLimit(displayedOrders.length)}
+                >
+                  Tout afficher ({displayedOrders.length})
+                </button>
+              </div>
+            )}
 
             {!displayedOrders.length && (
               <div className="admin-empty-orders" role="status">

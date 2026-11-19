@@ -651,9 +651,9 @@ export const appRouter = router({
         });
       }),
     syncOrders: adminProcedure
-      .input(z.object({ url: z.string().optional() }).optional())
+      .input(z.object({ url: z.string().optional(), force: z.boolean().optional() }).optional())
       .mutation(async ({ input }) => {
-        return await syncGoogleSheetOrders(input?.url);
+        return await syncGoogleSheetOrders(input?.url, input?.force ?? true);
       }),
   }),
 });

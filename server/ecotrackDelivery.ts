@@ -78,6 +78,10 @@ let wilayasCache: { at: number; items: Array<{ wilaya_id: number; wilaya_name: s
 let feesCache: { at: number; rates: Record<string, ShippingRate> } | null = null;
 let allCommunesCache: { at: number; items: RawEcoCommune[] } | null = null;
 let allDesksCache: { at: number; myDesk?: RawEcoDesk | null; otherDesks: RawEcoDesk[] } | null = null;
+const ECO_STATUS_TTL = 5 * 60 * 1000;
+const ECO_TRACKING_TTL = 90 * 1000;
+let ecoStatusCache: { at: number; credsKey: string; error: string | null } | null = null;
+const ecoTrackingCache = new Map<string, { at: number; data: EcomTrackingInfo }>();
 
 const isTestEnv = () => Boolean(process.env.VITEST || process.env.NODE_ENV === "test");
 const githubHeaders = () => ({
@@ -184,6 +188,8 @@ function clearCaches() {
   feesCache = null;
   allCommunesCache = null;
   allDesksCache = null;
+  ecoStatusCache = null;
+  ecoTrackingCache.clear();
 }
 
 async function credentials() {
@@ -276,8 +282,21 @@ export async function getEcoTrackStatus() {
     return { configured: false as const, shipments: state.shipments };
   }
   const tokenPreview = `${creds.token.slice(0, 4)}…${creds.token.slice(-4)}`;
+  const credsKey = `${creds.baseUrl}:${creds.token}`;
+  if (ecoStatusCache && ecoStatusCache.credsKey === credsKey && Date.now() - ecoStatusCache.at < ECO_STATUS_TTL) {
+    return {
+      configured: true as const,
+      connected: ecoStatusCache.error === null,
+      baseUrl: creds.baseUrl,
+      label: state.label || creds.baseUrl.replace(/^https?:\/\//, ""),
+      tokenPreview,
+      error: ecoStatusCache.error,
+      shipments: state.shipments,
+    };
+  }
   try {
     await validateToken(creds);
+    ecoStatusCache = { at: Date.now(), credsKey, error: null };
     return {
       configured: true as const,
       connected: true as const,
@@ -288,13 +307,15 @@ export async function getEcoTrackStatus() {
       shipments: state.shipments,
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Erreur de connexion EcoTrack";
+    ecoStatusCache = { at: Date.now(), credsKey, error: message };
     return {
       configured: true as const,
       connected: false as const,
       baseUrl: creds.baseUrl,
       label: state.label || creds.baseUrl.replace(/^https?:\/\//, ""),
       tokenPreview,
-      error: error instanceof Error ? error.message : "Erreur de connexion EcoTrack",
+      error: message,
       shipments: state.shipments,
     };
   }
@@ -312,6 +333,7 @@ export async function saveEcoTrackCredentials(baseUrlRaw: string, tokenRaw: stri
   state.token = token;
   state.label = (labelRaw || "").trim() || baseUrl.replace(/^https?:\/\//, "");
   clearCaches();
+  ecoStatusCache = { at: Date.now(), credsKey: `${baseUrl}:${token}`, error: null };
   await saveState();
   return {
     ok: true,
@@ -776,14 +798,26 @@ export async function getEcoTrackTrackingBatch(
   trackings: string[]
 ): Promise<Record<string, EcomTrackingInfo>> {
   const result: Record<string, EcomTrackingInfo> = {};
+  const now = Date.now();
   const unique = Array.from(new Set(trackings.filter(Boolean)));
   if (!unique.length) return result;
   const creds = await credentials();
   if (!creds) return result;
 
+  const toFetch: string[] = [];
+  for (const trk of unique) {
+    const cached = ecoTrackingCache.get(trk);
+    if (cached && now - cached.at < ECO_TRACKING_TTL) {
+      result[trk] = cached.data;
+    } else {
+      toFetch.push(trk);
+    }
+  }
+  if (!toFetch.length) return result;
+
   // Query in chunks of 40 via /api/v1/get/orders/status
-  for (let i = 0; i < unique.length; i += 40) {
-    const chunk = unique.slice(i, i + 40);
+  for (let i = 0; i < toFetch.length; i += 40) {
+    const chunk = toFetch.slice(i, i + 40);
     try {
       const resp = await ecoRequest<{
         data?: Record<
@@ -811,7 +845,7 @@ export async function getEcoTrackTrackingBatch(
       for (const [trk, info] of Object.entries(resp.data ?? {})) {
         const sit = formatEcoStatusLabel(info.status);
         const low = `${info.status || ""} ${sit}`.toLowerCase();
-        result[trk] = {
+        const item: EcomTrackingInfo = {
           tracking: trk,
           situation: sit,
           etat_logistique: info.status,
@@ -824,6 +858,8 @@ export async function getEcoTrackTrackingBatch(
             commentaire: a.details || (a.driver ? `Livreur : ${a.driver}` : undefined),
           })),
         };
+        ecoTrackingCache.set(trk, { at: Date.now(), data: item });
+        result[trk] = item;
       }
     } catch {
       // Ignore transient tracking error

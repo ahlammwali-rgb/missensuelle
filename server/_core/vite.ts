@@ -58,7 +58,25 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(
+    express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        const normalized = filePath.replace(/\\/g, "/");
+        if (normalized.endsWith(".html") || normalized.endsWith("/sw.js") || normalized.endsWith("/manifest.json")) {
+          res.setHeader("Cache-Control", "no-cache");
+        } else if (normalized.includes("/assets/") || normalized.includes("/tracking/bootstrap.")) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else if (
+          normalized.includes("/images/") ||
+          normalized.includes("/manus-storage/") ||
+          normalized.includes("/sounds/") ||
+          normalized.includes("/icons/")
+        ) {
+          res.setHeader("Cache-Control", "public, max-age=604800");
+        }
+      },
+    }),
+  );
 
   // the app's not-found page keeps a real 404 status for crawlers
   app.get("/404", (_req, res) => {

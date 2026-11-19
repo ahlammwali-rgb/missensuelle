@@ -9,6 +9,8 @@ const CLOUD_URL = "https://api.github.com/repos/ahlammwali-rgb/missensuelle-db/c
 const LOCAL_DIR = path.resolve(process.cwd(), ".data");
 const LOCAL_FILE = path.join(LOCAL_DIR, "ecom-state.json");
 const RATES_TTL = 10 * 60 * 1000;
+const STATUS_TTL = 5 * 60 * 1000;
+const TRACKING_TTL = 90 * 1000;
 
 export type EcomShipment = { tracking: string; at: string; idColis: number | null; readyToShip?: boolean };
 type EcomState = { key: string; token: string; shipments: Record<string, EcomShipment> };
@@ -23,6 +25,13 @@ export class EcomError extends Error {
 let state: EcomState = { key: "", token: "", shipments: {} };
 let loadPromise: Promise<void> | null = null;
 let ratesCache: { at: number; value: ShippingRates } | null = null;
+let statusCache: {
+  at: number;
+  credsKey: string;
+  account: EcomAccount | null;
+  error: string | null;
+} | null = null;
+const trackingCache = new Map<string, { at: number; data: EcomTrackingInfo }>();
 
 const isTestEnv = () => Boolean(process.env.VITEST || process.env.NODE_ENV === "test");
 const githubHeaders = () => ({
@@ -149,15 +158,28 @@ export async function getEcomStatus() {
   const creds = await credentials();
   if (!creds) return { configured: false as const, shipments: state.shipments };
   const keyPreview = `${creds.key.slice(0, 4)}…${creds.key.slice(-3)}`;
+  const credsKey = `${creds.key}:${creds.token}`;
+  if (statusCache && statusCache.credsKey === credsKey && Date.now() - statusCache.at < STATUS_TTL) {
+    return {
+      configured: true as const,
+      keyPreview,
+      account: statusCache.account,
+      error: statusCache.error,
+      shipments: state.shipments,
+    };
+  }
   try {
     const account = await ecomRequest<EcomAccount>("/test", { creds });
+    statusCache = { at: Date.now(), credsKey, account, error: null };
     return { configured: true as const, keyPreview, account, error: null, shipments: state.shipments };
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Erreur inconnue";
+    statusCache = { at: Date.now(), credsKey, account: null, error: message };
     return {
       configured: true as const,
       keyPreview,
       account: null,
-      error: error instanceof Error ? error.message : "Erreur inconnue",
+      error: message,
       shipments: state.shipments,
     };
   }
@@ -171,6 +193,8 @@ export async function saveEcomCredentials(key: string, token: string) {
   state.key = creds.key;
   state.token = creds.token;
   ratesCache = null;
+  statusCache = { at: Date.now(), credsKey: `${creds.key}:${creds.token}`, account, error: null };
+  trackingCache.clear();
   await saveState();
   return account;
 }
@@ -180,6 +204,8 @@ export async function clearEcomCredentials() {
   state.key = "";
   state.token = "";
   ratesCache = null;
+  statusCache = null;
+  trackingCache.clear();
   await saveState();
   return { cleared: true };
 }
@@ -401,13 +427,31 @@ export async function getEcomTracking(tracking: string): Promise<EcomTrackingInf
 
 export async function getEcomTrackingBatch(trackings: string[]): Promise<Record<string, EcomTrackingInfo>> {
   const result: Record<string, EcomTrackingInfo> = {};
+  const now = Date.now();
   const unique = Array.from(new Set(trackings.filter(Boolean)));
-  await Promise.all(
-    unique.map(async trk => {
-      const data = await getEcomTracking(trk);
-      if (data) result[trk] = data;
-    })
-  );
+  const toFetch: string[] = [];
+
+  for (const trk of unique) {
+    const cached = trackingCache.get(trk);
+    if (cached && now - cached.at < TRACKING_TTL) {
+      result[trk] = cached.data;
+    } else {
+      toFetch.push(trk);
+    }
+  }
+
+  for (let i = 0; i < toFetch.length; i += 8) {
+    const chunk = toFetch.slice(i, i + 8);
+    await Promise.all(
+      chunk.map(async trk => {
+        const data = await getEcomTracking(trk);
+        if (data) {
+          trackingCache.set(trk, { at: Date.now(), data });
+          result[trk] = data;
+        }
+      })
+    );
+  }
   return result;
 }
 
