@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { CheckoutOrder, OrderHistoryEvent } from "@shared/checkout";
 import { formatDZD } from "@/lib/store-data";
+import { trpc } from "@/lib/trpc";
 
 type Props = {
   order: CheckoutOrder;
@@ -132,8 +133,15 @@ function eventIconAndColor(event: OrderHistoryEvent): { icon: React.ReactNode; b
 }
 
 export function OrderHistoryModal({ order, onClose, onCall, onWhatsApp }: Props) {
+  const shouldFetchHistory = Boolean(order.dbId) && (!Array.isArray(order.history) || order.history.length === 0);
+  const historyQuery = trpc.admin.orderHistory.useQuery(
+    { dbId: order.dbId },
+    { enabled: shouldFetchHistory, staleTime: 30_000, retry: false },
+  );
+
   const events: OrderHistoryEvent[] = React.useMemo(() => {
-    const raw = Array.isArray(order.history) ? [...order.history] : [];
+    const source = historyQuery.data ?? order.history;
+    const raw = Array.isArray(source) ? [...source] : [];
     if (!raw.some(e => e.type === "created")) {
       raw.push({
         id: `seed-${order.id}`,
@@ -145,7 +153,7 @@ export function OrderHistoryModal({ order, onClose, onCall, onWhatsApp }: Props)
       });
     }
     return raw.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-  }, [order]);
+  }, [order, historyQuery.data]);
 
   const callCount = order.callCount ?? events.filter(e => e.type === "call").length;
   const whatsappCount = order.whatsappCount ?? events.filter(e => e.type === "whatsapp").length;

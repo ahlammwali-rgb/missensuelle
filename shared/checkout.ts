@@ -250,6 +250,7 @@ export type CheckoutOrder = {
   lastCalledAt?: string;
   lastCalledBy?: string;
   lastNrpAt?: string;
+  historyCount?: number;
   history?: OrderHistoryEvent[];
 };
 export type AbandonedCheckout = {

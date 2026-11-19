@@ -77,6 +77,7 @@ export type Order = {
   whatsappCount?: number;
   lastCalledAt?: string;
   lastCalledBy?: string;
+  historyCount?: number;
   history?: OrderHistoryEvent[];
 };
 

@@ -871,7 +871,7 @@ export function AdminDashboard({
                         }}
                       >
                         <History size={14} />
-                        <span>Historique ({order.history?.length || 1})</span>
+                        <span>Historique ({order.historyCount ?? order.history?.length ?? 1})</span>
                       </button>
                     )}
                   </div>

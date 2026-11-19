@@ -194,10 +194,22 @@ export const appRouter = router({
     discardDraft: publicProcedure.input(discardDraftSchema).mutation(({ input }) => discardCheckoutDraft(input)),
   }),
   admin: router({
-    // The UI may still send its search text; the server deliberately returns the complete array.
+    // The UI may still send its search text; the server strips heavy per-order history arrays and returns historyCount instead.
     orders: adminProcedure
       .input(z.object({ query: z.string().optional() }).optional())
-      .query(() => listCheckoutOrders()),
+      .query(async () => {
+        const all = await listCheckoutOrders();
+        return all.map(({ history, ...rest }) => ({
+          ...rest,
+          historyCount: Array.isArray(history) && history.length > 0 ? history.length : 1,
+        }));
+      }),
+    orderHistory: adminProcedure
+      .input(z.object({ dbId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        const all = await listCheckoutOrders();
+        return all.find(o => o.dbId === input.dbId)?.history ?? [];
+      }),
     abandonedOrders: adminProcedure.query(() => listAbandonedCheckouts()),
     updateOrderStatus: adminProcedure
       .input(updateOrderStatusWithMetaSchema)

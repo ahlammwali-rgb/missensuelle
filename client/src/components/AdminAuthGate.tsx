@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type FormEvent } from "react";
+import { useEffect, useState, type ReactNode, type FormEvent } from "react";
 import { AlertCircle, KeyRound, LogIn, RefreshCw, ShieldCheck } from "lucide-react";
 import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
@@ -29,6 +29,22 @@ export function AdminAuthGate({ children }: Props) {
     refetchOnWindowFocus: false,
   });
   const utils = trpc.useUtils();
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("ms_admin_has_session") === "1") {
+        void utils.admin.orders.prefetch();
+      }
+    } catch {}
+  }, [utils]);
+  useEffect(() => {
+    try {
+      if (me.data?.role === "admin") {
+        localStorage.setItem("ms_admin_has_session", "1");
+      } else if (!me.isLoading && !me.data) {
+        localStorage.removeItem("ms_admin_has_session");
+      }
+    } catch {}
+  }, [me.data, me.isLoading]);
   const claimAdmin = trpc.auth.claimAdmin.useMutation();
   const loginPassword = trpc.auth.loginPassword.useMutation();
   const [code, setCode] = useState("");

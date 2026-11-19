@@ -71,6 +71,7 @@ function toDashboardOrder(order: CheckoutOrder): DashboardOrder {
     callCount: order.callCount,
     whatsappCount: order.whatsappCount,
     lastCalledAt: order.lastCalledAt,
+    historyCount: order.historyCount,
     history: order.history,
   };
 }
@@ -3214,7 +3215,7 @@ function OrderModal({
                   fontWeight: 800,
                 }}
               >
-                <History size={15} />Historique ({order.history?.length || 1})
+                <History size={15} />Historique ({order.historyCount ?? order.history?.length ?? 1})
               </button>
             )}
           </div>
