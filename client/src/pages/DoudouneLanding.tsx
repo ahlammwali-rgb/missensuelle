@@ -35,21 +35,34 @@ export default function DoudouneLanding({
   product: Product;
   quantity: number;
 }) {
+  const cfg = product.landingConfig;
   const isBuiltIn =
+    !cfg &&
     (product.id === "p-008" || product.slug === "doudoune-hiver-luxe") &&
     (!product.image || product.image === "/manus-storage/doudoune-bg.jpg");
   const customVariants =
-    product.variantImages && product.variantImages.length > 0
-      ? product.variantImages
-      : product.colors && product.colors.length > 0
-        ? product.colors.map((c, idx) => ({
-            name: c,
-            image: product.gallery?.[idx] || product.image,
-          }))
-        : (product.gallery ?? []).map((img, idx) => ({
-            name: `اللون ${idx + 1}`,
-            image: img,
-          }));
+    !isBuiltIn && cfg?.colorSwatches && cfg.colorSwatches.length > 0
+      ? cfg.colorSwatches.map((sw, idx) => ({
+          name: sw.name,
+          image: product.variantImages?.[idx]?.image || product.gallery?.[idx] || product.image,
+        }))
+      : product.variantImages && product.variantImages.length > 0
+        ? product.variantImages
+        : product.colors && product.colors.length > 0
+          ? product.colors.map((c, idx) => ({
+              name: c,
+              image: product.gallery?.[idx] || product.image,
+            }))
+          : (product.gallery ?? []).map((img, idx) => ({
+              name: `اللون ${idx + 1}`,
+              image: img,
+            }));
+  const dynamicSizes = isBuiltIn
+    ? SIZES
+    : cfg?.sizes !== undefined
+      ? cfg.sizes.map(s => s.label)
+      : SIZES;
+  const hasPackOffer = isBuiltIn || (typeof product.packPrice === "number" && product.packPrice > 0);
   const defaultDoudouneGallery = new Set([
     "/manus-storage/doudoune-bg.jpg",
     "/manus-storage/doudoune-white.jpg",
@@ -69,7 +82,7 @@ export default function DoudouneLanding({
   const [delivery, setDelivery] = useState<"home" | "office">("home");
   const [offerMode, setOfferMode] = useState<OfferMode>("single");
   const [secondColor, setSecondColor] = useState<string>(isBuiltIn ? "black" : ((customVariants[1] ?? customVariants[0])?.name ?? "اللون 2"));
-  const [secondSize, setSecondSize] = useState<string>("L");
+  const [secondSize, setSecondSize] = useState<string>(dynamicSizes.includes("L") ? "L" : (dynamicSizes[0] ?? ""));
   const [remainingSeconds, setRemainingSeconds] = useState(18 * 3600 + 32 * 60);
   const [okMessage, setOkMessage] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -105,9 +118,11 @@ export default function DoudouneLanding({
             ? `1: ${getColorLabel(color)} | 2: ${getColorLabel(secondColor)}`
             : getColorLabel(color),
         size:
-          offerMode === "pack2"
-            ? `1: ${selectedSize} | 2: ${secondSize}`
-            : selectedSize,
+          dynamicSizes.length === 0
+            ? ""
+            : offerMode === "pack2"
+              ? `1: ${selectedSize} | 2: ${secondSize}`
+              : selectedSize,
       },
     ],
     watchKey: `${color}|${selectedSize}|${selectedWilaya}|${selectedCommune}|${delivery}|${offerMode}|${secondColor}|${secondSize}|${quantity}`,
@@ -146,11 +161,13 @@ export default function DoudouneLanding({
 
   useEffect(() => {
     const prevTitle = document.title;
-    document.title = "Miss Sensuelle – دواقون شتوية فاخرة";
+    document.title = isBuiltIn
+      ? "Miss Sensuelle – دواقون شتوية فاخرة"
+      : `Miss Sensuelle – ${product.arName || product.name}`;
     return () => {
       document.title = prevTitle;
     };
-  }, []);
+  }, [isBuiltIn, product.arName, product.name]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -192,15 +209,17 @@ export default function DoudouneLanding({
     const summaryColor = isPack
       ? `1: ${colorLabel} | 2: ${secondColorLabel}`
       : colorLabel;
-    const summarySize = isPack ? `1: ${size} | 2: ${secondSize}` : size;
+    const sizeSuffix = size ? ` (${size})` : "";
+    const secondSizeSuffix = secondSize ? ` (${secondSize})` : "";
+    const summarySize = dynamicSizes.length === 0 ? "" : isPack ? `1: ${size} | 2: ${secondSize}` : size;
     const offerNote = isPack
-      ? `🔥 عرض خاص: 2 قطع بـ ${PACK_2_PRICE.toLocaleString("en-US")} دج — [القطعة 1: ${colorLabel} (${size}) | القطعة 2: ${secondColorLabel} (${secondSize})]`
+      ? `🔥 عرض خاص: 2 قطع بـ ${PACK_2_PRICE.toLocaleString("en-US")} دج — [القطعة 1: ${colorLabel}${sizeSuffix} | القطعة 2: ${secondColorLabel}${secondSizeSuffix}]`
       : "";
 
     setOkMessage(
       isPack
-        ? `✅ شكرًا! تم استلام طلبك لعرض (2 دواقون بـ 12,900 دج فقط 🔥)، سنتصل بك قريبًا لتأكيده.`
-        : `✅ شكرًا! تم استلام طلبك (${colorLabel} - ${size})، سنتصل بك قريبًا لتأكيده.`,
+        ? `✅ شكرًا! تم استلام طلبك للعرض (2 × بـ ${PACK_2_PRICE.toLocaleString("en-US")} دج 🔥)، سنتصل بك قريبًا لتأكيده.`
+        : `✅ شكرًا! تم استلام طلبك (${colorLabel}${size ? ` - ${size}` : ""})، سنتصل بك قريبًا لتأكيده.`,
     );
 
     let serverOrderNumber = `MS-${Math.floor(1000 + Math.random() * 8999)}`;
@@ -399,17 +418,33 @@ export default function DoudouneLanding({
               src={activeCustomImage}
               alt={product.arName || product.name}
             />
-            <div style={{ padding: "14px 16px 4px", textAlign: "center" }}>
+            <div style={{ padding: "14px 16px 8px", textAlign: "center" }}>
+              {cfg?.promoBannerAr || cfg?.heroBadgeAr || product.badge ? (
+                <div style={{ marginBottom: 8 }}>
+                  <span style={{ display: "inline-block", background: "#e0112b", color: "#fff", padding: "4px 12px", borderRadius: 999, fontSize: 12, fontWeight: 800 }}>
+                    {cfg?.heroBadgeAr || cfg?.promoBannerAr || product.badge}
+                  </span>
+                </div>
+              ) : null}
               <h1 style={{ margin: "0 0 6px", fontSize: 24, fontWeight: 900, color: "#17307e" }}>
-                {product.arName || product.name}
+                {cfg?.heroHeadlineAr || product.arName || product.name}
               </h1>
               <p style={{ margin: "0 0 10px", fontSize: 14, color: "#475569", fontWeight: 600 }}>
-                {product.arDescription || product.description}
+                {cfg?.heroSubheadlineAr || product.arDescription || product.description}
               </p>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "6px 16px", borderRadius: 999, background: "#fef2f2", border: "1.5px solid #fecaca" }}>
                 <strong style={{ fontSize: 22, fontWeight: 900, color: "#e0112b" }}>{product.price.toLocaleString("en-US")} دج</strong>
                 {product.oldPrice ? <del style={{ fontSize: 14, color: "#94a3b8" }}>{product.oldPrice.toLocaleString("en-US")} دج</del> : null}
               </div>
+              {product.details && product.details.length > 0 ? (
+                <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 6, marginTop: 10 }}>
+                  {product.details.map(d => (
+                    <span key={d} style={{ background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: 999, padding: "4px 10px", fontSize: 12, fontWeight: 700, color: "#1e293b" }}>
+                      ✅ {d}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
             {customVariants.length > 0 && (
               <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(4, Math.max(2, customVariants.length))}, 1fr)`, gap: 10, padding: "12px 14px 4px" }}>
@@ -516,22 +551,24 @@ export default function DoudouneLanding({
                 )}
               </select>
             </label>
-            <label className="f">
-              <i>📏</i>
-              <select
-                name="size"
-                required
-                value={selectedSize}
-                onChange={e => setSelectedSize(e.target.value)}
-              >
-                <option value="">المقاس</option>
-                {SIZES.map(sz => (
-                  <option key={sz} value={sz}>
-                    {sz}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {dynamicSizes.length > 0 ? (
+              <label className="f">
+                <i>📏</i>
+                <select
+                  name="size"
+                  required
+                  value={selectedSize}
+                  onChange={e => setSelectedSize(e.target.value)}
+                >
+                  <option value="">المقاس</option>
+                  {dynamicSizes.map(sz => (
+                    <option key={sz} value={sz}>
+                      {sz}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <label className="f">
               <i>📍</i>
               <select
@@ -625,7 +662,7 @@ export default function DoudouneLanding({
               <div className="offer-option-main">
                 <span className="offer-radio" />
                 <div className="offer-text">
-                  <strong>{isBuiltIn ? "قطعة واحدة (1 دواقون)" : `قطعة واحدة (${product.arName || product.name})`}</strong>
+                  <strong>{isBuiltIn ? "قطعة واحدة (1 دواقون)" : (cfg?.offer1LabelAr || `قطعة واحدة (${product.arName || product.name})`)}</strong>
                   <small>العرض العادي</small>
                 </div>
               </div>
@@ -635,28 +672,30 @@ export default function DoudouneLanding({
               </div>
             </button>
 
-            <button
-              type="button"
-              className={`offer-option${offerMode === "pack2" ? " active" : ""}`}
-              onClick={() => setOfferMode("pack2")}
-            >
-              <div className="offer-option-main">
-                <span className="offer-radio" />
-                <div className="offer-text">
-                  <strong>{isBuiltIn ? "🔥 عرض خاص : اشتري 2 دواقون بتخفيض رائع !" : "🔥 عرض خاص : اشتري قطعتين (2) بتخفيض رائع !"}</strong>
-                  <small>2 قطع بـ {PACK_2_PRICE.toLocaleString("en-US")} دج فقط (وفّري {Math.max(0, product.price * 2 - PACK_2_PRICE).toLocaleString("en-US")} دج)</small>
+            {hasPackOffer ? (
+              <button
+                type="button"
+                className={`offer-option${offerMode === "pack2" ? " active" : ""}`}
+                onClick={() => setOfferMode("pack2")}
+              >
+                <div className="offer-option-main">
+                  <span className="offer-radio" />
+                  <div className="offer-text">
+                    <strong>{isBuiltIn ? "🔥 عرض خاص : اشتري 2 دواقون بتخفيض رائع !" : `🔥 ${cfg?.offer2LabelAr || "عرض خاص : اشتري قطعتين (2) بتخفيض رائع !"}`}</strong>
+                    <small>2 قطع بـ {PACK_2_PRICE.toLocaleString("en-US")} دج فقط (وفّري {Math.max(0, product.price * 2 - PACK_2_PRICE).toLocaleString("en-US")} دج)</small>
+                  </div>
                 </div>
-              </div>
-              <div className="offer-price">
-                <b>{PACK_2_PRICE.toLocaleString("en-US")} دج</b>
-                <del>{(product.price * 2).toLocaleString("en-US")} دج</del>
-              </div>
-            </button>
+                <div className="offer-price">
+                  <b>{PACK_2_PRICE.toLocaleString("en-US")} دج</b>
+                  <del>{(product.price * 2).toLocaleString("en-US")} دج</del>
+                </div>
+              </button>
+            ) : null}
 
-            {offerMode === "pack2" && (
+            {hasPackOffer && offerMode === "pack2" && (
               <div className="offer-subform">
                 <div className="offer-subform-title">
-                  {isBuiltIn ? "✨ اختاري لون ومقاس الدواقون الثانية 🧥" : "✨ اختاري لون ومقاس القطعة الثانية 🎁"}
+                  {isBuiltIn ? "✨ اختاري لون ومقاس الدواقون الثانية 🧥" : "✨ اختاري تفاصيل القطعة الثانية 🎁"}
                 </div>
                 <div className="offer-subform-row">
                   <label className="f">
@@ -680,19 +719,21 @@ export default function DoudouneLanding({
                       )}
                     </select>
                   </label>
-                  <label className="f">
-                    <i>📏</i>
-                    <select
-                      value={secondSize}
-                      onChange={e => setSecondSize(e.target.value)}
-                    >
-                      {SIZES.map(sz => (
-                        <option key={sz} value={sz}>
-                          مقاس 2: {sz}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  {dynamicSizes.length > 0 ? (
+                    <label className="f">
+                      <i>📏</i>
+                      <select
+                        value={secondSize}
+                        onChange={e => setSecondSize(e.target.value)}
+                      >
+                        {dynamicSizes.map(sz => (
+                          <option key={sz} value={sz}>
+                            مقاس 2: {sz}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
                 </div>
               </div>
             )}
@@ -729,8 +770,10 @@ export default function DoudouneLanding({
                 : orderSubmitted
                 ? "تم استلام طلبك بنجاح ✅"
                 : offerMode === "pack2"
-                ? "أؤكد طلبي للعرض (2 بـ 12,900 دج) 🛒"
-                : "أؤكد طلبي الآن 🛒"}
+                ? `أؤكد طلبي للعرض (2 بـ ${PACK_2_PRICE.toLocaleString("en-US")} دج) 🛒`
+                : isBuiltIn
+                ? "أؤكد طلبي الآن 🛒"
+                : `${cfg?.ctaLabelAr || "أؤكد طلبي الآن"} 🛒`}
             </button>
           </div>
 
@@ -739,29 +782,59 @@ export default function DoudouneLanding({
           </p>
         </form>
 
-        <div
-          className="under-form-offer"
-          onClick={activatePack2Offer}
-          role="button"
-          tabIndex={0}
-          onKeyDown={e => {
-            if (e.key === "Enter" || e.key === " ") activatePack2Offer();
-          }}
-        >
-          <span className="under-form-badge">🔥 تخفيض استثنائي لفترة محدودة 🔥</span>
-          <h3>
-            اشتري 2 دواقون بـ <span>12,900 دج فقط !</span>
-          </h3>
-          <p>
-            احصلي على قطعتين من الدواقون الشتوية الفاخرة (من اختيارك في الألوان
-            والمقاسات) بسعر مخفض <b>12,900 دج</b> بدلاً من <del>15,200 دج</del> !
-          </p>
-          <span className="under-form-cta">
-            {offerMode === "pack2"
-              ? "✅ تم تفعيل عرض 2 دواقون بـ 12,900 دج في الاستمارة أعلاه"
-              : "👈 اضغطي هنا للاستفادة من عرض 2 دواقون بـ 12,900 دج"}
-          </span>
-        </div>
+        {!isBuiltIn && cfg?.reviews && cfg.reviews.length > 0 ? (
+          <div style={{ margin: "14px auto 0", display: "grid", gap: 8 }}>
+            {cfg.reviews.slice(0, 3).map((rev, idx) => (
+              <div
+                key={`${rev.author}-${idx}`}
+                style={{
+                  background: "#fff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 12,
+                  padding: "10px 14px",
+                  fontSize: 13,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, marginBottom: 4 }}>
+                  <span>{rev.author}{rev.city ? ` · ${rev.city}` : ""}</span>
+                  <span style={{ color: "#d4af37" }}>{"★".repeat(Math.min(5, Math.max(1, rev.rating || 5)))}</span>
+                </div>
+                <p style={{ margin: 0, color: "#334155" }}>« {rev.text} »</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {hasPackOffer ? (
+          <div
+            className="under-form-offer"
+            onClick={activatePack2Offer}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => {
+              if (e.key === "Enter" || e.key === " ") activatePack2Offer();
+            }}
+          >
+            <span className="under-form-badge">🔥 تخفيض استثنائي لفترة محدودة 🔥</span>
+            <h3>
+              {isBuiltIn
+                ? <>اشتري 2 دواقون بـ <span>12,900 دج فقط !</span></>
+                : <>اشتري قطعتين من {product.arName || product.name} بـ <span>{PACK_2_PRICE.toLocaleString("en-US")} دج فقط !</span></>}
+            </h3>
+            <p>
+              {isBuiltIn ? (
+                <>احصلي على قطعتين من الدواقون الشتوية الفاخرة (من اختيارك في الألوان والمقاسات) بسعر مخفض <b>12,900 دج</b> بدلاً من <del>15,200 دج</del> !</>
+              ) : (
+                <>احصلي على قطعتين بسعر مخفض <b>{PACK_2_PRICE.toLocaleString("en-US")} دج</b> بدلاً من <del>{(product.price * 2).toLocaleString("en-US")} دج</del> !</>
+              )}
+            </p>
+            <span className="under-form-cta">
+              {offerMode === "pack2"
+                ? `✅ تم تفعيل عرض القطعتين بـ ${PACK_2_PRICE.toLocaleString("en-US")} دج في الاستمارة أعلاه`
+                : `👈 اضغطي هنا للاستفادة من عرض القطعتين بـ ${PACK_2_PRICE.toLocaleString("en-US")} دج`}
+            </span>
+          </div>
+        ) : null}
       </div>
     </div>
   );

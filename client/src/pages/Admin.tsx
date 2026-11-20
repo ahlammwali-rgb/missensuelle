@@ -1,12 +1,12 @@
 import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Bell, ChevronDown, ClipboardList, Copy, Download, ExternalLink, Facebook, FileSpreadsheet, Filter, History, ImagePlus, LayoutDashboard, Menu, MessageCircle, Moon, MoreHorizontal, Package, PackageCheck, Pencil, Phone, Plus, RefreshCw, RotateCcw, Save, Search, Settings2, Smartphone, Sun, Trash2, Truck, TrendingUp, Upload, UserCheck, Users, X } from "lucide-react";
+import { BarChart3, Bell, Check, ChevronDown, ClipboardList, Copy, Download, ExternalLink, Facebook, FileSpreadsheet, Filter, History, ImagePlus, KeyRound, LayoutDashboard, Loader2, Menu, MessageCircle, Moon, MoreHorizontal, Package, PackageCheck, Pencil, Phone, Plus, RefreshCw, RotateCcw, Save, Search, Settings2, Smartphone, Sparkles, Sun, Trash2, Truck, TrendingUp, Upload, UserCheck, Users, X } from "lucide-react";
 import { Link } from "wouter";
 import { AdminAuthGate } from "@/components/AdminAuthGate";
 import { trpc } from "@/lib/trpc";
 import type { CheckoutOrder } from "@shared/checkout";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
 import { isFreeShippingProduct, type ShippingRate, WILAYA_FRENCH_NAMES, wilayaIdFromName } from "@shared/shipping";
-import { categories, getCatalogProducts, getProductVariantOptions, saveCatalogProducts, formatDZD, wilayas, type LandingTemplateId, type Order, type OrderStatus, type Product, type ProductVariantImage } from "@/lib/store-data";
+import { categories, getCatalogProducts, getProductVariantOptions, saveCatalogProducts, formatDZD, wilayas, type LandingTemplateId, type Order, type OrderStatus, type Product, type ProductLandingConfig, type ProductVariantImage } from "@/lib/store-data";
 import { StatusPill } from "@/components/StoreLayout";
 import { useTheme } from "@/contexts/ThemeContext";
 import { getPixelConfig, savePixelConfig, trackPixelEvent, hasGlobalTikTokPixel, hasGlobalFacebookPixel, type PixelConfig } from "@/lib/tracking";
@@ -1714,9 +1714,64 @@ function ProductForm({
   );
   const [newGalleryUrl, setNewGalleryUrl] = useState("");
   const [isCompressing, setIsCompressing] = useState(false);
+  const [aiPhotoDataUrl, setAiPhotoDataUrl] = useState<string>(() => initial.image || "");
+  const [aiDescription, setAiDescription] = useState<string>(() => initial.arDescription || initial.description || "");
+  const [aiVariantsHint, setAiVariantsHint] = useState<string>(() => (initial.colors ?? []).join(", "));
+  const [aiUnitPrice, setAiUnitPrice] = useState<string>(() => (initial.price > 0 ? String(initial.price) : ""));
+  const [aiPackPrice, setAiPackPrice] = useState<string>(() => (initial.packPrice && initial.packPrice > 0 ? String(initial.packPrice) : ""));
+  const [aiGenerateStudioImages, setAiGenerateStudioImages] = useState(false);
+  const [aiStatusMsg, setAiStatusMsg] = useState("");
+  const [aiErrorMsg, setAiErrorMsg] = useState("");
+  const [showAiKeyBox, setShowAiKeyBox] = useState(false);
+  const [runtimeKeyInput, setRuntimeKeyInput] = useState("");
+  const aiPhotoRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const bulkVariantsRef = useRef<HTMLInputElement>(null);
+
+  const aiStatusQuery = trpc.admin.aiStatus.useQuery(undefined, {
+    retry: false,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const saveAiKeyMutation = trpc.admin.saveAiKey.useMutation({
+    onSuccess: () => {
+      void aiStatusQuery.refetch();
+      setRuntimeKeyInput("");
+      setShowAiKeyBox(false);
+      setAiErrorMsg("");
+      setAiStatusMsg(
+        "Clé API Gemini enregistrée ✅ (pour qu'elle reste active après redéploiement Render, ajoute aussi GEMINI_API_KEY dans Render -> Environment)."
+      );
+    },
+    onError: err => {
+      setAiErrorMsg(err.message || "Impossible d'enregistrer la clé Gemini.");
+    },
+  });
+  const generateLandingMutation = trpc.admin.generateLandingDraft.useMutation();
+
+  const AI_TEMPLATE_CHOICES: Array<{ id: "pyjama" | "badil" | "abaya" | "doudoune" | "extensions" | "coat"; label: string; tag: string }> = [
+    { id: "pyjama", label: "Rose & Or Multi-couleurs", tag: "Tailles + Couleurs" },
+    { id: "badil", label: "Beauté Rose & Or 2+1", tag: "Cosmétique / Soins" },
+    { id: "abaya", label: "Émeraude & Or Royal", tag: "Abayas & Luxe" },
+    { id: "doudoune", label: "Urgence + Pack Duo", tag: "Compteur + Duo" },
+    { id: "extensions", label: "Slider 1+1 Offerte", tag: "Variantes 1+1" },
+    { id: "coat", label: "Éditorial Chic 360°", tag: "Mode & Vestes" },
+  ];
+
+  const resolveAiTemplateId = (tpl?: LandingTemplateId): "pyjama" | "badil" | "abaya" | "doudoune" | "extensions" | "coat" => {
+    if (
+      tpl === "doudoune" ||
+      tpl === "extensions" ||
+      tpl === "abaya" ||
+      tpl === "coat" ||
+      tpl === "badil" ||
+      tpl === "pyjama"
+    ) {
+      return tpl;
+    }
+    return "pyjama";
+  };
 
   const selectedTemplateMeta =
     LANDING_TEMPLATES.find(t => t.id === (form.landingTemplate ?? "doudoune")) ?? LANDING_TEMPLATES[0];
@@ -1818,6 +1873,100 @@ function ProductForm({
     setIsCompressing(false);
   };
 
+  const handleAiPhotoUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setIsCompressing(true);
+    const dataUrl = await compressImageFile(files[0], 1024, 0.84);
+    setAiPhotoDataUrl(dataUrl);
+    if (!form.image) set("image", dataUrl);
+    setAiErrorMsg("");
+    setIsCompressing(false);
+  };
+
+  const handleAiGenerate = async () => {
+    const sourcePhoto = aiPhotoDataUrl || form.image || galleryList[0] || "";
+    if (!sourcePhoto) {
+      setAiErrorMsg("Importe d'abord 1 photo du produit dans la zone Studio IA.");
+      return;
+    }
+    if (aiDescription.trim().length < 3) {
+      setAiErrorMsg("Décris brièvement le produit (matière, bénéfice, cible...) pour guider l'IA.");
+      return;
+    }
+    setAiErrorMsg("");
+    setAiStatusMsg("");
+    const activeTpl = resolveAiTemplateId(form.landingTemplate);
+    const parsedUnit = Number(aiUnitPrice);
+    const parsedPack = Number(aiPackPrice);
+    try {
+      const draft = await generateLandingMutation.mutateAsync({
+        imageDataUrl: sourcePhoto,
+        description: aiDescription.trim(),
+        variantsHint: aiVariantsHint.trim(),
+        price: Number.isFinite(parsedUnit) && parsedUnit > 0 ? Math.round(parsedUnit) : undefined,
+        packPrice: Number.isFinite(parsedPack) && parsedPack > 0 ? Math.round(parsedPack) : undefined,
+        templateId: activeTpl,
+        generateStudioImages: aiGenerateStudioImages,
+      });
+
+      const primaryPhoto = draft.generatedImages?.[0] || sourcePhoto;
+      const mergedGallery = Array.from(
+        new Set([sourcePhoto, ...(draft.generatedImages ?? [])].filter(Boolean))
+      );
+      const swatchList = draft.landingConfig?.colorSwatches ?? [];
+      const hasUserVariants = Boolean(aiVariantsHint.trim()) || swatchList.length > 1 || (swatchList[0]?.name && swatchList[0].name !== "الأصلية");
+      const generatedVariants = hasUserVariants
+        ? draft.colors.map((cName, idx) => ({
+            name: cName,
+            image: draft.generatedImages?.[idx] || sourcePhoto,
+          }))
+        : [];
+
+      setForm(curr => ({
+        ...curr,
+        name: draft.name,
+        arName: draft.arName,
+        slug: curr.id ? curr.slug : draft.slug,
+        category: draft.category,
+        categoryLabel: draft.categoryLabel,
+        arCategoryLabel: draft.arCategoryLabel,
+        badge: draft.badge,
+        description: draft.description,
+        arDescription: draft.arDescription,
+        price: draft.price,
+        oldPrice: draft.oldPrice,
+        packPrice: draft.packPrice ?? 0,
+        image: primaryPhoto,
+        landingTemplate: activeTpl,
+        landingConfig: {
+          ...draft.landingConfig,
+          colorSwatches: hasUserVariants ? draft.landingConfig.colorSwatches : [],
+        },
+      }));
+      setDetailsText((draft.details ?? []).join("\n"));
+      setGalleryList(mergedGallery);
+      setVariants(generatedVariants);
+      setAiStatusMsg(
+        `✨ Landing Page générée avec ${draft.modelUsed} !${draft.imageNotice ? ` (${draft.imageNotice})` : ""} Vérifie les infos ci-dessous puis clique sur « Enregistrer ».`
+      );
+    } catch (err) {
+      setAiErrorMsg(err instanceof Error ? err.message : "Échec de génération IA Gemini.");
+    }
+  };
+
+  const updateLandingConfig = <K extends keyof ProductLandingConfig>(
+    key: K,
+    value: ProductLandingConfig[K]
+  ) => {
+    setForm(curr => ({
+      ...curr,
+      landingConfig: {
+        ...(curr.landingConfig ?? {}),
+        [key]: value,
+      },
+    }));
+  };
+
   const prefillFromExistingProduct = (templateId: LandingTemplateId) => {
     const sourceId =
       templateId === "doudoune"
@@ -1892,17 +2041,19 @@ function ProductForm({
       }))
       .filter(v => v.name.length > 0 || v.image.length > 0);
 
-    // Si l'utilisateur a ajouté des photos dans la galerie mais pas de photos sur les variantes, associer automatiquement
+    // Si l'utilisateur a ajouté des photos dans la galerie mais pas de variantes et que ce n'est pas un brouillon IA sans couleurs, associer automatiquement
     const enrichedVariants =
       cleanVariants.length > 0
         ? cleanVariants.map((v, idx) => ({
             name: v.name || `اللون ${idx + 1}`,
             image: v.image || mergedGallery[idx] || form.image || "",
           }))
-        : mergedGallery.map((img, idx) => ({
-            name: `اللون ${idx + 1}`,
-            image: img,
-          }));
+        : form.landingConfig
+          ? []
+          : mergedGallery.map((img, idx) => ({
+              name: `اللون ${idx + 1}`,
+              image: img,
+            }));
 
     const effectiveMainImage =
       form.image.trim() ||
@@ -1910,12 +2061,26 @@ function ProductForm({
       enrichedVariants.find(v => v.image)?.image ||
       "/manus-storage/doudoune-bg.jpg";
 
+    const syncedLandingConfig = form.landingConfig
+      ? {
+          ...form.landingConfig,
+          colorSwatches:
+            enrichedVariants.length > 0
+              ? enrichedVariants.map((v, idx) => ({
+                  name: v.name,
+                  hex: form.landingConfig?.colorSwatches?.[idx]?.hex || "#e0145f",
+                }))
+              : [],
+        }
+      : undefined;
+
     const product: Product = {
       ...form,
       id: form.id || `p-${Date.now()}`,
       slug,
       image: effectiveMainImage,
       landingTemplate: form.landingTemplate ?? "doudoune",
+      landingConfig: syncedLandingConfig,
       price: Number(form.price) || 0,
       oldPrice: form.oldPrice ? Number(form.oldPrice) : undefined,
       packPrice: form.packPrice ? Number(form.packPrice) : undefined,
@@ -1944,6 +2109,328 @@ function ProductForm({
         <button type="button" className="icon-button" onClick={onCancel} aria-label="Fermer le formulaire">
           <X size={18} />
         </button>
+      </div>
+
+      {/* STUDIO IA GEMINI : 1 PHOTO -> LANDING PAGE COMPLÈTE */}
+      <div
+        className="studio-step-box"
+        style={{
+          background: "linear-gradient(135deg, rgba(224,20,95,0.06) 0%, rgba(212,167,60,0.08) 100%)",
+          border: "1.5px solid rgba(224,20,95,0.28)",
+        }}
+      >
+        <div className="studio-step-header" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span className="studio-step-num" style={{ background: "linear-gradient(135deg, #e0145f, #d4a73c)" }}>
+              <Sparkles size={16} />
+            </span>
+            <div>
+              <h4>Studio IA Gemini — 1 Photo → Landing Page complète automatique</h4>
+              <p>Importe 1 photo, écris quelques mots et choisis ton template : l’IA rédige tout (Arabe COD, offres, tailles, couleurs, avis).</p>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "4px 10px",
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 800,
+                background: aiStatusQuery.data?.configured ? "rgba(16,185,129,0.14)" : "rgba(245,158,11,0.16)",
+                color: aiStatusQuery.data?.configured ? "#065f46" : "#92400e",
+              }}
+            >
+              {aiStatusQuery.data?.configured ? <Check size={14} /> : <KeyRound size={14} />}
+              {aiStatusQuery.data?.configured
+                ? `Gemini prêt (${aiStatusQuery.data.source === "env" ? "Render/Env" : "Serveur"})`
+                : "Clé Gemini à configurer"}
+            </span>
+            <button
+              type="button"
+              className="button button-light"
+              style={{ padding: "5px 10px", fontSize: 12 }}
+              onClick={() => setShowAiKeyBox(v => !v)}
+            >
+              <KeyRound size={13} /> {showAiKeyBox ? "Fermer" : "Clé API"}
+            </button>
+          </div>
+        </div>
+
+        {showAiKeyBox ? (
+          <div
+            style={{
+              marginTop: 10,
+              padding: 12,
+              borderRadius: 12,
+              background: "rgba(255,255,255,0.85)",
+              border: "1px solid var(--line)",
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <small style={{ color: "#475569", lineHeight: 1.5 }}>
+              Colle ta clé Google AI Studio (<code dir="ltr">AQ...</code> ou <code dir="ltr">AIza...</code>). Pour la garder de façon permanente sur Render, ajoute aussi <code>GEMINI_API_KEY</code> dans Render &rarr; Environment Variables.
+            </small>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <input
+                type="password"
+                value={runtimeKeyInput}
+                onChange={e => setRuntimeKeyInput(e.target.value)}
+                placeholder="Coller la clé API Gemini..."
+                style={{ flex: "1 1 240px", minHeight: 38, padding: "6px 12px", borderRadius: 10, border: "1px solid var(--line)" }}
+              />
+              <button
+                type="button"
+                className="button button-dark"
+                disabled={saveAiKeyMutation.isPending || runtimeKeyInput.trim().length < 16}
+                onClick={() => saveAiKeyMutation.mutate({ apiKey: runtimeKeyInput.trim() })}
+              >
+                {saveAiKeyMutation.isPending ? "Vérification..." : "Enregistrer la clé"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14, marginTop: 12 }}>
+          <div
+            style={{
+              border: "1.5px dashed rgba(224,20,95,0.45)",
+              borderRadius: 14,
+              padding: 12,
+              background: "rgba(255,255,255,0.72)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              textAlign: "center",
+            }}
+          >
+            {aiPhotoDataUrl || form.image ? (
+              <img
+                src={aiPhotoDataUrl || form.image}
+                alt="Photo produit IA"
+                style={{ width: 120, height: 120, objectFit: "cover", borderRadius: 12, border: "2px solid #e0145f" }}
+              />
+            ) : (
+              <ImagePlus size={32} color="#e0145f" />
+            )}
+            <button
+              type="button"
+              className="upload-inline"
+              onClick={() => aiPhotoRef.current?.click()}
+            >
+              <Upload size={14} /> {aiPhotoDataUrl || form.image ? "Changer la photo produit" : "Importer 1 photo du produit"}
+            </button>
+            <input
+              ref={aiPhotoRef}
+              className="visually-hidden"
+              type="file"
+              accept="image/*"
+              onChange={e => void handleAiPhotoUpload(e.target.files)}
+            />
+            <small style={{ fontSize: 11, color: "#64748b" }}>
+              Gemini Vision analyse la texture, la coupe et les couleurs directement sur ta photo.
+            </small>
+          </div>
+
+          <div style={{ display: "grid", gap: 8 }}>
+            <label style={{ fontSize: 13, fontWeight: 700, display: "grid", gap: 4 }}>
+              Description rapide du produit *
+              <textarea
+                rows={3}
+                placeholder="Ex: Ensemble pyjama été satin doux avec dentelle, confortable pour la maison, très tendance..."
+                value={aiDescription}
+                onChange={e => setAiDescription(e.target.value)}
+              />
+            </label>
+            <label style={{ fontSize: 13, fontWeight: 700, display: "grid", gap: 4 }}>
+              Variantes / Couleurs / Tailles (optionnel)
+              <input
+                placeholder="Ex: Noir, Rose poudré, Champagne · Tailles S à XL (laisse vide pour cosmétique)"
+                value={aiVariantsHint}
+                onChange={e => setAiVariantsHint(e.target.value)}
+              />
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, display: "grid", gap: 4 }}>
+                Prix 1 pièce (DA, opt.)
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="IA suggère si vide"
+                  value={aiUnitPrice}
+                  onChange={e => setAiUnitPrice(e.target.value)}
+                />
+              </label>
+              <label style={{ fontSize: 12, fontWeight: 700, display: "grid", gap: 4 }}>
+                Prix Pack / 2+1 (DA, opt.)
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="IA suggère si vide"
+                  value={aiPackPrice}
+                  onChange={e => setAiPackPrice(e.target.value)}
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6 }}>
+            Modèle visuel cible (synchronisé avec l’Étape 1 ci-dessous) :
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {AI_TEMPLATE_CHOICES.map(tpl => {
+              const active = resolveAiTemplateId(form.landingTemplate) === tpl.id;
+              return (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onClick={() => set("landingTemplate", tpl.id)}
+                  style={{
+                    padding: "6px 11px",
+                    borderRadius: 10,
+                    border: active ? "2px solid #e0145f" : "1px solid var(--line)",
+                    background: active ? "rgba(224,20,95,0.12)" : "#fff",
+                    color: active ? "#9d174d" : "#0f172a",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  {tpl.label} <span style={{ opacity: 0.7, fontWeight: 600 }}>({tpl.tag})</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={aiGenerateStudioImages}
+              onChange={e => setAiGenerateStudioImages(e.target.checked)}
+            />
+            Générer aussi un visuel Studio IA (Nano Banana 2.1 — nécessite compte Google AI Studio facturé $5+)
+          </label>
+
+          <button
+            type="button"
+            className="button button-gradient"
+            disabled={generateLandingMutation.isPending || isCompressing || !aiStatusQuery.data?.configured}
+            onClick={() => void handleAiGenerate()}
+          >
+            {generateLandingMutation.isPending ? (
+              <>
+                <Loader2 size={16} className="spin" /> Génération IA en cours (3–8 s)...
+              </>
+            ) : (
+              <>
+                <Sparkles size={16} /> Générer la Landing Page par IA
+              </>
+            )}
+          </button>
+        </div>
+
+        {aiErrorMsg ? (
+          <div style={{ marginTop: 10, padding: "8px 12px", borderRadius: 10, background: "rgba(239,68,68,0.12)", color: "#b91c1c", fontSize: 13, fontWeight: 700 }}>
+            ⚠️ {aiErrorMsg}
+          </div>
+        ) : null}
+        {aiStatusMsg ? (
+          <div style={{ marginTop: 10, padding: "8px 12px", borderRadius: 10, background: "rgba(16,185,129,0.14)", color: "#065f46", fontSize: 13, fontWeight: 700 }}>
+            {aiStatusMsg}
+          </div>
+        ) : null}
+
+        {form.landingConfig ? (
+          <div
+            style={{
+              marginTop: 12,
+              padding: 12,
+              borderRadius: 12,
+              background: "rgba(255,255,255,0.88)",
+              border: "1px solid rgba(212,167,60,0.45)",
+              display: "grid",
+              gap: 8,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <strong style={{ fontSize: 13 }}>🎨 Textes Landing IA (éditables avant publication)</strong>
+              {form.landingConfig.aiModel ? (
+                <small style={{ fontSize: 11, color: "#64748b" }}>Généré par {form.landingConfig.aiModel}</small>
+              ) : null}
+            </div>
+            <div className="product-admin-grid">
+              <label>
+                Titre Hero Arabe
+                <input
+                  dir="rtl"
+                  value={form.landingConfig.heroHeadlineAr ?? ""}
+                  onChange={e => updateLandingConfig("heroHeadlineAr", e.target.value)}
+                />
+              </label>
+              <label>
+                Bouton CTA Arabe
+                <input
+                  dir="rtl"
+                  value={form.landingConfig.ctaLabelAr ?? ""}
+                  onChange={e => updateLandingConfig("ctaLabelAr", e.target.value)}
+                />
+              </label>
+              <label>
+                Libellé Offre 1 Pièce (AR)
+                <input
+                  dir="rtl"
+                  value={form.landingConfig.offer1LabelAr ?? ""}
+                  onChange={e => updateLandingConfig("offer1LabelAr", e.target.value)}
+                />
+              </label>
+              <label>
+                Libellé Offre Pack / Duo (AR)
+                <input
+                  dir="rtl"
+                  value={form.landingConfig.offer2LabelAr ?? ""}
+                  onChange={e => updateLandingConfig("offer2LabelAr", e.target.value)}
+                />
+              </label>
+              <label className="wide-field">
+                Sous-titre Hero Arabe
+                <input
+                  dir="rtl"
+                  value={form.landingConfig.heroSubheadlineAr ?? ""}
+                  onChange={e => updateLandingConfig("heroSubheadlineAr", e.target.value)}
+                />
+              </label>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, fontSize: 12 }}>
+              <span>
+                📏 Tailles détectées :{" "}
+                <b>
+                  {form.landingConfig.sizes && form.landingConfig.sizes.length > 0
+                    ? form.landingConfig.sizes.map(s => s.label).join(", ")
+                    : "Aucune taille requise (adapté cosmétique/accessoire)"}
+                </b>
+              </span>
+              {form.landingConfig.sizes && form.landingConfig.sizes.length > 0 ? (
+                <button
+                  type="button"
+                  className="button button-light"
+                  style={{ padding: "4px 10px", fontSize: 11 }}
+                  onClick={() => updateLandingConfig("sizes", [])}
+                >
+                  Retirer le choix de taille
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* ÉTAPE 1 : CHOIX DU TEMPLATE DE LANDING PAGE */}

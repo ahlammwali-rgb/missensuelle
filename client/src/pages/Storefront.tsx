@@ -3,7 +3,7 @@ import { Link, useLocation, useRoute } from "wouter";
 import { ArrowDown, ArrowLeft, ArrowRight, Check, ChevronDown, Clock3, Flame, Heart, Home, LayoutGrid, MapPin, Minus, Plus, Search, ShieldCheck, ShoppingBag, Sparkles, Star, Truck, X } from "lucide-react";
 import "./home-app.css";
 import { CartDrawer, ScrollReveal, StoreFooter, StoreHeader, useLanguage } from "@/components/StoreLayout";
-import { categories, formatDZD, getCatalogProducts, getProduct, darkHeroImage, beautyImage, products, type CartLine, type CategoryId, type Order, type Product, wilayas } from "@/lib/store-data";
+import { categories, formatDZD, getCatalogProducts, getProduct, isCatalogSyncDone, darkHeroImage, beautyImage, products, type CartLine, type CategoryId, type Order, type Product, wilayas } from "@/lib/store-data";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
 import { trackPixelEvent } from "@/lib/tracking";
 import { trpc } from "@/lib/trpc";
@@ -362,7 +362,11 @@ function useCatalogProducts() {
     const refresh = () => setCatalog(getCatalogProducts());
     refresh();
     window.addEventListener("miss-sensuelle-catalog-updated", refresh);
-    return () => window.removeEventListener("miss-sensuelle-catalog-updated", refresh);
+    window.addEventListener("miss-sensuelle-catalog-synced", refresh);
+    return () => {
+      window.removeEventListener("miss-sensuelle-catalog-updated", refresh);
+      window.removeEventListener("miss-sensuelle-catalog-synced", refresh);
+    };
   }, []);
   return catalog;
 }
@@ -374,8 +378,28 @@ function ProductPage({ onAdd, slugOverride }: { onAdd: (product: typeof products
   const [, paramsAlt] = useRoute("/produits/:slug");
   const [, paramsEn] = useRoute("/product/:slug");
   const slug = slugOverride ?? params?.slug ?? paramsAlt?.slug ?? paramsEn?.slug ?? "";
-  useCatalogProducts();
-  const product = getProduct(slug);
+  const catalog = useCatalogProducts();
+  const [syncDone, setSyncDone] = useState<boolean>(() => isCatalogSyncDone());
+  useEffect(() => {
+    if (isCatalogSyncDone()) {
+      setSyncDone(true);
+      return;
+    }
+    const onSynced = () => setSyncDone(true);
+    window.addEventListener("miss-sensuelle-catalog-synced", onSynced);
+    window.addEventListener("miss-sensuelle-catalog-updated", onSynced);
+    return () => {
+      window.removeEventListener("miss-sensuelle-catalog-synced", onSynced);
+      window.removeEventListener("miss-sensuelle-catalog-updated", onSynced);
+    };
+  }, []);
+  const product = useMemo(() => {
+    const normalized = slug.toLowerCase().trim();
+    return (
+      catalog.find((p) => p.slug.toLowerCase() === normalized || p.id.toLowerCase() === normalized) ??
+      getProduct(slug)
+    );
+  }, [catalog, slug]);
   const effectiveTemplate = product?.landingTemplate ?? (
     product?.id === "p-001" ? "coat" :
     product?.id === "p-007" ? "abaya" :
@@ -398,7 +422,10 @@ function ProductPage({ onAdd, slugOverride }: { onAdd: (product: typeof products
   const gallery = product?.gallery ?? (product ? [product.image] : []);
   const [activeImage, setActiveImage] = useState(gallery[0] ?? "");
   const { lang } = useLanguage();
-  useEffect(() => { setActiveImage(gallery[0] ?? ""); }, [params?.slug]);
+  useEffect(() => {
+    setActiveImage(gallery[0] ?? "");
+    setSelectedColor(product?.colors[0] ?? "");
+  }, [slug, product?.id]);
   useLayoutEffect(() => {
     try {
       if ("scrollRestoration" in window.history) {
@@ -420,6 +447,7 @@ function ProductPage({ onAdd, slugOverride }: { onAdd: (product: typeof products
   }, [slug, product?.id]);
   useEffect(() => { if (product) trackPixelEvent("ViewContent", { content_type: "product", content_id: product.id, content_ids: [product.id], content_name: product.name, value: product.price, currency: "DZD" }); }, [product?.id]);
   useEffect(() => { document.body.classList.toggle("vest-experience", Boolean(isVest)); return () => document.body.classList.remove("vest-experience"); }, [isVest]);
+  if (!product && !syncDone) return <LandingFallback />;
   if (!product) return <div className="not-found-inline"><h1>Cette pièce a disparu.</h1><Link href="/catalogue" className="button button-dark">Retour à la boutique</Link></div>;
   const displayName = lang === "ar" && product.arName ? product.arName : product.name;
   if (isVest) return <Suspense fallback={<LandingFallback />}><CoatLanding key={product.id} product={product} quantity={quantity} /></Suspense>;

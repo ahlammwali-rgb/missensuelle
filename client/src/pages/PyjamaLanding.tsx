@@ -122,31 +122,62 @@ function isValidDzPhone(raw: string): boolean {
 
 export default function PyjamaLanding({ product }: { product?: Product }) {
   const activeProduct = product ?? getProduct("pyjama-ete");
+  const cfg = activeProduct?.landingConfig;
   const productId = activeProduct?.id || "p-011";
+  const isBuiltIn =
+    !cfg &&
+    (productId === "p-011" || activeProduct?.slug === "pyjama-ete") &&
+    (!activeProduct?.image || activeProduct.image === "/images/pyjama/01-pyjama.jpg");
   const unitPrice = activeProduct?.price || 1800;
-  const packPrice = activeProduct?.packPrice || 3000;
+  const hasPackOffer = isBuiltIn || (typeof activeProduct?.packPrice === "number" && activeProduct.packPrice > 0);
+  const packPrice = activeProduct?.packPrice || (isBuiltIn ? 3000 : unitPrice * 2);
 
-  const offers: PyjamaOffer[] = useMemo(
-    () => [
+  const colorOptions = useMemo(() => {
+    if (isBuiltIn) return PYJAMA_COLORS.map(c => ({ value: c.value as string, hex: c.hex as string }));
+    if (cfg?.colorSwatches && cfg.colorSwatches.length > 0) {
+      return cfg.colorSwatches.map(c => ({ value: c.name, hex: c.hex || "#e0145f" }));
+    }
+    if (activeProduct?.colors && activeProduct.colors.length > 0) {
+      const palette = ["#e0145f", "#d4a73c", "#14100c", "#9b7ff0", "#ffd21f", "#ff9a85"];
+      return activeProduct.colors.map((c, idx) => ({ value: c, hex: palette[idx % palette.length] }));
+    }
+    return [];
+  }, [isBuiltIn, cfg?.colorSwatches, activeProduct?.colors]);
+
+  const sizeOptions = useMemo(() => {
+    if (isBuiltIn) return PYJAMA_SIZES.map(s => ({ value: s.value as string, weight: s.weight as string }));
+    if (cfg?.sizes !== undefined) {
+      return cfg.sizes.map(s => ({ value: s.label, weight: s.hint || "" }));
+    }
+    return [];
+  }, [isBuiltIn, cfg?.sizes]);
+
+  const offers: PyjamaOffer[] = useMemo(() => {
+    const base: PyjamaOffer[] = [
       {
         id: "single",
         value: `1 قطعة - ${unitPrice} DA`,
-        label: "قطعة واحدة",
+        label: isBuiltIn ? "قطعة واحدة" : cfg?.offer1LabelAr || "قطعة واحدة",
         quantity: 1,
         price: unitPrice,
       },
-      {
+    ];
+    if (hasPackOffer) {
+      base.push({
         id: "pack",
-        value: `2 قطع + 1 مجانا - ${packPrice} DA`,
-        label: "قطعتان + الثالثة مجانا",
+        value: `2 قطع - ${packPrice} DA`,
+        label: isBuiltIn ? "قطعتان + الثالثة مجانا" : cfg?.offer2LabelAr || "قطعتان بسعر خاص",
         quantity: 2,
         price: packPrice,
-      },
-    ],
-    [unitPrice, packPrice],
-  );
+      });
+    }
+    return base;
+  }, [unitPrice, packPrice, hasPackOffer, isBuiltIn, cfg?.offer1LabelAr, cfg?.offer2LabelAr]);
 
-  const [selectedOfferId, setSelectedOfferId] = useState<PyjamaOfferId>("pack");
+  const [selectedOfferId, setSelectedOfferId] = useState<PyjamaOfferId>(hasPackOffer ? "pack" : "single");
+  useEffect(() => {
+    setSelectedOfferId(hasPackOffer ? "pack" : "single");
+  }, [hasPackOffer, productId]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [customer, setCustomer] = useState("");
@@ -171,7 +202,7 @@ export default function PyjamaLanding({ product }: { product?: Product }) {
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const checkoutStartedRef = useRef(false);
 
-  const selectedOffer = offers.find(o => o.id === selectedOfferId) ?? offers[1];
+  const selectedOffer = offers.find(o => o.id === selectedOfferId) ?? offers[0];
   const communes = useMemo(() => getCommunesForWilaya(wilaya), [wilaya]);
   const resolvedCommune = communeChoice === "__o" ? customCommune.trim() : communeChoice.trim();
   const colorsJoined = selectedColors.join(" + ");
@@ -293,7 +324,7 @@ export default function PyjamaLanding({ product }: { product?: Product }) {
     setSelectedOfferId(nextId);
     setValidationError("");
     ensureInitiateCheckout();
-    const nextOffer = offers.find(o => o.id === nextId) ?? offers[1];
+    const nextOffer = offers.find(o => o.id === nextId) ?? offers[0];
     fireAddToCart(nextOffer, selectedColors, selectedSize);
   }
 
@@ -333,11 +364,11 @@ export default function PyjamaLanding({ product }: { product?: Product }) {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (selectedColors.length === 0) {
+    if (colorOptions.length > 0 && selectedColors.length === 0) {
       setValidationError("المرجو اختيار اللون");
       return;
     }
-    if (!selectedSize) {
+    if (sizeOptions.length > 0 && !selectedSize) {
       setValidationError("المرجو اختيار المقاس");
       return;
     }
@@ -424,32 +455,216 @@ export default function PyjamaLanding({ product }: { product?: Product }) {
     });
   }
 
-  const promoImages = [
-    { src: activeProduct?.gallery?.[0] || "/images/pyjama/01-pyjama.jpg", alt: "Sensuelle بيجامة صيفية", lazy: false },
-    { src: activeProduct?.gallery?.[1] || "/images/pyjama/02-pyjama.jpg", alt: "الألوان المتوفرة", lazy: true },
-    { src: activeProduct?.gallery?.[2] || "/images/pyjama/03-pyjama.jpg", alt: "المقاسات والعروض", lazy: true },
-  ];
+  const promoImages = isBuiltIn
+    ? [
+        { src: activeProduct?.gallery?.[0] || "/images/pyjama/01-pyjama.jpg", alt: "Sensuelle بيجامة صيفية", lazy: false },
+        { src: activeProduct?.gallery?.[1] || "/images/pyjama/02-pyjama.jpg", alt: "الألوان المتوفرة", lazy: true },
+        { src: activeProduct?.gallery?.[2] || "/images/pyjama/03-pyjama.jpg", alt: "المقاسات والعروض", lazy: true },
+      ]
+    : [];
+
+  const customImages = useMemo(
+    () =>
+      isBuiltIn
+        ? []
+        : (Array.from(
+            new Set([activeProduct?.image, ...(activeProduct?.gallery ?? [])].filter(Boolean)),
+          ) as string[]),
+    [isBuiltIn, activeProduct?.image, activeProduct?.gallery],
+  );
+  const ctaText = isBuiltIn ? "اطلبي الآن" : cfg?.ctaLabelAr || "اطلبي الآن";
+  const displayHeadline = cfg?.heroHeadlineAr || activeProduct?.arName || activeProduct?.name || "";
+  const displaySubheadline =
+    cfg?.heroSubheadlineAr || activeProduct?.arDescription || activeProduct?.description || "";
+  const hasOldPrice = Boolean(activeProduct?.oldPrice && activeProduct.oldPrice > unitPrice);
 
   return (
     <div className="pyjama-page" dir="rtl" lang="ar">
       <div className="pyjama-wrap">
-        {promoImages.map((img, idx) => (
-          <img
-            key={img.src + idx}
-            src={img.src}
-            alt={img.alt}
-            loading={img.lazy ? "lazy" : undefined}
-            decoding={idx === 0 ? "sync" : "async"}
-            fetchPriority={idx === 0 ? "high" : "low"}
-          />
-        ))}
+        {isBuiltIn ? (
+          promoImages.map((img, idx) => (
+            <img
+              key={img.src + idx}
+              src={img.src}
+              alt={img.alt}
+              loading={img.lazy ? "lazy" : undefined}
+              decoding={idx === 0 ? "sync" : "async"}
+              fetchPriority={idx === 0 ? "high" : "low"}
+            />
+          ))
+        ) : (
+          <>
+            {cfg?.promoBannerAr ? (
+              <div
+                style={{
+                  background: "linear-gradient(90deg, #e0145f, #d4a73c)",
+                  color: "#fff",
+                  textAlign: "center",
+                  padding: "9px 12px",
+                  fontSize: "13px",
+                  fontWeight: 800,
+                }}
+              >
+                {cfg.promoBannerAr}
+              </div>
+            ) : null}
+
+            {customImages[0] ? (
+              <img
+                src={customImages[0]}
+                alt={displayHeadline}
+                decoding="sync"
+                fetchPriority="high"
+                style={{ width: "100%", maxHeight: 540, objectFit: "cover" }}
+              />
+            ) : null}
+
+            <div
+              style={{
+                background: "linear-gradient(165deg, #fff5f8 0%, #ffe0ea 100%)",
+                padding: "16px 15px 18px",
+                borderBottom: "3px solid #d4a73c",
+              }}
+            >
+              {cfg?.heroBadgeAr || activeProduct?.badge ? (
+                <span
+                  style={{
+                    display: "inline-block",
+                    background: "#e0145f",
+                    color: "#fff",
+                    fontSize: "12px",
+                    fontWeight: 800,
+                    padding: "4px 12px",
+                    borderRadius: "999px",
+                    marginBottom: "8px",
+                  }}
+                >
+                  {cfg?.heroBadgeAr || activeProduct?.badge}
+                </span>
+              ) : null}
+
+              <h1
+                style={{
+                  margin: "0 0 6px",
+                  fontSize: "23px",
+                  fontWeight: 900,
+                  lineHeight: 1.35,
+                  color: "#14100c",
+                }}
+              >
+                {displayHeadline}
+              </h1>
+
+              {displaySubheadline ? (
+                <p
+                  style={{
+                    margin: "0 0 12px",
+                    fontSize: "14px",
+                    lineHeight: 1.65,
+                    color: "#432833",
+                    fontWeight: 600,
+                  }}
+                >
+                  {displaySubheadline}
+                </p>
+              ) : null}
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                  marginBottom: activeProduct?.details?.length ? "12px" : 0,
+                }}
+              >
+                <span
+                  dir="ltr"
+                  style={{
+                    fontSize: "22px",
+                    fontWeight: 900,
+                    color: "#e0145f",
+                    background: "#fff",
+                    border: "2px solid #e0145f",
+                    borderRadius: "10px",
+                    padding: "4px 12px",
+                  }}
+                >
+                  {unitPrice} DA
+                </span>
+                {hasOldPrice ? (
+                  <del dir="ltr" style={{ fontSize: "15px", color: "#8b6b77", fontWeight: 700 }}>
+                    {activeProduct?.oldPrice} DA
+                  </del>
+                ) : null}
+              </div>
+
+              {activeProduct?.details && activeProduct.details.length > 0 ? (
+                <ul
+                  style={{
+                    listStyle: "none",
+                    padding: 0,
+                    margin: 0,
+                    display: "grid",
+                    gap: "6px",
+                  }}
+                >
+                  {activeProduct.details.map(detail => (
+                    <li
+                      key={detail}
+                      style={{
+                        background: "#ffffffd9",
+                        border: "1px solid #f7b8cc",
+                        borderRadius: "10px",
+                        padding: "7px 10px",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: "#221018",
+                      }}
+                    >
+                      ✨ {detail}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+
+            {customImages.slice(1, 3).map((src, idx) => (
+              <img
+                key={src + idx}
+                src={src}
+                alt={`${displayHeadline} ${idx + 2}`}
+                loading="lazy"
+                style={{ width: "100%", maxHeight: 520, objectFit: "cover" }}
+              />
+            ))}
+          </>
+        )}
 
         <section id="pyjama-form" ref={sectionRef}>
-          <img
-            className="pyjama-tt"
-            src={activeProduct?.gallery?.[3] || "/images/pyjama/04-pyjama.jpg"}
-            alt="إستمارة الطلب"
-          />
+          {isBuiltIn ? (
+            <img
+              className="pyjama-tt"
+              src={activeProduct?.gallery?.[3] || "/images/pyjama/04-pyjama.jpg"}
+              alt="إستمارة الطلب"
+            />
+          ) : (
+            <div
+              style={{
+                textAlign: "center",
+                background: "linear-gradient(90deg, #14100c, #3b1726)",
+                color: "#fff",
+                borderRadius: "12px",
+                padding: "10px 14px",
+                marginBottom: "14px",
+                border: "2px solid #d4a73c",
+                fontWeight: 900,
+                fontSize: "17px",
+              }}
+            >
+              ✨ استمارة الطلب السريع — الدفع عند الاستلام ✨
+            </div>
+          )}
 
           {submittedOrder ? (
             <div className="pyjama-ok" role="status">
@@ -459,7 +674,9 @@ export default function PyjamaLanding({ product }: { product?: Product }) {
               <span className="pyjama-ok-meta">
                 رقم الطلب: <b dir="ltr">{submittedOrder.orderNumber}</b>
                 <br />
-                {submittedOrder.offerLabel} · المقاس {submittedOrder.size} · الألوان: {submittedOrder.colors}
+                {submittedOrder.offerLabel}
+                {submittedOrder.size ? ` · المقاس ${submittedOrder.size}` : ""}
+                {submittedOrder.colors ? ` · الألوان: ${submittedOrder.colors}` : ""}
                 <br />
                 {submittedOrder.wilaya} - {submittedOrder.commune}
                 <br />
@@ -481,7 +698,10 @@ export default function PyjamaLanding({ product }: { product?: Product }) {
               <input type="hidden" name="note" value={computedNote} />
               <input type="hidden" name="delivery" value="home" />
 
-              <div className="pyjama-offers">
+              <div
+                className="pyjama-offers"
+                style={offers.length === 1 ? { gridTemplateColumns: "1fr" } : undefined}
+              >
                 {offers.map(offer => (
                   <label className="pyjama-offer-label" key={offer.id}>
                     <input
@@ -499,43 +719,51 @@ export default function PyjamaLanding({ product }: { product?: Product }) {
                 ))}
               </div>
 
-              <div className="pyjama-lab">اختاري اللون (يمكنك اختيار أكثر من لون)</div>
-              <div className="pyjama-chips">
-                {PYJAMA_COLORS.map(colorItem => (
-                  <label key={colorItem.value}>
-                    <input
-                      type="checkbox"
-                      name="colorChoice"
-                      value={colorItem.value}
-                      checked={selectedColors.includes(colorItem.value)}
-                      onChange={() => handleColorToggle(colorItem.value)}
-                    />
-                    <span>
-                      <i style={{ background: colorItem.hex }} />
-                      {colorItem.value}
-                    </span>
-                  </label>
-                ))}
-              </div>
+              {colorOptions.length > 0 ? (
+                <>
+                  <div className="pyjama-lab">اختاري اللون (يمكنك اختيار أكثر من لون)</div>
+                  <div className="pyjama-chips">
+                    {colorOptions.map(colorItem => (
+                      <label key={colorItem.value}>
+                        <input
+                          type="checkbox"
+                          name="colorChoice"
+                          value={colorItem.value}
+                          checked={selectedColors.includes(colorItem.value)}
+                          onChange={() => handleColorToggle(colorItem.value)}
+                        />
+                        <span>
+                          <i style={{ background: colorItem.hex }} />
+                          {colorItem.value}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              ) : null}
 
-              <div className="pyjama-lab">اختاري المقاس</div>
-              <div className="pyjama-chips pyjama-sz">
-                {PYJAMA_SIZES.map(sizeItem => (
-                  <label key={sizeItem.value}>
-                    <input
-                      type="radio"
-                      name="sizeChoice"
-                      value={sizeItem.value}
-                      checked={selectedSize === sizeItem.value}
-                      onChange={() => handleSizeChange(sizeItem.value)}
-                    />
-                    <span>
-                      {sizeItem.value}
-                      <small>{sizeItem.weight}</small>
-                    </span>
-                  </label>
-                ))}
-              </div>
+              {sizeOptions.length > 0 ? (
+                <>
+                  <div className="pyjama-lab">اختاري المقاس</div>
+                  <div className="pyjama-chips pyjama-sz">
+                    {sizeOptions.map(sizeItem => (
+                      <label key={sizeItem.value}>
+                        <input
+                          type="radio"
+                          name="sizeChoice"
+                          value={sizeItem.value}
+                          checked={selectedSize === sizeItem.value}
+                          onChange={() => handleSizeChange(sizeItem.value)}
+                        />
+                        <span>
+                          {sizeItem.value}
+                          {sizeItem.weight ? <small>{sizeItem.weight}</small> : null}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              ) : null}
 
               <div className="pyjama-fl">
                 <input
@@ -641,18 +869,25 @@ export default function PyjamaLanding({ product }: { product?: Product }) {
                 </div>
               ) : null}
 
-              <div className="pyjama-row2">
-                <img
-                  src={activeProduct?.gallery?.[4] || "/images/pyjama/05-pyjama.jpg"}
-                  alt="تفاصيل البيجامة"
-                  loading="lazy"
-                />
-                <img
-                  src={activeProduct?.gallery?.[5] || "/images/pyjama/06-pyjama.jpg"}
-                  alt="ألوان البيجامة الصيفية"
-                  loading="lazy"
-                />
-              </div>
+              {isBuiltIn ? (
+                <div className="pyjama-row2">
+                  <img
+                    src={activeProduct?.gallery?.[4] || "/images/pyjama/05-pyjama.jpg"}
+                    alt="تفاصيل البيجامة"
+                    loading="lazy"
+                  />
+                  <img
+                    src={activeProduct?.gallery?.[5] || "/images/pyjama/06-pyjama.jpg"}
+                    alt="ألوان البيجامة الصيفية"
+                    loading="lazy"
+                  />
+                </div>
+              ) : customImages.length >= 5 ? (
+                <div className="pyjama-row2">
+                  <img src={customImages[3]} alt={displayHeadline} loading="lazy" />
+                  <img src={customImages[4]} alt={displayHeadline} loading="lazy" />
+                </div>
+              ) : null}
 
               <div className="pyjama-summary" aria-live="polite">
                 <div className="pyjama-summary-line">
@@ -686,7 +921,7 @@ export default function PyjamaLanding({ product }: { product?: Product }) {
                   "⏳ جاري تسجيل الطلب..."
                 ) : (
                   <>
-                    <span>🛒</span> اطلبي الآن <span>👆</span>
+                    <span>🛒</span> {ctaText} <span>👆</span>
                   </>
                 )}
               </button>
@@ -694,22 +929,61 @@ export default function PyjamaLanding({ product }: { product?: Product }) {
           )}
         </section>
 
+        {!isBuiltIn && cfg?.reviews && cfg.reviews.length > 0 ? (
+          <div style={{ padding: "14px 12px 4px", display: "grid", gap: "8px" }}>
+            <div style={{ fontWeight: 900, fontSize: "15px", color: "#3b1726", textAlign: "center" }}>
+              ⭐ آراء زبوناتنا حول {displayHeadline}
+            </div>
+            {cfg.reviews.slice(0, 3).map((rev, idx) => (
+              <div
+                key={`${rev.author}-${idx}`}
+                style={{
+                  background: "#fff",
+                  border: "1px solid #f5bfd2",
+                  borderRadius: "12px",
+                  padding: "10px 12px",
+                  boxShadow: "0 2px 8px #0001",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: 800, marginBottom: "4px" }}>
+                  <span>{rev.author}{rev.city ? ` · ${rev.city}` : ""}</span>
+                  <span style={{ color: "#d4a73c" }}>{"★".repeat(Math.min(5, Math.max(1, rev.rating || 5)))}</span>
+                </div>
+                <p style={{ margin: 0, fontSize: "13px", lineHeight: 1.55, color: "#3b232c" }}>
+                  “{rev.text}”
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         <div className="pyjama-trust">
-          <div>
-            <b>🚚</b>التوصيل لكل الولايات
-          </div>
-          <div>
-            <b>💵</b>الدفع عند الاستلام
-          </div>
-          <div>
-            <b>✅</b>جودة عالية
-          </div>
+          {!isBuiltIn && cfg?.trustItems && cfg.trustItems.length > 0 ? (
+            cfg.trustItems.slice(0, 3).map((item, idx) => (
+              <div key={`${item.label}-${idx}`}>
+                <b>{item.icon || ["🚚", "💵", "✅"][idx % 3]}</b>
+                {item.label}
+              </div>
+            ))
+          ) : (
+            <>
+              <div>
+                <b>🚚</b>التوصيل لكل الولايات
+              </div>
+              <div>
+                <b>💵</b>الدفع عند الاستلام
+              </div>
+              <div>
+                <b>✅</b>جودة عالية
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       <div className={`pyjama-sticky${hideSticky ? " is-hidden" : ""}`}>
         <button className="pyjama-btn" type="button" onClick={handleStickyClick}>
-          <span>🛒</span> اطلبي الآن <span>👆</span>
+          <span>🛒</span> {ctaText} <span>👆</span>
         </button>
       </div>
     </div>

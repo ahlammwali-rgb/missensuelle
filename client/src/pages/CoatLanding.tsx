@@ -1,4 +1,4 @@
-import React, { type FormEvent, useLayoutEffect, useRef, useState } from "react";
+import React, { type FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { Search, ShoppingBag } from "lucide-react";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
@@ -16,32 +16,47 @@ const detailNames = { collar: "ياقة فرو ناعمة", buttons: "أزرار
 const colorChoices = [{ id: "black" as const, label: "أسود", hex: "#111" }, { id: "white" as const, label: "أبيض", hex: "#f4ecdf" }];
 
 export default function CoatLanding({ product, quantity = 1 }: { product: Product; quantity?: number }) {
+  const cfg = product.landingConfig;
   const isBuiltIn =
+    !cfg &&
     (product.id === "p-001" || product.slug === "blazer-lilac-dream") &&
     (!product.image || product.image === coatImages.black.hero);
   const dynamicColorChoices =
-    !isBuiltIn && product.variantImages && product.variantImages.length > 0
-      ? product.variantImages.map((v, idx) => ({
-          id: v.name || `اللون ${idx + 1}`,
-          label: v.name || `اللون ${idx + 1}`,
-          hex: idx % 2 === 0 ? "#111" : "#f4ecdf",
-          image: v.image || product.gallery?.[idx] || product.image,
+    !isBuiltIn && cfg?.colorSwatches && cfg.colorSwatches.length > 0
+      ? cfg.colorSwatches.map((sw, idx) => ({
+          id: sw.name || `اللون ${idx + 1}`,
+          label: sw.name || `اللون ${idx + 1}`,
+          hex: sw.hex || (idx % 2 === 0 ? "#111" : "#f4ecdf"),
+          image: product.variantImages?.[idx]?.image || product.gallery?.[idx] || product.image,
         }))
-      : !isBuiltIn && product.colors && product.colors.length > 0
-        ? product.colors.map((c, idx) => ({
-            id: c,
-            label: c,
+      : !isBuiltIn && product.variantImages && product.variantImages.length > 0
+        ? product.variantImages.map((v, idx) => ({
+            id: v.name || `اللون ${idx + 1}`,
+            label: v.name || `اللون ${idx + 1}`,
             hex: idx % 2 === 0 ? "#111" : "#f4ecdf",
-            image: product.gallery?.[idx] || product.image,
+            image: v.image || product.gallery?.[idx] || product.image,
           }))
-        : !isBuiltIn && product.gallery && product.gallery.length > 0
-          ? product.gallery.map((img, idx) => ({
-              id: `الموديل ${idx + 1}`,
-              label: `الموديل ${idx + 1}`,
+        : !isBuiltIn && product.colors && product.colors.length > 0
+          ? product.colors.map((c, idx) => ({
+              id: c,
+              label: c,
               hex: idx % 2 === 0 ? "#111" : "#f4ecdf",
-              image: img,
+              image: product.gallery?.[idx] || product.image,
             }))
-          : colorChoices.map(c => ({ ...c, image: "" }));
+          : !isBuiltIn && product.gallery && product.gallery.length > 0
+            ? product.gallery.map((img, idx) => ({
+                id: `الموديل ${idx + 1}`,
+                label: `الموديل ${idx + 1}`,
+                hex: idx % 2 === 0 ? "#111" : "#f4ecdf",
+                image: img,
+              }))
+            : colorChoices.map(c => ({ ...c, image: "" }));
+
+  const dynamicSizes = isBuiltIn
+    ? ["S", "M", "L", "XL", "XXL"]
+    : cfg?.sizes !== undefined
+      ? cfg.sizes.map(s => s.label)
+      : ["S", "M", "L", "XL", "XXL"];
 
   const [color, setColor] = useState<string | null>(null);
   const [wilaya, setWilaya] = useState("");
@@ -72,6 +87,16 @@ export default function CoatLanding({ product, quantity = 1 }: { product: Produc
     });
     return () => window.cancelAnimationFrame(raf);
   }, [product.id]);
+
+  useEffect(() => {
+    const prevTitle = document.title;
+    if (!isBuiltIn) {
+      document.title = `Miss Sensuelle — ${product.arName || product.name}`;
+    }
+    return () => {
+      if (!isBuiltIn) document.title = prevTitle;
+    };
+  }, [isBuiltIn, product.arName, product.name]);
   const current: CoatColor = color === "white" ? "white" : "black";
   const images = coatImages[current];
   const abaya = getProduct("abaya-royal-emerald");
@@ -111,7 +136,7 @@ export default function CoatLanding({ product, quantity = 1 }: { product: Produc
     if (!/^(?:0[567]\d{8}|\+213[567]\d{8})$/.test(phone)) nextErrors.phone = "رقم غير صحيح (مثال: 0555123456)";
     if (!wilaya) nextErrors.wilaya = "اختاري الولاية";
     if (!communes.includes(commune)) nextErrors.commune = "اختاري البلدية";
-    if (!size) nextErrors.size = "اختاري المقاس";
+    if (dynamicSizes.length > 0 && !size) nextErrors.size = "اختاري المقاس";
     if (!color) nextErrors.color = "اختاري اللون";
     if (product.stock <= 0) nextErrors.form = "المنتج غير متوفر حالياً";
     setErrors(nextErrors);
@@ -149,8 +174,13 @@ export default function CoatLanding({ product, quantity = 1 }: { product: Produc
             height="674"
             fetchPriority="high"
           />
-          <div className="hx-t1">{isBuiltIn ? "معطف شتوي فاخر" : (product.arName || product.name)}</div>
-          <div className="hx-t2">{isBuiltIn ? <>ستايل أنيق و دافئ <b>♥</b></> : <>{product.badge || "ستايل أنيق و راقٍ"} <b>♥</b></>}</div>
+          <div className="hx-t1">{isBuiltIn ? "معطف شتوي فاخر" : (cfg?.heroHeadlineAr || product.arName || product.name)}</div>
+          <div className="hx-t2">{isBuiltIn ? <>ستايل أنيق و دافئ <b>♥</b></> : <>{cfg?.heroBadgeAr || product.badge || "ستايل أنيق و راقٍ"} <b>♥</b></>}</div>
+          {!isBuiltIn && (cfg?.heroSubheadlineAr || product.arDescription || product.description) ? (
+            <p style={{ margin: "6px auto 10px", maxWidth: "92%", textAlign: "center", fontSize: 13.5, lineHeight: 1.6, opacity: 0.9 }}>
+              {cfg?.heroSubheadlineAr || product.arDescription || product.description}
+            </p>
+          ) : null}
           <ul className="hx-ck">
             {isBuiltIn ? (
               <><li>قماش عالي الجودة</li><li>مناسب لجميع المناسبات</li><li>مريح و خفيف</li></>
@@ -197,17 +227,32 @@ export default function CoatLanding({ product, quantity = 1 }: { product: Produc
                 <div><div className="fld"><i aria-hidden="true">📞</i><input name="phone" aria-label="رقم الهاتف" aria-invalid={Boolean(errors.phone)} type="tel" inputMode="tel" required placeholder="رقم الهاتف (07...)" autoComplete="tel" /></div><div className="err" role={errors.phone ? "alert" : undefined}>{errors.phone}</div></div>
                 <div><div className="fld"><i aria-hidden="true">📍</i><select name="wilaya" aria-label="الولاية" required value={wilaya} onChange={event => { setWilaya(event.target.value); setCommune(""); }}><option value="">الولاية</option>{abayaWilayas.map(item => <option key={item}>{item}</option>)}</select></div><div className="err" role={errors.wilaya ? "alert" : undefined}>{errors.wilaya}</div></div>
                 <div><div className="fld"><i aria-hidden="true">🏘️</i><select name="commune" aria-label="البلدية" required disabled={!wilaya} value={commune} onChange={event => setCommune(event.target.value)}><option value="">البلدية</option>{communes.map(item => <option key={item}>{item}</option>)}</select></div><div className="err" role={errors.commune ? "alert" : undefined}>{errors.commune}</div></div>
-                <div style={{ gridColumn: "1 / -1" }}><div className="fld"><i aria-hidden="true">📏</i><select name="size" aria-label="المقاس" required value={size} onChange={event => setSize(event.target.value)}><option value="">المقاس</option>{["S", "M", "L", "XL", "XXL"].map(item => <option key={item}>{item}</option>)}</select></div><div className="err" role={errors.size ? "alert" : undefined}>{errors.size}</div></div>
+                {dynamicSizes.length > 0 ? (
+                  <div style={{ gridColumn: "1 / -1" }}><div className="fld"><i aria-hidden="true">📏</i><select name="size" aria-label="المقاس" required value={size} onChange={event => setSize(event.target.value)}><option value="">المقاس</option>{dynamicSizes.map(item => <option key={item}>{item}</option>)}</select></div><div className="err" role={errors.size ? "alert" : undefined}>{errors.size}</div></div>
+                ) : null}
               </div>
               <label>اللون</label><div className="sw">{dynamicColorChoices.map(item => <button type="button" key={item.id} aria-pressed={color === item.id} onClick={() => setColor(item.id)}><span className="dot" style={{ background: item.hex }} />{item.label}</button>)}</div><div className="err" role={errors.color ? "alert" : undefined}>{errors.color}</div>
               <label>نوع التوصيل</label><div className="sw"><button type="button" aria-pressed={delivery === "home"} onClick={() => setDelivery("home")}>🏠 إلى المنزل{homeFee !== null ? ` (${homeFee === 0 ? "مجاني" : `${homeFee} DA`})` : ""}</button><button type="button" aria-pressed={delivery === "office"} onClick={() => setDelivery("office")}>🏢 إلى المكتب{officeFee !== null ? ` (${officeFee === 0 ? "مجاني" : `${officeFee} DA`})` : ""}</button></div>
               <div className="fld" style={{ marginTop: 10 }}><i aria-hidden="true">💬</i><textarea name="note" aria-label="ملاحظة اختيارية" rows={2} maxLength={300} placeholder="ملاحظة (اختياري)" style={{ borderRadius: 20 }} /></div>
-              <div className="sum">المقاس: {size || "—"} | اللون: {dynamicColorChoices.find(item => item.id === color)?.label ?? "—"}<br />الولاية: {wilaya || "—"} | البلدية: {commune || "—"}<br />التوصيل: {delivery === "home" ? "إلى المنزل" : "إلى المكتب"} {wilaya ? `(${shippingFee === 0 ? "مجاني" : `${shippingFee} DA`})` : ""}<br /><b>المجموع: <span dir="ltr">{grandTotal} DA</span></b> — الدفع عند الاستلام{!wilaya && <><br /><small>اختاري الولاية لحساب سعر التوصيل.</small></>}</div>
-              <div className="err" role={errors.form || checkout.draftError ? "alert" : undefined}>{errors.form || checkout.draftError}</div><button className="btn" type="submit" disabled={product.stock <= 0 || checkout.pending}>{checkout.pending ? "جارٍ إرسال الطلب…" : "أكدي طلبك الآن 🛒"}</button>
+              <div className="sum">{dynamicSizes.length > 0 ? <>المقاس: {size || "—"} | </> : null}اللون: {dynamicColorChoices.find(item => item.id === color)?.label ?? "—"}<br />الولاية: {wilaya || "—"} | البلدية: {commune || "—"}<br />التوصيل: {delivery === "home" ? "إلى المنزل" : "إلى المكتب"} {wilaya ? `(${shippingFee === 0 ? "مجاني" : `${shippingFee} DA`})` : ""}<br /><b>المجموع: <span dir="ltr">{grandTotal} DA</span></b> — الدفع عند الاستلام{!wilaya && <><br /><small>اختاري الولاية لحساب سعر التوصيل.</small></>}</div>
+              <div className="err" role={errors.form || checkout.draftError ? "alert" : undefined}>{errors.form || checkout.draftError}</div><button className="btn" type="submit" disabled={product.stock <= 0 || checkout.pending}>{checkout.pending ? "جارٍ إرسال الطلب…" : isBuiltIn ? "أكدي طلبك الآن 🛒" : `${cfg?.ctaLabelAr || "أكدي طلبك الآن"} 🛒`}</button>
             </form>
           )}
         </section>
-        {abaya && <Link className="oth" href={`/produit/${abaya.slug}`}><img src={abaya.image} alt="" /><div><small>اكتشفي أيضاً</small><b>عباية رويال + Jump suit</b></div></Link>}
+        {!isBuiltIn && cfg?.reviews && cfg.reviews.length > 0 ? (
+          <div style={{ display: "grid", gap: 8, margin: "12px 0" }}>
+            {cfg.reviews.slice(0, 3).map((rev, idx) => (
+              <div key={`${rev.author}-${idx}`} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 14, padding: "10px 12px", fontSize: 13 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, marginBottom: 4 }}>
+                  <span>{rev.author}{rev.city ? ` · ${rev.city}` : ""}</span>
+                  <span style={{ color: "#d4af37" }}>{"★".repeat(Math.min(5, Math.max(1, rev.rating || 5)))}</span>
+                </div>
+                <p style={{ margin: 0, color: "#374151" }}>« {rev.text} »</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {isBuiltIn && abaya && <Link className="oth" href={`/produit/${abaya.slug}`}><img src={abaya.image} alt="" /><div><small>اكتشفي أيضاً</small><b>عباية رويال + Jump suit</b></div></Link>}
         <footer><div><span>🔒</span>دفع آمن 100%</div><div><span>🚚</span>توصيل سريع<br />1-3 أيام</div><div><span>💛</span>رضاك يهمنا</div></footer>
       </div>
     </div>

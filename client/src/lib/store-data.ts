@@ -10,6 +10,22 @@ export type ProductVariantImage = {
   image: string;
 };
 
+export type ProductLandingConfig = {
+  heroHeadlineAr?: string;
+  heroSubheadlineAr?: string;
+  heroBadgeAr?: string;
+  promoBannerAr?: string;
+  ctaLabelAr?: string;
+  offer1LabelAr?: string;
+  offer2LabelAr?: string;
+  colorSwatches?: Array<{ name: string; hex: string }>;
+  sizes?: Array<{ label: string; hint?: string }>;
+  trustItems?: Array<{ icon: string; label: string }>;
+  reviews?: Array<{ author: string; city: string; rating: number; text: string }>;
+  aiGeneratedAt?: string;
+  aiModel?: string;
+};
+
 export type Product = {
   id: string;
   slug: string;
@@ -20,6 +36,7 @@ export type Product = {
   oldPrice?: number;
   packPrice?: number;
   landingTemplate?: LandingTemplateId;
+  landingConfig?: ProductLandingConfig;
   variantImages?: ProductVariantImage[];
   badge?: string;
   description: string;
@@ -560,8 +577,15 @@ export function saveCatalogProducts(next: Product[]) {
 }
 
 let catalogSyncStarted = false;
+let catalogSyncCompleted = false;
+
+export function isCatalogSyncDone(): boolean {
+  return catalogSyncCompleted;
+}
+
 export function syncCatalogFromServer() {
-  if (typeof window === "undefined" || catalogSyncStarted) return;
+  if (typeof window === "undefined") return;
+  if (catalogSyncStarted) return;
   catalogSyncStarted = true;
   void fetch("/api/checkout/catalog")
     .then(r => (r.ok ? r.json() : null))
@@ -588,7 +612,11 @@ export function syncCatalogFromServer() {
         window.dispatchEvent(new CustomEvent("miss-sensuelle-catalog-updated"));
       }
     })
-    .catch(() => {});
+    .catch(() => {})
+    .finally(() => {
+      catalogSyncCompleted = true;
+      window.dispatchEvent(new CustomEvent("miss-sensuelle-catalog-synced"));
+    });
 }
 
 if (typeof window !== "undefined") {

@@ -85,6 +85,12 @@ import {
   upsertStaffMember,
 } from "./persistentStore";
 import { triggerStoreSave } from "./checkout";
+import {
+  generateLandingDraft,
+  generateLandingDraftInputSchema,
+  getAiKeyStatus,
+  saveRuntimeGeminiKey,
+} from "./aiLanding";
 import { z } from "zod";
 
 function isOwnerUser(user: { openId?: string | null; loginMethod?: string | null } | null | undefined): boolean {
@@ -449,6 +455,34 @@ export const appRouter = router({
         const updated = setNotificationPreferences(input);
         triggerStoreSave();
         return updated;
+      }),
+    aiStatus: adminProcedure.query(() => getAiKeyStatus()),
+    saveAiKey: adminProcedure
+      .input(z.object({ apiKey: z.string().min(16).max(300) }))
+      .mutation(async ({ ctx, input }) => {
+        if (!isOwnerUser(ctx.user)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Seul le propriétaire peut configurer la clé API Gemini." });
+        }
+        try {
+          return await saveRuntimeGeminiKey(input.apiKey);
+        } catch (err) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: err instanceof Error ? err.message : "Clé API Gemini refusée.",
+          });
+        }
+      }),
+    generateLandingDraft: adminProcedure
+      .input(generateLandingDraftInputSchema)
+      .mutation(async ({ input }) => {
+        try {
+          return await generateLandingDraft(input);
+        } catch (err) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: err instanceof Error ? err.message : "Échec de génération IA.",
+          });
+        }
       }),
   }),
   ecom: router({

@@ -5,6 +5,8 @@ import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
 import { abayaImages } from "@/lib/abaya-images";
 import { getProduct, type Product } from "@/lib/store-data";
 import { trackPixelEvent } from "@/lib/tracking";
+import { trpc } from "@/lib/trpc";
+import { isFreeShippingProduct, shippingFeeFor } from "@shared/shipping";
 import { CheckoutDraftNotice } from "@/components/CheckoutDraftNotice";
 import { useCheckoutDraft } from "@/components/useCheckoutDraft";
 import "./abaya-template.css";
@@ -33,11 +35,21 @@ const SIZES = ["S", "M", "L", "XL", "XXL"];
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export default function AbayaLanding({ product, quantity = 1 }: { product: Product; quantity?: number }) {
+  const cfg = product.landingConfig;
   const isBuiltIn =
+    !cfg &&
     (product.id === "p-007" || product.slug === "abaya-royal-emerald") &&
     (!product.image || product.image === "/manus-storage/v-hero_de8d807e.jpg");
-  const dynamicColorChoices =
-    product.variantImages && product.variantImages.length > 0 && !isBuiltIn
+
+  const dynamicColorChoices = !isBuiltIn && cfg?.colorSwatches && cfg.colorSwatches.length > 0
+    ? cfg.colorSwatches.map((sw, idx) => ({
+        id: `c-${idx}`,
+        label: sw.name,
+        storeValue: sw.name,
+        hex: sw.hex || (idx % 2 === 0 ? "#0d4b37" : "#111111"),
+        thumb: product.variantImages?.[idx]?.image || product.gallery?.[idx] || product.image,
+      }))
+    : product.variantImages && product.variantImages.length > 0 && !isBuiltIn
       ? product.variantImages.map((v, idx) => ({
           id: `c-${idx}`,
           label: v.name || `اللون ${idx + 1}`,
@@ -63,10 +75,16 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
             }))
           : colorChoices;
 
+  const dynamicSizes = isBuiltIn
+    ? SIZES
+    : cfg?.sizes !== undefined
+      ? cfg.sizes.map(s => s.label)
+      : SIZES;
+
   const [color, setColor] = useState<string>(dynamicColorChoices[0]?.id ?? "green");
   const [wilaya, setWilaya] = useState("");
   const [commune, setCommune] = useState("");
-  const [size, setSize] = useState("L");
+  const [size, setSize] = useState(dynamicSizes.includes("L") ? "L" : (dynamicSizes[0] ?? ""));
   const [delivery, setDelivery] = useState<"home" | "office">("home");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [orderNumber, setOrderNumber] = useState("");
@@ -95,6 +113,10 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
   }, [product.id]);
 
   useEffect(() => {
+    const prevTitle = document.title;
+    if (!isBuiltIn) {
+      document.title = `Miss Sensuelle — ${product.arName || product.name}`;
+    }
     trackPixelEvent("ViewContent", {
       content_type: "product",
       content_id: product.id,
@@ -103,7 +125,10 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
       value: product.price || 7500,
       currency: "DZD",
     });
-  }, [product.id]);
+    return () => {
+      if (!isBuiltIn) document.title = prevTitle;
+    };
+  }, [product.id, product.arName, product.name, product.price, isBuiltIn]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -118,15 +143,29 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
     ? abayaImages.colorPreviews[current]
     : { thumb: selectedColorChoice.thumb, caption: selectedColorChoice.label };
   const doudoune = getProduct("doudoune-hiver-luxe");
+  const ratesQuery = trpc.store.shippingRates.useQuery(undefined, {
+    enabled: !isBuiltIn,
+    retry: false,
+    staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
   const communes = abayaCommunesByWilaya[wilaya] ?? [];
   const unitPrice = isBuiltIn ? 7500 : (product.price || 7500);
   const oldPriceVal = isBuiltIn ? 14000 : (product.oldPrice || Math.round(unitPrice * 1.4));
   const total = unitPrice * quantity;
+  const freeShipping = isBuiltIn || isFreeShippingProduct(product.id);
+  const shippingFee = freeShipping
+    ? 0
+    : wilaya
+      ? shippingFeeFor(ratesQuery.data?.rates, wilaya, delivery, [product.id])
+      : 0;
+  const grandTotal = total + shippingFee;
 
   const checkout = useCheckoutDraft({
     formRef,
     source: "abaya",
-    getItems: () => [{ productId: product.id, quantity, color: selectedColorChoice.storeValue, size }],
+    getItems: () => [{ productId: product.id, quantity, color: selectedColorChoice.storeValue, size: dynamicSizes.length > 0 ? size : "" }],
     watchKey: `${color}|${wilaya}|${commune}|${size}|${delivery}|${quantity}`,
   });
 
@@ -163,7 +202,7 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
     if (!/^(?:0[567]\d{8}|\+213[567]\d{8})$/.test(phone)) nextErrors.phone = "رقم غير صحيح (مثال: 0555123456)";
     if (!wilaya) nextErrors.wilaya = "اختاري الولاية";
     if (!communes.includes(commune)) nextErrors.commune = "اختاري البلدية";
-    if (!size) nextErrors.size = "اختاري المقاس";
+    if (dynamicSizes.length > 0 && !size) nextErrors.size = "اختاري المقاس";
     if (!color) nextErrors.color = "اختاري اللون";
     if (product.stock <= 0) nextErrors.form = "المنتج غير متوفر حالياً";
     setErrors(nextErrors);
@@ -192,7 +231,11 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
     <div className="abaya-template" dir="rtl">
       <div className="w">
         <div className="top-promo-bar">
-          🚚 <span>التوصيل مجاني 100%</span> لجميع 58 ولاية · الدفع عند الاستلام وفحص الطلبية قبل الدفع 🔥
+          {!isBuiltIn && cfg?.promoBannerAr ? (
+            <span>{cfg.promoBannerAr}</span>
+          ) : (
+            <>🚚 <span>التوصيل {freeShipping ? "مجاني 100%" : "سريع لـ 58 ولاية"}</span> · الدفع عند الاستلام وفحص الطلبية قبل الدفع 🔥</>
+          )}
         </div>
 
         <header className="hd">
@@ -221,15 +264,15 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
             <div className="hero-price-badge-7500">
               <strong>{unitPrice} دج</strong>
               <del>{oldPriceVal} دج</del>
-              <span>🚚 التوصيل مجاني</span>
+              <span>{freeShipping ? "🚚 التوصيل مجاني" : `✨ ${cfg?.heroBadgeAr || product.badge || "حصري"}`}</span>
             </div>
           </div>
 
           <div className="hero-conversion-box">
             <div className="hero-conv-top">
               <div className="hero-conv-title">
-                <h1>👑 {isBuiltIn ? "طقم عباية رويال + جمبسوت أسود" : (product.arName || product.name)}</h1>
-                <small>✅ توصيل مجاني لباب المنزل (0 دج) · الدفع عند الاستلام</small>
+                <h1>👑 {isBuiltIn ? "طقم عباية رويال + جمبسوت أسود" : (cfg?.heroHeadlineAr || product.arName || product.name)}</h1>
+                <small>{isBuiltIn ? "✅ توصيل مجاني لباب المنزل (0 دج) · الدفع عند الاستلام" : (cfg?.heroSubheadlineAr || product.arDescription || product.description || "✅ الدفع عند الاستلام لجميع 58 ولاية")}</small>
               </div>
               <div className="hero-conv-price">
                 <b>{unitPrice.toLocaleString("en-US")} دج</b>
@@ -246,20 +289,31 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
             </div>
 
             <button type="button" className="hero-fast-cta" onClick={scrollToOrderForm}>
-              👇 اضغطي هنا لحجز طلبيتك الآن (التوصيل مجاني 🚚)
+              👇 {isBuiltIn ? "اضغطي هنا لحجز طلبيتك الآن (التوصيل مجاني 🚚)" : (cfg?.ctaLabelAr || "اضغطي هنا لطلب المنتج الآن 🛒")}
             </button>
           </div>
 
           <div className="vx-adv-bar">
-            <div><i>🚚</i><b>توصيل مجاني</b><small>لجميع 58 ولاية</small></div>
-            <div><i>🛡️</i><b>دفع عند الاستلام</b><small>افحصي قبل الدفع</small></div>
-            <div><i>✅</i><b>جودة ملكية</b><small>تفاصيل متقنة</small></div>
-            <div><i>🔄</i><b>تبديل المقاس</b><small>مضمون 100%</small></div>
+            {!isBuiltIn && cfg?.trustItems && cfg.trustItems.length > 0 ? (
+              cfg.trustItems.slice(0, 4).map((item, idx) => (
+                <div key={`${item.label}-${idx}`}>
+                  <i>{item.icon || ["🚚", "🛡️", "✅", "🔄"][idx % 4]}</i>
+                  <b>{item.label}</b>
+                </div>
+              ))
+            ) : (
+              <>
+                <div><i>🚚</i><b>{freeShipping ? "توصيل مجاني" : "توصيل سريع"}</b><small>لجميع 58 ولاية</small></div>
+                <div><i>🛡️</i><b>دفع عند الاستلام</b><small>افحصي قبل الدفع</small></div>
+                <div><i>✅</i><b>جودة ملكية</b><small>تفاصيل متقنة</small></div>
+                <div><i>🔄</i><b>ضمان الجودة</b><small>خدمة زبائن 100%</small></div>
+              </>
+            )}
           </div>
         </section>
 
         <div className="g5">
-          {(isBuiltIn ? abayaImages.thumbs : (product.gallery ?? [product.image]).slice(0, 5).map((src, i) => ({ key: `g-${i}`, src, label: product.details?.[i] || `${product.arName || product.name} ${i + 1}` }))).map(item => (
+          {(isBuiltIn ? abayaImages.thumbs : (product.gallery && product.gallery.length > 0 ? product.gallery : [product.image]).slice(0, 5).map((src, i) => ({ key: `g-${i}`, src, label: product.details?.[i] || `${product.arName || product.name} ${i + 1}` }))).map(item => (
             <div key={item.key}>
               <img src={item.src} alt={item.label} loading="lazy" />
               <p>{item.label}</p>
@@ -276,7 +330,7 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
               <>{product.arDescription || product.description} — بسعر استثنائي <b>{unitPrice.toLocaleString("en-US")} دج فقط</b> !</>
             )}
           </div>
-          <div className="pk"><div><span>🎁</span><br />التوصيل مجاني<br />0 دج</div></div>
+          <div className="pk"><div><span>🎁</span><br />{freeShipping ? <>التوصيل مجاني<br />0 دج</> : <>الدفع عند<br />الاستلام</>}</div></div>
         </div>
 
         <section className="reviews-sec" aria-label="آراء الزبونات">
@@ -285,39 +339,53 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
             <span>⭐ 4.9 / 5 (+500 تقييم)</span>
           </div>
           <div className="reviews-list">
-            <div className="review-item">
-              <div className="review-meta">
-                <b>سارة ب. · الجزائر العاصمة ✅</b>
-                <em>★★★★★</em>
-              </div>
-              <p>« وصلتني اليوم والتوصيل كان مجاني لباب الدار ! القماش قطيفة ثقيلة والتطريز فخم بزاف أحسن حتى من الصور، يعطيكم الصحة ❤️ »</p>
-            </div>
-            <div className="review-item">
-              <div className="review-meta">
-                <b>أمينة م. · وهران ✅</b>
-                <em>★★★★★</em>
-              </div>
-              <p>« عباية ملكية صح والجمبسوت تاعها مريح بزاف ومقاسو مضبوط. فتحت الكولي وتأكدت منها قبل ما نخلص، ثقة ومعاملة راقية ! »</p>
-            </div>
-            <div className="review-item">
-              <div className="review-meta">
-                <b>نسرين ك. · قسنطينة ✅</b>
-                <em>★★★★★</em>
-              </div>
-              <p>« بهذ السعر 7500 دج ومع التوصيل باطل والله غير صفقة رائعة، ديت الخضراء الملكية خرجت عليا تهبل ننصح بيها كل وحدة ! »</p>
-            </div>
+            {!isBuiltIn && cfg?.reviews && cfg.reviews.length > 0 ? (
+              cfg.reviews.slice(0, 3).map((rev, idx) => (
+                <div className="review-item" key={`${rev.author}-${idx}`}>
+                  <div className="review-meta">
+                    <b>{rev.author}{rev.city ? ` · ${rev.city}` : ""} ✅</b>
+                    <em>{"★".repeat(Math.min(5, Math.max(1, rev.rating || 5)))}</em>
+                  </div>
+                  <p>« {rev.text} »</p>
+                </div>
+              ))
+            ) : (
+              <>
+                <div className="review-item">
+                  <div className="review-meta">
+                    <b>سارة ب. · الجزائر العاصمة ✅</b>
+                    <em>★★★★★</em>
+                  </div>
+                  <p>« وصلتني اليوم والتوصيل كان مجاني لباب الدار ! القماش قطيفة ثقيلة والتطريز فخم بزاف أحسن حتى من الصور، يعطيكم الصحة ❤️ »</p>
+                </div>
+                <div className="review-item">
+                  <div className="review-meta">
+                    <b>أمينة م. · وهران ✅</b>
+                    <em>★★★★★</em>
+                  </div>
+                  <p>« عباية ملكية صح والجمبسوت تاعها مريح بزاف ومقاسو مضبوط. فتحت الكولي وتأكدت منها قبل ما نخلص، ثقة ومعاملة راقية ! »</p>
+                </div>
+                <div className="review-item">
+                  <div className="review-meta">
+                    <b>نسرين ك. · قسنطينة ✅</b>
+                    <em>★★★★★</em>
+                  </div>
+                  <p>« بهذ السعر 7500 دج ومع التوصيل باطل والله غير صفقة رائعة، ديت الخضراء الملكية خرجت عليا تهبل ننصح بيها كل وحدة ! »</p>
+                </div>
+              </>
+            )}
           </div>
         </section>
 
         <section className="o" id="order">
           <div className="o-royal-ribbon">
             <div className="o-royal-ribbon-text">
-              <strong>👑 عرض خاص : عباية رويال + جمبسوت</strong>
-              <span>🚚 التوصيل مجاني 100% لجميع الولايات !</span>
+              <strong>👑 {isBuiltIn ? "عرض خاص : عباية رويال + جمبسوت" : `عرض خاص : ${cfg?.heroHeadlineAr || product.arName || product.name}`}</strong>
+              <span>{freeShipping ? "🚚 التوصيل مجاني 100% لجميع الولايات !" : "🚚 توصيل سريع لـ 58 ولاية مع الدفع عند الاستلام !"}</span>
             </div>
             <div className="o-royal-ribbon-price">
               <b>{total} دج</b>
-              <del>14000 دج</del>
+              <del>{oldPriceVal} دج</del>
             </div>
           </div>
 
@@ -396,30 +464,34 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
                   <div>
                     <small>اختيارك الحالي :</small>
                     <b>{activeColorPreview.caption}</b>
-                    <span>🚚 التوصيل مجاني (0 دج) · {total} دج فقط</span>
+                    <span>{freeShipping ? "🚚 التوصيل مجاني (0 دج) · " : ""}{total} دج فقط</span>
                   </div>
                 </div>
                 <div className="err" id="e_c" role={errors.color ? "alert" : undefined}>{errors.color}</div>
 
-                <label>3️⃣ اختاري المقاس المناسب :</label>
-                <div className="size-pills" id="sz" role="group" aria-label="المقاس">
-                  {SIZES.map(item => (
-                    <button
-                      type="button"
-                      key={item}
-                      aria-pressed={size === item}
-                      onClick={() => setSize(item)}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-                <div className="err" id="e_s" role={errors.size ? "alert" : undefined}>{errors.size}</div>
+                {dynamicSizes.length > 0 ? (
+                  <>
+                    <label>3️⃣ اختاري المقاس المناسب :</label>
+                    <div className="size-pills" id="sz" role="group" aria-label="المقاس">
+                      {dynamicSizes.map(item => (
+                        <button
+                          type="button"
+                          key={item}
+                          aria-pressed={size === item}
+                          onClick={() => setSize(item)}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="err" id="e_s" role={errors.size ? "alert" : undefined}>{errors.size}</div>
+                  </>
+                ) : null}
 
-                <label>4️⃣ مكان الاستلام (مجاني في الحالتين 🎁) :</label>
+                <label>{dynamicSizes.length > 0 ? "4️⃣" : "3️⃣"} مكان الاستلام {freeShipping ? "(مجاني في الحالتين 🎁)" : ":"}</label>
                 <div className="sw" id="dv">
-                  <button type="button" data-d="home" aria-pressed={delivery === "home"} onClick={() => setDelivery("home")}>🏠 لباب المنزل (مجاناً)</button>
-                  <button type="button" data-d="office" aria-pressed={delivery === "office"} onClick={() => setDelivery("office")}>🏢 مكتب التوصيل (مجاناً)</button>
+                  <button type="button" data-d="home" aria-pressed={delivery === "home"} onClick={() => setDelivery("home")}>🏠 لباب المنزل {freeShipping ? "(مجاناً)" : ""}</button>
+                  <button type="button" data-d="office" aria-pressed={delivery === "office"} onClick={() => setDelivery("office")}>🏢 مكتب التوصيل {freeShipping ? "(مجاناً)" : ""}</button>
                 </div>
 
                 <div className="fld fld-textarea">
@@ -429,29 +501,41 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
 
                 <div className="sum" id="sum">
                   <div className="sum-row">
-                    <span>الطقم ({selectedColorChoice.label} · مقاس {size || "-"})</span>
+                    <span>{isBuiltIn ? "الطقم" : (product.arName || product.name)} ({selectedColorChoice.label}{dynamicSizes.length > 0 ? ` · مقاس ${size || "-"}` : ""})</span>
                     <b>{total} دج</b>
                   </div>
                   <div className="sum-row">
                     <span>سعر التوصيل ({wilaya || "كل الولايات"})</span>
-                    <span className="sum-free">مجاني 0 دج 🎁</span>
+                    <span className="sum-free">
+                      {freeShipping
+                        ? "مجاني 0 دج 🎁"
+                        : !wilaya
+                          ? "حددي الولاية"
+                          : shippingFee > 0
+                            ? `${shippingFee} دج`
+                            : "حسب الولاية"}
+                    </span>
                   </div>
                   <div className="sum-total">
                     <span>المبلغ الإجمالي عند الاستلام :</span>
-                    <strong>{total} دج فقط</strong>
+                    <strong>{grandTotal} دج فقط</strong>
                   </div>
                 </div>
 
                 <div className="err" id="e_f" role={errors.form || checkout.draftError ? "alert" : undefined}>{errors.form || checkout.draftError}</div>
                 <button className="btn" id="b" type="submit" disabled={product.stock <= 0 || checkout.pending}>
-                  {checkout.pending ? "جارٍ إرسال الطلب…" : `أؤكد طلبي الآن — ${total} دج + توصيل مجاني 🛒`}
+                  {checkout.pending
+                    ? "جارٍ إرسال الطلب…"
+                    : !isBuiltIn && cfg?.ctaLabelAr
+                      ? `${cfg.ctaLabelAr} — ${grandTotal} دج 🛒`
+                      : `أؤكد طلبي الآن — ${grandTotal} دج${freeShipping ? " + توصيل مجاني" : ""} 🛒`}
                 </button>
                 <div className="btn-subnote">
-                  🔒 الدفع عند الاستلام بعد فحص الطلبية · استبدال المقاس مضمون
+                  🔒 الدفع عند الاستلام بعد فحص الطلبية
                 </div>
               </form>
               <div className="ft">
-                <div><i>🎁</i>توصيل مجاني 0 دج</div>
+                <div><i>🎁</i>{freeShipping ? "توصيل مجاني 0 دج" : "توصيل سريع"}</div>
                 <div><i>🔍</i>افحصي قبل الدفع</div>
                 <div><i>⚡</i>توصيل سريع 58 ولاية</div>
               </div>
@@ -459,13 +543,15 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
           )}
         </section>
 
-        <Link className="oth" href={doudoune ? `/produit/${doudoune.slug}` : "/produit/doudoune-hiver-luxe"}>
-          <img src="/manus-storage/doudoune-bg.jpg" alt="دواقون شتوية فاخرة" />
-          <div><small>اكتشفي أيضاً عرض الشتاء 🔥</small><b>دواقون شتوية فاخرة — 7,600 دج</b></div>
-        </Link>
+        {isBuiltIn ? (
+          <Link className="oth" href={doudoune ? `/produit/${doudoune.slug}` : "/produit/doudoune-hiver-luxe"}>
+            <img src="/manus-storage/doudoune-bg.jpg" alt="دواقون شتوية فاخرة" />
+            <div><small>اكتشفي أيضاً عرض الشتاء 🔥</small><b>دواقون شتوية فاخرة — 7,600 دج</b></div>
+          </Link>
+        ) : null}
 
         <div className="fb">
-          <div><span>🎁</span>توصيل مجاني 58 ولاية</div>
+          <div><span>🎁</span>{freeShipping ? "توصيل مجاني 58 ولاية" : "توصيل 58 ولاية"}</div>
           <div><span>🔍</span>افحصي طلبك قبل الدفع</div>
           <div><span>💛</span>الدفع عند الاستلام 100% أمان</div>
         </div>
@@ -474,9 +560,9 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
         <div className="abaya-sticky-bar">
           <div className="abaya-sticky-inner">
             <div className="abaya-sticky-price">
-              <small>🚚 التوصيل مجاني 0 دج</small>
-              <strong>{total} دج</strong>
-              <del>14000 دج</del>
+              <small>{freeShipping ? "🚚 التوصيل مجاني 0 دج" : "🚚 الدفع عند الاستلام"}</small>
+              <strong>{grandTotal} دج</strong>
+              <del>{oldPriceVal} دج</del>
             </div>
             <a
               href="#order"
@@ -486,7 +572,7 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
                 scrollToOrderForm();
               }}
             >
-              🛒 احجزي الآن — توصيل مجاني
+              🛒 {isBuiltIn ? "احجزي الآن — توصيل مجاني" : (cfg?.ctaLabelAr || "احجزي الآن")}
             </a>
           </div>
         </div>
