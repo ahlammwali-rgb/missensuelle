@@ -48,6 +48,7 @@ type Props = {
   onCreateOrder?: () => void;
   onUpdateStatus?: (id: string, status: OrderStatus) => void;
   onSetCarrier?: (id: string, carrier: "ecom" | "ecotrack") => void;
+  heroBanner?: ReactNode;
   stockPanel: ReactNode;
 };
 
@@ -115,7 +116,8 @@ function KpiSparkline({
     >
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.34" />
+          <stop offset="65%" stopColor={color} stopOpacity="0.12" />
           <stop offset="100%" stopColor={color} stopOpacity="0.01" />
         </linearGradient>
       </defs>
@@ -124,7 +126,7 @@ function KpiSparkline({
         d={points}
         fill="none"
         stroke={color}
-        strokeWidth="2.4"
+        strokeWidth="2.6"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -153,6 +155,7 @@ export function AdminDashboard({
   onCreateOrder,
   onUpdateStatus,
   onSetCarrier,
+  heroBanner,
   stockPanel,
 }: Props) {
   const stats = useMemo(() => getOrderStats(orders), [orders]);
@@ -314,6 +317,12 @@ export function AdminDashboard({
         </div>
       </section>
 
+      {heroBanner && (
+        <div className="gcome-mobile-hero-slot">
+          {heroBanner}
+        </div>
+      )}
+
       {/* ===== MAIN GRID: ORDERS + SIDEBAR ===== */}
       <section className="app-main-grid">
         <div className="app-orders-container">
@@ -325,7 +334,7 @@ export function AdminDashboard({
                 Flux Commandes <span className="app-count-bubble">{displayedOrders.length}</span>
               </h2>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <div className="gcome-flux-actions">
               {onCreateOrder && (
                 <button
                   type="button"
@@ -933,18 +942,9 @@ export function AdminDashboard({
                     {onOpenHistory && (
                       <button
                         type="button"
-                        className="aoc-btn"
+                        className="aoc-btn aoc-btn-history"
                         onClick={() => onOpenHistory(order)}
                         title="Voir l'historique complet des appels, modifications et statuts"
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "5px",
-                          background: "rgba(99, 102, 241, 0.1)",
-                          color: "#3730a3",
-                          border: "1px solid rgba(99, 102, 241, 0.28)",
-                          fontWeight: 800,
-                        }}
                       >
                         <History size={14} />
                         <span>Historique ({order.historyCount ?? order.history?.length ?? 1})</span>

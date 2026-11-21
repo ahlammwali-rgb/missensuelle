@@ -4632,19 +4632,23 @@ html.dark .admin-shell.gcome-shell,
 /* Brand Logo SVG */
 .gcome-logo-link {
   text-decoration: none !important;
+  flex-shrink: 0;
 }
 .gcome-brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   line-height: 1;
 }
 .gcome-brand.is-compact {
-  gap: 8px;
+  gap: 7px;
+}
+.gcome-brand.is-large {
+  gap: 12px;
 }
 .gcome-bag-svg {
   flex-shrink: 0;
-  filter: drop-shadow(0 6px 12px rgba(109, 40, 217, 0.22));
+  filter: drop-shadow(0 6px 14px rgba(109, 40, 217, 0.25));
 }
 .gcome-brand-text {
   display: flex;
@@ -4652,9 +4656,20 @@ html.dark .admin-shell.gcome-shell,
   gap: 2px;
 }
 .gcome-brand-title-row {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+.gcome-brand.has-crown-above .gcome-brand-text {
+  padding-top: 7px;
+}
+.gcome-brand.has-crown-above .gcome-brand-crown {
+  position: absolute;
+  top: -11px;
+  left: 16px;
+  transform: rotate(-4deg);
+  filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.45));
 }
 .gcome-brand-name {
   font-size: 21px;
@@ -4663,7 +4678,10 @@ html.dark .admin-shell.gcome-shell,
   color: var(--app-text, #111827);
 }
 .gcome-brand.is-compact .gcome-brand-name {
-  font-size: 18px;
+  font-size: 17px;
+}
+.gcome-brand.is-large .gcome-brand-name {
+  font-size: 26px;
 }
 .gcome-brand-crown {
   color: #f59e0b;
@@ -4677,7 +4695,15 @@ html.dark .admin-shell.gcome-shell,
   letter-spacing: 0.01em;
 }
 .gcome-brand.is-compact .gcome-brand-sub {
-  font-size: 9px;
+  font-size: 8.5px;
+}
+.gcome-brand.is-large .gcome-brand-sub {
+  font-size: 11.5px;
+  color: #475569;
+}
+html.dark .gcome-brand.is-large .gcome-brand-sub,
+.dark .gcome-brand.is-large .gcome-brand-sub {
+  color: #cbd5e1;
 }
 
 /* Top Controls & Avatar Pills */
@@ -4702,7 +4728,7 @@ html.dark .admin-shell.gcome-shell,
   width: 34px;
   height: 34px;
   border-radius: 50% !important;
-  border: 2px solid rgba(255, 255, 255, 0.9) !important;
+  border: 2px solid rgba(255, 255, 255, 0.92) !important;
   background: linear-gradient(135deg, #6d28d9 0%, #8b5cf6 100%) !important;
   color: #fff !important;
   font-size: 12px;
@@ -4743,11 +4769,11 @@ html.dark .gcome-shell .admin-sidebar,
   border-right-color: rgba(139, 92, 246, 0.2);
 }
 .gcome-mobile-bell {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 1px solid rgba(124, 58, 237, 0.18);
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.92);
   color: #4c1d95;
   display: inline-flex;
   align-items: center;
@@ -4785,40 +4811,47 @@ html.dark .gcome-mobile-bell,
   letter-spacing: -0.02em;
 }
 
-/* Hero Card (Sidebar Desktop) */
+/* Hero Card (Screen 1 Desktop Sidebar + Mobile Slot) */
+.gcome-mobile-hero-slot {
+  display: none;
+}
 .gcome-hero-card {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 18px;
-  margin-bottom: 16px;
-  border-radius: 22px;
-  background: linear-gradient(135deg, #5b21b6 0%, #6d28d9 52%, #7c3aed 100%);
+  gap: 10px;
+  padding: 16px 16px 15px;
+  margin-bottom: 14px;
+  border-radius: 24px;
+  background: radial-gradient(circle at 86% 14%, rgba(250, 204, 21, 0.22) 0%, transparent 42%),
+              radial-gradient(circle at 10% 95%, rgba(236, 72, 153, 0.24) 0%, transparent 44%),
+              linear-gradient(135deg, #4c1d95 0%, #6d28d9 50%, #7e22ce 100%);
   color: #fff;
-  box-shadow: 0 16px 32px -6px rgba(109, 40, 217, 0.38);
+  box-shadow: 0 18px 34px -8px rgba(91, 33, 182, 0.44);
   overflow: hidden;
 }
 .gcome-hero-copy {
   position: relative;
   z-index: 1;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 .gcome-hero-badge {
   display: inline-block;
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.08em;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.16);
   color: #fde047;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .gcome-hero-copy h3 {
-  margin: 0 0 6px;
-  font-size: 18px;
-  line-height: 1.2;
+  margin: 0 0 5px;
+  font-size: 17px;
+  line-height: 1.18;
   font-weight: 900;
   color: #fff;
 }
@@ -4827,10 +4860,10 @@ html.dark .gcome-mobile-bell,
   color: #fde047;
 }
 .gcome-hero-copy p {
-  margin: 0 0 12px;
+  margin: 0 0 11px;
   font-size: 11.5px;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.9);
 }
 .gcome-hero-cta {
   display: inline-flex;
@@ -4839,22 +4872,33 @@ html.dark .gcome-mobile-bell,
   padding: 7px 14px;
   border-radius: 999px;
   border: 0;
-  background: linear-gradient(135deg, #facc15 0%, #f59e0b 100%);
+  background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);
   color: #1e1b4b;
   font-size: 12px;
   font-weight: 900;
   cursor: pointer;
-  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.38);
+  box-shadow: 0 7px 18px rgba(245, 158, 11, 0.4);
 }
 .gcome-hero-art {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.14);
+  width: 96px;
+  height: 82px;
   display: grid;
   place-items: center;
-  color: #fde047;
   flex-shrink: 0;
+  filter: drop-shadow(0 8px 16px rgba(15, 23, 42, 0.25));
+}
+.gcome-hero-svg {
+  width: 96px;
+  height: 82px;
+}
+@media (max-width: 1120px) {
+  .gcome-mobile-hero-slot {
+    display: block;
+    margin-bottom: 14px;
+  }
+  .gcome-shell .app-stock-sidebar .gcome-hero-card {
+    display: none;
+  }
 }
 
 /* KPI Cards + Sparklines (Screen 2) */
@@ -4880,18 +4924,36 @@ html.dark .gcome-mobile-bell,
   position: relative;
 }
 .gcome-shell .app-kpi-icon-pill {
-  width: 38px;
-  height: 38px;
-  border-radius: 13px;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  box-shadow: 0 6px 14px rgba(109, 40, 217, 0.12);
+}
+.gcome-shell .kpi-gradient-purple .app-kpi-icon-pill {
+  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%) !important;
+  color: #6d28d9 !important;
+}
+.gcome-shell .kpi-gradient-orange .app-kpi-icon-pill {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
+  color: #d97706 !important;
+}
+.gcome-shell .kpi-gradient-mint .app-kpi-icon-pill {
+  background: linear-gradient(135deg, #d1fae5 0%, #6ee7b7 100%) !important;
+  color: #059669 !important;
+}
+.gcome-shell .kpi-gradient-blue .app-kpi-icon-pill {
+  background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 100%) !important;
+  color: #2563eb !important;
 }
 .gcome-shell .app-kpi-title {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--app-text-muted);
 }
 .gcome-shell .app-kpi-num {
-  font-size: 28px;
+  font-size: 27px;
   font-weight: 900;
   margin-bottom: 2px;
 }
@@ -4919,9 +4981,9 @@ html.dark .gcome-mobile-bell,
   right: 0;
   bottom: 0;
   width: 100%;
-  height: 40px;
+  height: 44px;
   pointer-events: none;
-  opacity: 0.9;
+  opacity: 0.94;
 }
 
 /* Flux Commandes Toolbar & Status Pills */
@@ -4936,14 +4998,21 @@ html.dark .gcome-mobile-bell,
   color: #fff;
   border-radius: 999px;
 }
+.gcome-flux-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .gcome-new-order-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 10px 16px;
   border-radius: 999px;
   border: 0;
-  background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
   color: #fff;
   font-weight: 800;
   font-size: 13px;
@@ -4951,6 +5020,9 @@ html.dark .gcome-mobile-bell,
   box-shadow: 0 8px 20px rgba(109, 40, 217, 0.3);
 }
 .gcome-shell .app-export-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
   background: var(--app-surface);
   border: 1px solid rgba(124, 58, 237, 0.22);
@@ -4961,6 +5033,7 @@ html.dark .gcome-mobile-bell,
   border-radius: 999px;
   border: 1px solid rgba(124, 58, 237, 0.16);
   background: var(--app-surface);
+  box-shadow: 0 4px 14px rgba(76, 29, 149, 0.04);
 }
 .gcome-shell .app-status-tab {
   border-radius: 999px !important;
@@ -5132,9 +5205,22 @@ html.dark .gcome-price-line strong,
   box-shadow: 0 8px 18px rgba(16, 185, 129, 0.25) !important;
 }
 .gcome-shell .aoc-actions-bar .aoc-btn:not(.gcome-confirm-full) {
-  border-radius: 12px !important;
-  height: 36px !important;
+  border-radius: 999px !important;
+  height: 35px !important;
   font-weight: 700 !important;
+  font-size: 12px !important;
+  justify-content: center !important;
+}
+.gcome-shell .aoc-btn-history {
+  background: rgba(99, 102, 241, 0.1) !important;
+  color: #4338ca !important;
+  border: 1px solid rgba(99, 102, 241, 0.24) !important;
+}
+html.dark .gcome-shell .aoc-btn-history,
+.dark .gcome-shell .aoc-btn-history {
+  background: rgba(99, 102, 241, 0.2) !important;
+  color: #c7d2fe !important;
+  border-color: rgba(129, 140, 248, 0.35) !important;
 }
 
 .gcome-shell .aoc-status-pill {
@@ -5157,7 +5243,32 @@ html.dark .gcome-shell .badge-status-nouvelle,
   .admin-shell.gcome-shell .admin-mobile-quick-top {
     display: inline-flex !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 5px !important;
+    flex-shrink: 0 !important;
+  }
+  .admin-shell.gcome-shell .admin-mobile-quick-top .neo-darkmode-btn {
+    padding: 5px 9px !important;
+    min-height: 32px !important;
+    font-size: 11px !important;
+  }
+  .admin-shell.gcome-shell .admin-topbar {
+    text-align: center !important;
+    align-items: center !important;
+    padding: 12px 12px 6px !important;
+    gap: 4px !important;
+  }
+  .admin-shell.gcome-shell .admin-topbar .eyebrow {
+    font-size: 10.5px !important;
+    color: #5b5f88 !important;
+  }
+  html.dark .admin-shell.gcome-shell .admin-topbar .eyebrow,
+  .dark .admin-shell.gcome-shell .admin-topbar .eyebrow {
+    color: #a5b4fc !important;
+  }
+  .admin-shell.gcome-shell .admin-topbar h1 {
+    font-size: clamp(20px, 5.7vw, 26px) !important;
+    margin-top: 2px !important;
+    text-align: center !important;
   }
   .admin-shell.gcome-shell .admin-top-actions {
     display: none !important;
@@ -5177,7 +5288,7 @@ html.dark .gcome-shell .badge-status-nouvelle,
     z-index: 40 !important;
     backdrop-filter: none !important;
     background: rgba(255, 255, 255, 0.96) !important;
-    padding: 10px 12px !important;
+    padding: 9px 10px !important;
     border-bottom: 1px solid rgba(124, 58, 237, 0.12) !important;
   }
   html.dark .admin-shell.gcome-shell .admin-sidebar,
@@ -5186,7 +5297,7 @@ html.dark .gcome-shell .badge-status-nouvelle,
     border-bottom-color: rgba(139, 92, 246, 0.22) !important;
   }
   .admin-shell.gcome-shell .admin-content {
-    padding: 0 12px calc(92px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 4px 12px calc(92px + env(safe-area-inset-bottom, 0px)) !important;
   }
   .admin-shell.gcome-shell .admin-mobile-nav.gcome-bottom-dock {
     position: fixed !important;
@@ -5197,17 +5308,17 @@ html.dark .gcome-shell .badge-status-nouvelle,
     margin: 0 !important;
     height: 66px !important;
     border-radius: 28px !important;
-    background: rgba(255, 255, 255, 0.96) !important;
+    background: rgba(255, 255, 255, 0.97) !important;
     backdrop-filter: blur(22px) !important;
     -webkit-backdrop-filter: blur(22px) !important;
     border: 1px solid rgba(124, 58, 237, 0.16) !important;
     border-top: 1px solid rgba(124, 58, 237, 0.16) !important;
-    box-shadow: 0 14px 36px rgba(76, 29, 149, 0.2) !important;
+    box-shadow: 0 14px 36px rgba(76, 29, 149, 0.22) !important;
     display: grid !important;
     grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
     gap: 2px !important;
     padding: 6px 6px !important;
-    z-index: 950 !important;
+    z-index: 980 !important;
   }
   html.dark .admin-shell.gcome-shell .admin-mobile-nav.gcome-bottom-dock,
   .dark .admin-shell.gcome-shell .admin-mobile-nav.gcome-bottom-dock {
@@ -5264,35 +5375,155 @@ html.dark .gcome-shell .badge-status-nouvelle,
     gap: 10px !important;
   }
   .gcome-shell .app-kpi-card {
-    padding: 14px 14px 36px !important;
+    padding: 13px 13px 38px !important;
   }
   .gcome-shell .app-kpi-num {
-    font-size: 25px !important;
+    font-size: 23px !important;
+  }
+  .gcome-shell .app-panel-head {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  .gcome-shell .gcome-flux-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+  .gcome-shell .gcome-flux-actions button {
+    width: 100% !important;
+    padding: 10px 8px !important;
+    font-size: 12.5px !important;
   }
   .gcome-shell .admin-more-menu-sheet {
-    padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+@media (max-width: 400px) {
+  .gcome-brand.is-compact .gcome-brand-name {
+    font-size: 15.5px;
+  }
+  .gcome-brand.is-compact .gcome-brand-sub {
+    display: none;
+  }
+  .admin-shell.gcome-shell .admin-mobile-quick-top .neo-darkmode-btn {
+    padding: 4px 7px !important;
+    font-size: 10.5px !important;
+    min-height: 30px !important;
+  }
+  .gcome-profile-pill,
+  .gcome-mobile-bell {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 11px !important;
   }
 }
 
 /* Menu & Autres Espaces Drawer (Screen 3) */
-.gcome-shell .admin-more-menu-sheet {
-  border-radius: 26px 26px 0 0;
-  background: linear-gradient(180deg, #ffffff 0%, #faf8ff 100%);
+.gcome-shell .admin-more-menu-overlay.gcome-menu-overlay {
+  z-index: 920 !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  padding-top: env(safe-area-inset-top, 0px);
+  background: radial-gradient(circle at 10% 6%, rgba(168, 85, 247, 0.35) 0%, transparent 45%),
+              radial-gradient(circle at 92% 4%, rgba(251, 191, 36, 0.25) 0%, transparent 38%),
+              linear-gradient(180deg, rgba(237, 233, 254, 0.96) 0%, rgba(245, 243, 255, 0.94) 30%, rgba(15, 23, 42, 0.55) 100%) !important;
+  backdrop-filter: blur(14px) !important;
 }
-html.dark .gcome-shell .admin-more-menu-sheet,
-.dark .gcome-shell .admin-more-menu-sheet {
-  background: linear-gradient(180deg, #13172b 0%, #0d1020 100%);
+html.dark .gcome-shell .admin-more-menu-overlay.gcome-menu-overlay,
+.dark .gcome-shell .admin-more-menu-overlay.gcome-menu-overlay {
+  background: radial-gradient(circle at 10% 6%, rgba(124, 58, 237, 0.32) 0%, transparent 45%),
+              radial-gradient(circle at 92% 4%, rgba(245, 158, 11, 0.16) 0%, transparent 38%),
+              linear-gradient(180deg, rgba(15, 18, 36, 0.97) 0%, rgba(10, 12, 26, 0.95) 100%) !important;
 }
-.gcome-menu-item {
-  border-radius: 18px !important;
+.gcome-menu-top-banner {
+  width: 100%;
+  max-width: 540px;
+  padding: 16px 20px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.gcome-menu-settings-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  background: rgba(255, 255, 255, 0.85);
+  color: #1e1b4b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(76, 29, 149, 0.14);
+  flex-shrink: 0;
+}
+html.dark .gcome-menu-settings-btn,
+.dark .gcome-menu-settings-btn {
+  background: rgba(30, 27, 75, 0.72);
+  color: #e9d5ff;
+  border-color: rgba(139, 92, 246, 0.35);
+}
+.gcome-shell .admin-more-menu-sheet.gcome-menu-sheet {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  max-width: 540px !important;
+  border-radius: 30px 30px 0 0 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f8f6ff 100%) !important;
+  box-shadow: 0 -14px 44px rgba(76, 29, 149, 0.18) !important;
+  padding: 12px 16px 28px !important;
+}
+html.dark .gcome-shell .admin-more-menu-sheet.gcome-menu-sheet,
+.dark .gcome-shell .admin-more-menu-sheet.gcome-menu-sheet {
+  background: linear-gradient(180deg, #13172b 0%, #0d1020 100%) !important;
+}
+.gcome-shell .gcome-menu-sheet .admin-more-sheet-title-row h3 {
+  font-size: 17px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em;
+}
+.gcome-shell .gcome-menu-item {
+  border-radius: 20px !important;
+  padding: 11px 13px !important;
   background: #ffffff !important;
-  border: 1px solid rgba(124, 58, 237, 0.12) !important;
-  box-shadow: 0 4px 14px rgba(76, 29, 149, 0.04);
+  border: 1px solid rgba(124, 58, 237, 0.1) !important;
+  box-shadow: 0 6px 18px rgba(76, 29, 149, 0.055) !important;
 }
-html.dark .gcome-menu-item,
-.dark .gcome-menu-item {
-  background: rgba(255, 255, 255, 0.04) !important;
+html.dark .gcome-shell .gcome-menu-item,
+.dark .gcome-shell .gcome-menu-item {
+  background: rgba(255, 255, 255, 0.045) !important;
   border-color: rgba(139, 92, 246, 0.2) !important;
+}
+.gcome-shell .gcome-menu-item .more-item-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  box-shadow: 0 6px 14px rgba(76, 29, 149, 0.12);
+}
+.gcome-shell .gcome-menu-item .more-item-icon.icon-purple {
+  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  color: #6d28d9;
+}
+.gcome-shell .gcome-menu-item .more-item-icon.icon-emerald {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  color: #059669;
+}
+.gcome-shell .gcome-menu-item .more-item-icon.icon-orange {
+  background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
+  color: #ea580c;
+}
+.gcome-shell .gcome-menu-item .more-item-icon.icon-blue {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #2563eb;
+}
+.gcome-shell .gcome-menu-item .more-item-icon.icon-rose {
+  background: linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%);
+  color: #e11d48;
 }
 .gcome-menu-chev {
   color: #94a3b8;
@@ -5325,39 +5556,59 @@ html.dark .gcome-menu-item,
 }
 .gcome-pro-banner {
   margin-top: 6px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #5b21b6 0%, #6d28d9 60%, #7c3aed 100%);
+  padding: 13px 15px;
+  border-radius: 22px;
+  background: radial-gradient(circle at 82% 20%, rgba(236, 72, 153, 0.35) 0%, transparent 45%),
+              linear-gradient(135deg, #4c1d95 0%, #6d28d9 58%, #7c3aed 100%);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  box-shadow: 0 12px 26px rgba(109, 40, 217, 0.34);
+  gap: 10px;
+  box-shadow: 0 14px 28px rgba(91, 33, 182, 0.34);
+  overflow: hidden;
+}
+.gcome-pro-copy {
+  min-width: 0;
 }
 .gcome-pro-title {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 15px;
+  font-size: 16px;
   color: #fde047;
+}
+.gcome-pro-crown {
+  filter: drop-shadow(0 2px 5px rgba(250, 204, 21, 0.45));
 }
 .gcome-pro-banner small {
   display: block;
   font-size: 11.5px;
-  color: rgba(255, 255, 255, 0.88);
+  color: rgba(255, 255, 255, 0.9);
   margin-top: 2px;
 }
+.gcome-pro-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.gcome-pro-rocket-svg {
+  width: 44px;
+  height: 44px;
+  filter: drop-shadow(0 6px 12px rgba(15, 23, 42, 0.28));
+}
 .gcome-pro-cta {
-  padding: 8px 16px;
+  padding: 9px 15px;
   border-radius: 999px;
   border: 0;
-  background: linear-gradient(135deg, #facc15 0%, #f59e0b 100%);
+  background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);
   color: #1e1b4b;
   font-size: 12.5px;
   font-weight: 900;
   cursor: pointer;
   flex-shrink: 0;
+  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.38);
 }
 
 
