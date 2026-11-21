@@ -502,8 +502,8 @@ export function OrderHistoryModal({ order, onClose, onCall, onWhatsApp }: Props)
                         marginTop: "4px",
                         padding: "8px 10px",
                         borderRadius: "10px",
-                        background: "rgba(248, 250, 252, 0.95)",
-                        border: "1px solid rgba(203, 213, 225, 0.6)",
+                        background: "var(--surface-2, rgba(248, 250, 252, 0.95))",
+                        border: "1px solid var(--border, rgba(203, 213, 225, 0.6))",
                         display: "grid",
                         gap: "4px",
                         fontSize: "12px",
@@ -511,12 +511,12 @@ export function OrderHistoryModal({ order, onClose, onCall, onWhatsApp }: Props)
                     >
                       {event.changes.map((ch, idx) => (
                         <div key={idx} style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                          <strong style={{ color: "#475569", minWidth: "90px" }}>{ch.label} :</strong>
-                          <span style={{ textDecoration: "line-through", color: "#ef4444", background: "rgba(239, 68, 68, 0.08)", padding: "1px 6px", borderRadius: "6px" }}>
+                          <strong style={{ color: "var(--app-text-muted, #475569)", minWidth: "90px" }}>{ch.label} :</strong>
+                          <span style={{ textDecoration: "line-through", color: "#f87171", background: "rgba(239, 68, 68, 0.14)", padding: "1px 6px", borderRadius: "6px" }}>
                             {ch.before}
                           </span>
-                          <span style={{ color: "#64748b", fontWeight: 700 }}>➔</span>
-                          <span style={{ color: "#059669", fontWeight: 800, background: "rgba(16, 185, 129, 0.1)", padding: "1px 6px", borderRadius: "6px" }}>
+                          <span style={{ color: "var(--app-text-muted, #64748b)", fontWeight: 700 }}>➔</span>
+                          <span style={{ color: "#10b981", fontWeight: 800, background: "rgba(16, 185, 129, 0.15)", padding: "1px 6px", borderRadius: "6px" }}>
                             {ch.after}
                           </span>
                         </div>

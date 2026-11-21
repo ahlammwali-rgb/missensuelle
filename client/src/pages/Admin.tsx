@@ -2776,18 +2776,18 @@ function ProductForm({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 13, fontWeight: 900, color: "#065f46" }}>
+            <span className="gcome-photo-summary-title">
               {isCompressing
                 ? "⏳ Optimisation et compression HD des photos en cours…"
                 : "✅ Bilan des photos prises en compte :"}
             </span>
-            <span style={{ fontSize: 12, fontWeight: 800, background: "#fff", color: "#0f172a", padding: "3px 10px", borderRadius: 999, border: "1px solid rgba(16,185,129,0.4)" }}>
+            <span className="gcome-photo-summary-chip">
               🖼️ Hero : {form.image || galleryList[0] || variants.some(v => v.image) ? "1 photo prête" : "Auto"}
             </span>
-            <span style={{ fontSize: 12, fontWeight: 800, background: "#fff", color: "#0f172a", padding: "3px 10px", borderRadius: 999, border: "1px solid rgba(16,185,129,0.4)" }}>
+            <span className="gcome-photo-summary-chip">
               🎨 Variantes avec photo : {variants.filter(v => v.image.trim()).length} / {variants.length}
             </span>
-            <span style={{ fontSize: 12, fontWeight: 800, background: "#fff", color: "#0f172a", padding: "3px 10px", borderRadius: 999, border: "1px solid rgba(16,185,129,0.4)" }}>
+            <span className="gcome-photo-summary-chip">
               📸 Galerie / Bannières : {galleryList.length + (newGalleryUrl.trim() ? 1 : 0)} photo(s)
             </span>
           </div>

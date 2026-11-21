@@ -6,6 +6,7 @@ import {
   Calendar,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Clock,
   Copy,
   Edit3,
@@ -485,35 +486,10 @@ export function AdminDashboard({
                   key={String(tab.key)}
                   type="button"
                   onClick={() => setNrpSubFilter(tab.key)}
-                  style={{
-                    padding: "6px 12px",
-                    borderRadius: "999px",
-                    border:
-                      nrpSubFilter === tab.key
-                        ? "1.5px solid #d97706"
-                        : "1px solid rgba(217,119,6,0.28)",
-                    background: nrpSubFilter === tab.key ? "#d97706" : "#fff",
-                    color: nrpSubFilter === tab.key ? "#fff" : "#92400e",
-                    fontSize: "0.78rem",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                  }}
+                  className={`gcome-nrp-subtab ${nrpSubFilter === tab.key ? "is-active" : ""}`}
                 >
                   <span>{tab.label}</span>
-                  <b
-                    style={{
-                      background:
-                        nrpSubFilter === tab.key ? "rgba(255,255,255,0.25)" : "rgba(217,119,6,0.12)",
-                      padding: "1px 7px",
-                      borderRadius: "999px",
-                      fontSize: "0.72rem",
-                    }}
-                  >
-                    {tab.count}
-                  </b>
+                  <b>{tab.count}</b>
                 </button>
               ))}
             </div>
@@ -554,35 +530,13 @@ export function AdminDashboard({
                         <span className="aoc-carrier-tag">E-com Delivery</span>
                       )}
                       {order.isDelivered && (
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            padding: "3px 9px",
-                            borderRadius: "999px",
-                            background: "rgba(16, 185, 129, 0.14)",
-                            color: "#065f46",
-                            fontSize: "0.72rem",
-                            fontWeight: 800,
-                          }}
-                        >
+                        <span className="gcome-meta-badge gcome-meta-badge--green">
                           📦 Livrée ✅
                         </span>
                       )}
                       {handlerName && (
                         <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            padding: "3px 9px",
-                            borderRadius: "999px",
-                            background: "rgba(99, 102, 241, 0.12)",
-                            color: "#3730a3",
-                            fontSize: "0.72rem",
-                            fontWeight: 700,
-                          }}
+                          className="gcome-meta-badge gcome-meta-badge--indigo"
                           title="Confirmateur en charge de cette commande"
                         >
                           <UserCheck size={12} />
@@ -591,17 +545,7 @@ export function AdminDashboard({
                       )}
                       {(order.callCount ?? 0) > 0 && (
                         <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            padding: "2px 8px",
-                            borderRadius: "999px",
-                            background: "rgba(16, 185, 129, 0.1)",
-                            color: "#047857",
-                            fontSize: "0.71rem",
-                            fontWeight: 700,
-                          }}
+                          className="gcome-meta-badge gcome-meta-badge--green"
                           title="Nombre d'appels effectués sur cette commande"
                         >
                           📞 {order.callCount} appel{(order.callCount ?? 0) > 1 ? "s" : ""}
@@ -609,48 +553,33 @@ export function AdminDashboard({
                       )}
                     </div>
 
-                    <span className="aoc-date">{formatOrderDate(order.createdAt)}</span>
+                    <span className="aoc-date">
+                      <Calendar size={12} aria-hidden="true" />
+                      <span>{formatOrderDate(order.createdAt)}</span>
+                    </span>
                   </div>
 
                   {/* ID Row: Wrap-Safe, Break-All, Clean Copy */}
-                  <div className="aoc-id-row">
+                  <div className="aoc-id-row gcome-id-bar">
                     <button
                       type="button"
                       className="aoc-id-btn"
                       onClick={() => copyId(order.id)}
                       title="Cliquer pour copier l'identifiant"
                     >
-                      <span className="aoc-id-hash">#</span>
-                      <strong className="aoc-id">{order.id}</strong>
+                      <span className="aoc-id-left">
+                        <span className="aoc-id-hash">#</span>
+                        <strong className="aoc-id">{order.id}</strong>
+                      </span>
                       <span className="aoc-copy-hint">
-                        {copiedId === order.id ? "Copié !" : <Copy size={11} />}
+                        {copiedId === order.id ? "Copié !" : <Copy size={13} />}
                       </span>
                     </button>
                   </div>
 
                   {/* Postponed Reminder Banner */}
                   {order.status === "reportee" && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        flexWrap: "wrap",
-                        gap: "8px",
-                        padding: "9px 12px",
-                        marginBottom: "10px",
-                        borderRadius: "12px",
-                        background: isPostponeDue
-                          ? "linear-gradient(135deg, rgba(220,38,38,0.14), rgba(245,158,11,0.18))"
-                          : "rgba(37, 99, 235, 0.08)",
-                        border: isPostponeDue
-                          ? "1.5px solid rgba(220,38,38,0.45)"
-                          : "1px solid rgba(37, 99, 235, 0.22)",
-                        color: isPostponeDue ? "#991b1b" : "#1e40af",
-                        fontSize: "0.8rem",
-                        fontWeight: 700,
-                      }}
-                    >
+                    <div className={`gcome-postpone-banner ${isPostponeDue ? "is-due" : ""}`}>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
                         <AlarmClock size={15} />
                         {order.postponedUntil ? (
@@ -674,16 +603,7 @@ export function AdminDashboard({
                         <button
                           type="button"
                           onClick={() => onOpenPostponeModal(order)}
-                          style={{
-                            padding: "4px 10px",
-                            borderRadius: "8px",
-                            border: "1px solid currentColor",
-                            background: "rgba(255,255,255,0.8)",
-                            color: "inherit",
-                            fontSize: "0.73rem",
-                            fontWeight: 800,
-                            cursor: "pointer",
-                          }}
+                          className="gcome-postpone-edit-btn"
                         >
                           Modifier l'heure
                         </button>
@@ -693,39 +613,31 @@ export function AdminDashboard({
 
                   {/* Cancellation Reason Banner */}
                   {order.status === "annulee" && order.cancelReason && (
-                    <div
-                      style={{
-                        padding: "8px 12px",
-                        marginBottom: "10px",
-                        borderRadius: "10px",
-                        background: "rgba(239, 68, 68, 0.08)",
-                        border: "1px solid rgba(239, 68, 68, 0.22)",
-                        color: "#991b1b",
-                        fontSize: "0.79rem",
-                        fontWeight: 700,
-                      }}
-                    >
+                    <div className="gcome-cancel-banner">
                       ❌ Motif d'annulation : <b>{order.cancelReason}</b>
                     </div>
                   )}
 
-                  {/* Customer Block with Sleek Call & WhatsApp Buttons */}
+                  {/* Customer Block (2-Column Split Grid matching Mockup) */}
                   <div className="aoc-customer-box gcome-customer-box">
-                    <div className="aoc-customer-left">
-                      <div className="aoc-avatar gcome-bag-avatar">
-                        <ShoppingBag size={20} />
+                    <div className="gcome-cust-col">
+                      <div className="aoc-avatar gcome-initials-avatar">
+                        {(() => {
+                          const raw = (order.customer || "CL").trim();
+                          const words = raw.split(/\s+/).filter(Boolean);
+                          if (words.length >= 2) {
+                            return `${Array.from(words[0])[0] ?? ""}${Array.from(words[1])[0] ?? ""}`.toUpperCase();
+                          }
+                          return Array.from(raw).slice(0, 2).join("").toUpperCase();
+                        })()}
                       </div>
 
                       <div className="aoc-customer-details">
-                        <div className="aoc-customer-name-row">
-                          <h3 className="aoc-name">{order.customer || "Cliente"}</h3>
-                          <span className="aoc-delivery-pill">
-                            {order.delivery === "office" ? "🏢 Bureau / Stopdesk" : "🏠 À domicile"}
-                          </span>
-                        </div>
+                        <span className="gcome-cust-eyebrow">Client</span>
+                        <h3 className="aoc-name">{order.customer || "Cliente"}</h3>
 
                         <div className="aoc-loc-row">
-                          <MapPin size={13} className="aoc-pin-icon" />
+                          <MapPin size={12} className="aoc-pin-icon" />
                           <span className="aoc-wilaya">
                             <b>{order.wilaya || "Wilaya non spécifiée"}</b>
                             {order.commune ? ` — ${order.commune}` : ""}
@@ -734,23 +646,29 @@ export function AdminDashboard({
 
                         {order.address && (
                           <div className="aoc-address-text">
-                            <small>Adresse : {order.address}</small>
+                            <small>| Adresse : {order.address}</small>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Sleek Equal Pill Call + WhatsApp Action Group */}
-                    <div className="gcome-contact-row">
+                    <div className="gcome-contact-col">
                       <button
                         type="button"
-                        className="aoc-call-compact-btn gcome-call-pill"
+                        className="gcome-call-col-btn"
                         onClick={() => (onCallOrder ? onCallOrder(order) : onCall(order.phone))}
                         aria-label={`Appeler ${order.customer || order.phone}`}
                         title="Appeler la cliente (enregistré dans l'historique)"
                       >
-                        <Phone size={14} />
-                        <span className="aoc-call-num">{order.phone}</span>
+                        <span className="gcome-call-ico">
+                          <Phone size={15} />
+                        </span>
+                        <span className="gcome-call-meta">
+                          <small className="gcome-deliv-label">
+                            {order.delivery === "office" ? "Bureau / Stopdesk" : "À domicile"}
+                          </small>
+                          <strong className="aoc-call-num">{order.phone}</strong>
+                        </span>
                       </button>
 
                       {onWhatsAppOrder && (
@@ -818,6 +736,7 @@ export function AdminDashboard({
                                   <>
                                     {cleanExtVariants && (
                                       <span className="aoc-chip aoc-chip-color">
+                                        <Package size={12} aria-hidden="true" />
                                         <b>{cleanExtVariants}</b>
                                       </span>
                                     )}
@@ -832,6 +751,7 @@ export function AdminDashboard({
                                     </span>
                                     {order.color && (
                                       <span className="aoc-chip aoc-chip-color">
+                                        <Package size={12} aria-hidden="true" />
                                         <b>{order.color}</b>
                                       </span>
                                     )}
@@ -844,17 +764,16 @@ export function AdminDashboard({
                                 )}
                               </div>
                             </div>
-
-                            <div className="aoc-price-tag gcome-price-tag">
-                              <small>Total à encaisser</small>
-                              <div className="gcome-price-line">
-                                <strong>{formatDZD(order.total)}</strong>
-                                <span className="gcome-price-trend" aria-hidden="true">
-                                  <TrendingUp size={13} />
-                                </span>
-                              </div>
-                            </div>
                           </div>
+                        </div>
+
+                        {/* Dedicated TOTAL À ENCAISSER Bar */}
+                        <div className="gcome-total-bar">
+                          <span className="gcome-total-label">
+                            <span aria-hidden="true">💰</span>
+                            <span>TOTAL À ENCAISSER</span>
+                          </span>
+                          <strong className="gcome-total-value">{formatDZD(order.total)}</strong>
                         </div>
 
                         {order.note && !hideAutoExtNote && (
@@ -867,7 +786,7 @@ export function AdminDashboard({
                     );
                   })()}
 
-                  {/* Complete 1-Tap Confirmation Actions Bar with ALL buttons: Confirmer, NRP 1/2/3, Reporter, Annuler, Modifier, Historique */}
+                  {/* Complete 1-Tap Confirmation Actions Bar matching Mockup */}
                   <div className="aoc-actions-bar">
                     {order.status !== "confirmee" ? (
                       <button
@@ -875,8 +794,9 @@ export function AdminDashboard({
                         className="aoc-btn aoc-btn-confirm gcome-confirm-full"
                         onClick={() => onUpdateStatus?.(order.id, "confirmee")}
                       >
-                        <CheckCircle2 size={16} />
-                        <span>Confirmer la commande</span>
+                        <CheckCircle2 size={17} />
+                        <span>Confirmer</span>
+                        <ChevronRight size={17} className="gcome-cta-chev" />
                       </button>
                     ) : (
                       <div className="aoc-tag-confirmed gcome-confirm-full">
@@ -888,7 +808,7 @@ export function AdminDashboard({
                     {/* Bouton unique « Pas de réponse » qui ouvre les options au clic */}
                     <button
                       type="button"
-                      className="aoc-btn aoc-btn-noanswer"
+                      className={`aoc-btn aoc-btn-noanswer ${openNrpMenuOrderId === order.id ? "is-open" : ""}`}
                       onClick={() => {
                         if (onSetNrpLevel) {
                           setOpenNrpMenuOrderId(prev => (prev === order.id ? null : order.id));
@@ -897,16 +817,8 @@ export function AdminDashboard({
                         }
                       }}
                       title="Marquer Pas de réponse et choisir le niveau de relance (NRP 1, 2, 3 ou WhatsApp)"
-                      style={
-                        openNrpMenuOrderId === order.id
-                          ? {
-                              boxShadow: "0 0 0 2px #f59e0b",
-                              background: "rgba(245, 158, 11, 0.22)",
-                            }
-                          : undefined
-                      }
                     >
-                      <PhoneOff size={14} />
+                      <XCircle size={14} />
                       <span>
                         Pas de réponse
                         {order.status === "ne_repond_pas" ? ` (NRP ${order.nrpLevel ?? 1})` : ""}
@@ -967,7 +879,7 @@ export function AdminDashboard({
                     {onOpenHistory && (
                       <button
                         type="button"
-                        className="aoc-btn aoc-btn-history"
+                        className="aoc-btn aoc-btn-history gcome-history-full"
                         onClick={() => onOpenHistory(order)}
                         title="Voir l'historique complet des appels, modifications et statuts"
                       >
@@ -978,51 +890,21 @@ export function AdminDashboard({
                   </div>
 
                   {order.status === "confirmee" && onSetCarrier && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        flexWrap: "wrap",
-                        marginTop: "6px",
-                        padding: "6px 10px",
-                        borderRadius: "10px",
-                        background: "rgba(15, 23, 42, 0.03)",
-                        border: "1px dashed rgba(100, 116, 139, 0.25)",
-                      }}
-                    >
-                      <span style={{ fontSize: "11px", fontWeight: 700, color: "#475569" }}>
+                    <div className="gcome-carrier-bar">
+                      <span className="gcome-carrier-label">
                         🚚 Société de livraison liée :
                       </span>
                       <button
                         type="button"
-                        className="aoc-btn"
+                        className={`aoc-btn gcome-carrier-pill ${(!order.carrier || order.carrier === "ecom") ? "is-ecom" : ""}`}
                         onClick={() => onSetCarrier(order.id, "ecom")}
-                        style={{
-                          padding: "4px 10px",
-                          fontSize: "11px",
-                          fontWeight: 800,
-                          borderRadius: "8px",
-                          background: (!order.carrier || order.carrier === "ecom") ? "#0f766e" : "rgba(255,255,255,0.85)",
-                          color: (!order.carrier || order.carrier === "ecom") ? "#fff" : "#334155",
-                          border: (!order.carrier || order.carrier === "ecom") ? "1px solid #0f766e" : "1px solid rgba(148,163,184,0.35)",
-                        }}
                       >
                         🚚 E-com Delivery
                       </button>
                       <button
                         type="button"
-                        className="aoc-btn"
+                        className={`aoc-btn gcome-carrier-pill ${order.carrier === "ecotrack" ? "is-ecotrack" : ""}`}
                         onClick={() => onSetCarrier(order.id, "ecotrack")}
-                        style={{
-                          padding: "4px 10px",
-                          fontSize: "11px",
-                          fontWeight: 800,
-                          borderRadius: "8px",
-                          background: order.carrier === "ecotrack" ? "#2563eb" : "rgba(255,255,255,0.85)",
-                          color: order.carrier === "ecotrack" ? "#fff" : "#334155",
-                          border: order.carrier === "ecotrack" ? "1px solid #2563eb" : "1px solid rgba(148,163,184,0.35)",
-                        }}
                       >
                         📦 DHD (EcoTrack)
                       </button>
@@ -1034,35 +916,16 @@ export function AdminDashboard({
                     const currentLvl = order.status === "ne_repond_pas" ? (order.nrpLevel ?? 1) : 0;
                     const recommendedLvl = Math.min(3, currentLvl + 1) as 1 | 2 | 3;
                     return (
-                      <div
-                        style={{
-                          marginTop: "10px",
-                          padding: "12px 14px",
-                          borderRadius: "14px",
-                          background: "linear-gradient(135deg, rgba(245, 158, 11, 0.11), rgba(234, 88, 12, 0.06))",
-                          border: "1.5px solid rgba(245, 158, 11, 0.38)",
-                          display: "grid",
-                          gap: "10px",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
-                          <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "#92400e", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <div className="gcome-nrp-panel">
+                        <div className="gcome-nrp-head">
+                          <span className="gcome-nrp-head-title">
                             <PhoneOff size={14} />
                             Choisis le niveau « Pas de réponse » (NRP) :
                           </span>
                           <button
                             type="button"
                             onClick={() => setOpenNrpMenuOrderId(null)}
-                            style={{
-                              background: "rgba(255,255,255,0.8)",
-                              border: "1px solid rgba(146, 64, 14, 0.2)",
-                              borderRadius: "999px",
-                              padding: "3px 10px",
-                              fontSize: "0.72rem",
-                              fontWeight: 800,
-                              color: "#92400e",
-                              cursor: "pointer",
-                            }}
+                            className="gcome-nrp-close"
                           >
                             ✕ Fermer
                           </button>
@@ -1080,32 +943,10 @@ export function AdminDashboard({
                               <button
                                 key={opt.lvl}
                                 type="button"
+                                className={`gcome-nrp-opt ${isCurrent ? "is-current" : ""} ${isRecommended ? "is-rec" : ""} ${opt.lvl === 3 ? "is-lvl3" : ""}`}
                                 onClick={() => {
                                   onSetNrpLevel(order.id, opt.lvl);
                                   setOpenNrpMenuOrderId(null);
-                                }}
-                                style={{
-                                  flex: "1 1 150px",
-                                  padding: "9px 12px",
-                                  borderRadius: "11px",
-                                  border: isCurrent
-                                    ? opt.lvl === 3
-                                      ? "2px solid #dc2626"
-                                      : "2px solid #d97706"
-                                    : isRecommended
-                                      ? "2px solid #f59e0b"
-                                      : "1px solid rgba(217, 119, 6, 0.28)",
-                                  background: isCurrent
-                                    ? opt.lvl === 3
-                                      ? "#dc2626"
-                                      : "#d97706"
-                                    : "#fff",
-                                  color: isCurrent ? "#fff" : opt.lvl === 3 ? "#991b1b" : "#92400e",
-                                  textAlign: "left",
-                                  cursor: "pointer",
-                                  display: "grid",
-                                  gap: "2px",
-                                  boxShadow: isRecommended ? "0 4px 12px rgba(245, 158, 11, 0.18)" : "none",
                                 }}
                               >
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "4px" }}>
@@ -1113,24 +954,13 @@ export function AdminDashboard({
                                     {opt.lvl === 3 ? "🔴" : "🟠"} {opt.title}
                                   </strong>
                                   {isRecommended && (
-                                    <span
-                                      style={{
-                                        fontSize: "0.65rem",
-                                        padding: "1px 6px",
-                                        borderRadius: "999px",
-                                        background: "rgba(245, 158, 11, 0.2)",
-                                        color: "#b45309",
-                                        fontWeight: 800,
-                                      }}
-                                    >
-                                      Suivant
-                                    </span>
+                                    <span className="gcome-nrp-next-tag">Suivant</span>
                                   )}
                                   {isCurrent && (
                                     <span style={{ fontSize: "0.65rem", fontWeight: 800 }}>✓ Actif</span>
                                   )}
                                 </div>
-                                <small style={{ fontSize: "0.7rem", opacity: isCurrent ? 0.9 : 0.75 }}>{opt.sub}</small>
+                                <small style={{ fontSize: "0.7rem", opacity: isCurrent ? 0.9 : 0.78 }}>{opt.sub}</small>
                               </button>
                             );
                           })}
@@ -1138,29 +968,18 @@ export function AdminDashboard({
                           {onWhatsAppOrder && (
                             <button
                               type="button"
+                              className="gcome-nrp-wa"
                               onClick={() => {
                                 onSetNrpLevel(order.id, recommendedLvl);
                                 onWhatsAppOrder({ ...order, status: "ne_repond_pas", nrpLevel: recommendedLvl });
                                 setOpenNrpMenuOrderId(null);
-                              }}
-                              style={{
-                                flex: "1 1 200px",
-                                padding: "9px 12px",
-                                borderRadius: "11px",
-                                border: "1.5px solid rgba(16, 185, 129, 0.45)",
-                                background: "linear-gradient(135deg, #ecfdf5, #d1fae5)",
-                                color: "#065f46",
-                                textAlign: "left",
-                                cursor: "pointer",
-                                display: "grid",
-                                gap: "2px",
                               }}
                             >
                               <strong style={{ fontSize: "0.8rem", fontWeight: 900, display: "flex", alignItems: "center", gap: "5px" }}>
                                 <MessageCircle size={14} />
                                 NRP {recommendedLvl} + Relance WhatsApp
                               </strong>
-                              <small style={{ fontSize: "0.7rem", color: "#047857" }}>
+                              <small style={{ fontSize: "0.7rem" }}>
                                 Marque NRP {recommendedLvl} et ouvre WhatsApp pré-rempli en 1 clic
                               </small>
                             </button>
