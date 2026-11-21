@@ -1,5 +1,5 @@
 import { FormEvent, lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { BarChart3, Bell, ChevronDown, ClipboardList, Copy, Download, ExternalLink, Facebook, FileSpreadsheet, Filter, History, ImagePlus, LayoutDashboard, Menu, MessageCircle, Moon, MoreHorizontal, Package, PackageCheck, Pencil, Phone, Plus, RefreshCw, RotateCcw, Save, Search, Settings2, Smartphone, Sparkles, Sun, Trash2, Truck, TrendingUp, Upload, UserCheck, Users, X } from "lucide-react";
+import { BarChart3, Bell, ChevronDown, ChevronRight, ClipboardList, Copy, Crown, Download, ExternalLink, Facebook, FileSpreadsheet, Filter, History, ImagePlus, LayoutDashboard, Menu, MessageCircle, Moon, MoreHorizontal, Package, PackageCheck, Pencil, Phone, Plus, RefreshCw, RotateCcw, Save, Search, Settings2, ShoppingBag, Smartphone, Sparkles, Sun, Trash2, Truck, TrendingUp, Upload, UserCheck, Users, X } from "lucide-react";
 import { Link } from "wouter";
 import { AdminAuthGate } from "@/components/AdminAuthGate";
 import { trpc } from "@/lib/trpc";
@@ -38,6 +38,54 @@ type AdminSection = "dashboard" | "abandoned" | "catalogue" | "settings" | "ecom
 type DashboardOrder = Order;
 
 const emptyProduct: Product = { id: "", slug: "", name: "", category: "mode", categoryLabel: "Mode femme", price: 0, oldPrice: 0, packPrice: 0, landingTemplate: "doudoune", variantImages: [], badge: "Nouveau", description: "", details: [], colors: [], image: "", gallery: [], arName: "", arCategoryLabel: "", arDescription: "", accent: "#9B82F6", stock: 20 };
+
+function GcomeBrand({ compact = false }: { compact?: boolean }) {
+  return (
+    <span className={`gcome-brand ${compact ? "is-compact" : ""}`}>
+      <svg
+        className="gcome-bag-svg"
+        width={compact ? 32 : 38}
+        height={compact ? 32 : 38}
+        viewBox="0 0 40 40"
+        fill="none"
+        aria-hidden="true"
+      >
+        <defs>
+          <linearGradient id="gcomeBagGrad" x1="4" y1="8" x2="34" y2="36" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#8B5CF6" />
+            <stop offset="55%" stopColor="#6D28D9" />
+            <stop offset="100%" stopColor="#EC4899" />
+          </linearGradient>
+          <linearGradient id="gcomeGoldGrad" x1="12" y1="15" x2="34" y2="36" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#FDE047" />
+            <stop offset="100%" stopColor="#F59E0B" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M14 12V9.5C14 6.46 16.46 4 19.5 4C22.54 4 25 6.46 25 9.5V12"
+          stroke="#4C1D95"
+          strokeWidth="2.8"
+          strokeLinecap="round"
+        />
+        <rect x="6" y="11" width="24" height="25" rx="6" fill="url(#gcomeBagGrad)" />
+        <rect x="13" y="17" width="21" height="19" rx="5.5" fill="url(#gcomeGoldGrad)" />
+        <path
+          d="M19 19V16.5C19 14.57 20.57 13 22.5 13C24.43 13 26 14.57 26 16.5V19"
+          stroke="#FFFFFF"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+        />
+      </svg>
+      <span className="gcome-brand-text">
+        <span className="gcome-brand-title-row">
+          <strong className="gcome-brand-name">Gcome</strong>
+          <Crown size={compact ? 11 : 13} className="gcome-brand-crown" />
+        </span>
+        <small className="gcome-brand-sub">Vendez · Gérez · Suivez</small>
+      </span>
+    </span>
+  );
+}
 
 function toDashboardOrder(order: CheckoutOrder): DashboardOrder {
   return {
@@ -793,62 +841,60 @@ function AdminPageContent() {
   const activePostponeOrder = postponeOrderId ? orderById.get(postponeOrderId) ?? null : null;
   const activeCancelOrder = cancelOrderId ? orderById.get(cancelOrderId) ?? null : null;
 
-  return <div className="admin-shell"><aside className="admin-sidebar"><div className="admin-brand-mobile-row"><Link href="/" className="wordmark admin-wordmark"><span className="wordmark-star">✦</span><span>miss</span><em>sensuelle</em></Link><div className="admin-mobile-quick-top"><button type="button" className="neo-darkmode-btn mobile-top-theme-btn" onClick={toggleTheme} title={theme === "dark" ? "Passer en Mode Clair" : "Passer en Mode Sombre"} aria-label="Basculer Mode Clair / Sombre">{theme === "dark" ? (<><Sun size={15} className="neo-sun-glow" /><span>Clair</span></>) : (<><Moon size={15} className="neo-moon-glow" /><span>Dark</span></>)}</button><button type="button" className="neo-darkmode-btn mobile-top-create-btn" onClick={() => setIsCreatingOrder(true)} title="Créer une nouvelle commande"><Plus size={15} /><span>Commande</span></button><button type="button" onClick={() => setIsProfileModalOpen(true)} title="Mon profil, salaire & commissions" aria-label="Mon profil et commissions" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: "50%", border: "2px solid #a855f7", background: "linear-gradient(135deg, #9b82f6, #f472b6)", color: "#fff", fontSize: 11, fontWeight: 900, cursor: "pointer", flexShrink: 0 }}>{currentActorName.slice(0, 2).toUpperCase()}</button></div></div><nav className="admin-mobile-nav" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={17} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={17} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge">{transferredCount}</span>}</button><button type="button" className={section === "catalogue" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => { go("catalogue"); setIsMoreMenuOpen(false); }}><Package size={17} /><span>Produits</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={17} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><Menu size={17} /><span>Menu</span></button></nav><button type="button" className="admin-user" onClick={() => setIsProfileModalOpen(true)} style={{ background: "transparent", border: 0, width: "100%", textAlign: "left", cursor: "pointer" }} title="Voir mon salaire, évolution & commissions"><div className="admin-avatar">{currentActorName.slice(0, 2).toUpperCase()}</div><div><strong>{currentActorName}</strong><span>{isOwner ? "Administratrice" : "Confirmateur • Voir salaire"}</span></div></button><nav className="admin-nav"><span className="admin-nav-label">Workspace</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{activeNewCount}</b></button><button className={section === "staff" ? "active" : ""} onClick={() => go("staff")}><Users size={18} />Confirmateurs & Salaires</button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com & DHD <b>{confirmedCount}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue & Landing <b>{catalogCount}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button onClick={() => go("staff")}><BarChart3 size={18} />Rapports & Performances</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "staff" ? "Confirmateurs, Salaires & Journal d'Activité" : section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Studio Produits & Landing Pages" : section === "ecom" ? "E-com Delivery & DHD (EcoTrack)" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : `Bonjour, ${currentActorName}`} <span>✦</span></h1></div><div className="admin-top-actions">
-  <button type="button" className="neo-darkmode-btn" onClick={toggleTheme} title={theme === "dark" ? "Mode Clair" : "Mode Sombre Neo Waw"} aria-label="Basculer Mode Sombre Neo">
+  return <div className="admin-shell gcome-shell"><aside className="admin-sidebar"><div className="admin-brand-mobile-row"><Link href="/" className="wordmark admin-wordmark gcome-logo-link"><GcomeBrand compact /></Link><div className="admin-mobile-quick-top"><button type="button" className="neo-darkmode-btn mobile-top-theme-btn" onClick={toggleTheme} title={theme === "dark" ? "Passer en Mode Clair" : "Passer en Mode Sombre"} aria-label="Basculer Mode Clair / Sombre">{theme === "dark" ? (<><Sun size={15} className="neo-sun-glow" /><span>Clair</span></>) : (<><Moon size={15} className="neo-moon-glow" /><span>Dark</span></>)}</button><button type="button" className="neo-darkmode-btn mobile-top-create-btn gcome-mobile-cmd-btn" onClick={() => setIsCreatingOrder(true)} title="Créer une nouvelle commande"><Plus size={15} /><span>Commande</span></button><button type="button" onClick={() => setIsProfileModalOpen(true)} title="Mon profil, salaire & commissions" aria-label="Mon profil et commissions" className="gcome-profile-pill">{currentActorName.slice(0, 2).toUpperCase()}</button></div></div><nav className="admin-mobile-nav gcome-bottom-dock" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={18} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={18} /><span>Suivi</span>{(activeNewCount > 0 || transferredCount > 0) && <span className="nav-count-badge gcome-red-badge">{activeNewCount > 0 ? activeNewCount : transferredCount}</span>}</button><button type="button" className={section === "catalogue" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => { go("catalogue"); setIsMoreMenuOpen(false); }}><Package size={18} /><span>Produits</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={18} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><Menu size={18} /><span>Menu</span></button></nav><button type="button" className="admin-user gcome-sidebar-shop-card" onClick={() => setIsProfileModalOpen(true)} title="Voir mon salaire, évolution & commissions"><div className="admin-avatar">{currentActorName.slice(0, 2).toUpperCase()}</div><div><strong>{currentActorName}</strong><span>{isOwner ? "Boutique Active • Voir profil" : "Confirmateur • Voir salaire"}</span></div></button><nav className="admin-nav"><span className="admin-nav-label">Espace Boutique</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{activeNewCount}</b></button><button className={section === "staff" ? "active" : ""} onClick={() => go("staff")}><Users size={18} />Confirmateurs & Salaires</button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com & DHD <b>{confirmedCount}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue & Studio IA <b>{catalogCount}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button onClick={() => go("staff")}><BarChart3 size={18} />Rapports & Performances</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "staff" ? "Confirmateurs, Salaires & Journal d'Activité" : section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Studio Produits & Landing Pages" : section === "ecom" ? "E-com Delivery & DHD (EcoTrack)" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : `Bonjour, ${currentActorName} 👑`}</h1></div><div className="admin-top-actions">
+  <button type="button" className="neo-darkmode-btn" onClick={toggleTheme} title={theme === "dark" ? "Mode Clair" : "Mode Sombre"} aria-label="Basculer Mode Sombre">
   {theme === "dark" ? (
     <>
       <Sun size={15} className="neo-sun-glow" />
-      <span className="neo-btn-label">Mode Clair</span>
+      <span className="neo-btn-label">Clair</span>
     </>
   ) : (
     <>
       <Moon size={15} className="neo-moon-glow" />
-      <span className="neo-btn-label">Mode Dark</span>
-      <span className="neo-glow-badge">NEO</span>
+      <span className="neo-btn-label">Dark</span>
     </>
   )}
   </button>
   <button
     type="button"
-    className="neo-darkmode-btn"
+    className="neo-darkmode-btn gcome-desktop-cmd-btn"
     onClick={() => setIsCreatingOrder(true)}
     title="Créer manuellement une nouvelle commande"
-    style={{ background: "linear-gradient(135deg, #10b981, #059669)", border: "1px solid #10b981", cursor: "pointer", color: "#fff" }}
   >
-    <Plus size={14} style={{ color: "#fff" }} />
-    <span className="neo-btn-label" style={{ color: "#fff", fontWeight: 800 }}>Nouvelle commande</span>
+    <Plus size={14} />
+    <span className="neo-btn-label">+ Commande</span>
   </button>
   <button
     type="button"
     className="neo-darkmode-btn"
     onClick={() => go("catalogue")}
-    title="Créer un produit ou choisir un template de Landing Page"
-    style={{ background: "rgba(236, 72, 153, 0.14)", border: "1px solid rgba(236, 72, 153, 0.35)", cursor: "pointer" }}
+    title="Créer un produit ou lancer le Studio IA"
+    style={{ background: "rgba(124, 58, 237, 0.10)", border: "1px solid rgba(124, 58, 237, 0.28)", cursor: "pointer" }}
   >
-    <Package size={14} style={{ color: "#ec4899" }} />
-    <span className="neo-btn-label" style={{ color: "#ec4899", fontWeight: 700 }}>Créer produit</span>
+    <Sparkles size={14} style={{ color: "#7c3aed" }} />
+    <span className="neo-btn-label" style={{ color: "#6d28d9", fontWeight: 800 }}>Studio IA</span>
   </button>
   <button
     type="button"
     className="neo-darkmode-btn"
     onClick={() => go("staff")}
     title="Gérer les confirmateurs, salaires, commissions et appels"
-    style={{ background: "rgba(16, 185, 129, 0.14)", border: "1px solid rgba(16, 185, 129, 0.35)", cursor: "pointer" }}
+    style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid rgba(16, 185, 129, 0.30)", cursor: "pointer" }}
   >
-    <Users size={14} style={{ color: "#10b981" }} />
-    <span className="neo-btn-label" style={{ color: "#10b981", fontWeight: 700 }}>Confirmateurs</span>
+    <Users size={14} style={{ color: "#059669" }} />
+    <span className="neo-btn-label" style={{ color: "#047857", fontWeight: 700 }}>Confirmateurs</span>
   </button>
   <button
     type="button"
     className="neo-darkmode-btn"
     onClick={() => go("settings")}
     title="Installer l'application mobile & alertes sonores"
-    style={{ background: "rgba(139, 92, 246, 0.15)", border: "1px solid rgba(139, 92, 246, 0.35)", cursor: "pointer" }}
+    style={{ background: "rgba(245, 158, 11, 0.12)", border: "1px solid rgba(245, 158, 11, 0.32)", cursor: "pointer" }}
   >
-    <Smartphone size={14} style={{ color: "#a855f7" }} />
-    <span className="neo-btn-label" style={{ color: "#a855f7", fontWeight: 600 }}>App Mobile</span>
+    <Smartphone size={14} style={{ color: "#d97706" }} />
+    <span className="neo-btn-label" style={{ color: "#b45309", fontWeight: 700 }}>App Mobile</span>
   </button>
-  <button className="icon-button" aria-label="Notifications"><Bell size={19} />{activeNewCount > 0 && <i />}</button><button type="button" className="admin-profile" onClick={() => setIsProfileModalOpen(true)} title="Voir mon profil, salaire & commissions" style={{ background: "transparent", border: 0, cursor: "pointer" }}><div className="admin-avatar small">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></button></div></header><div className="admin-content"><Suspense fallback={<section className="admin-data-state" role="status"><span className="eyebrow">Administration</span><h2>Chargement du module…</h2></section>}>{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onSetCarrier={handleSetCarrier} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} stockPanel={<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} />} />}</Suspense></div></main>{isSearchOpen && (
+  <button className="icon-button gcome-notif-bell" aria-label="Notifications"><Bell size={19} />{activeNewCount > 0 && <span className="gcome-bell-badge">{activeNewCount}</span>}</button><button type="button" className="admin-profile" onClick={() => setIsProfileModalOpen(true)} title="Voir mon profil, salaire & commissions" style={{ background: "transparent", border: 0, cursor: "pointer" }}><div className="admin-avatar small gcome-avatar-badge">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></button></div></header><div className="admin-content"><Suspense fallback={<section className="admin-data-state" role="status"><span className="eyebrow">Administration</span><h2>Chargement du module…</h2></section>}>{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onSetCarrier={handleSetCarrier} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} stockPanel={<><div className="gcome-hero-card"><div className="gcome-hero-copy"><span className="gcome-hero-badge">✦ GCOME STUDIO IA</span><h3>Votre boutique au bout des <em>doigts !</em></h3><p>Commandes, Landing Pages IA et suivi transporteurs en un seul endroit.</p><button type="button" className="gcome-hero-cta" onClick={() => go("catalogue")}>Découvrir Gcome <ChevronRight size={14} /></button></div><div className="gcome-hero-art" aria-hidden="true"><ShoppingBag size={36} /></div></div><StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} /></>} />}</Suspense></div></main>{isSearchOpen && (
   <div className="admin-search-modal-overlay" onClick={() => setIsSearchOpen(false)}>
     <div className="admin-search-modal" onClick={e => e.stopPropagation()}>
       <div className="admin-search-modal-head">
@@ -957,24 +1003,27 @@ function AdminPageContent() {
         </div>
       </div>
 
-      <div className="admin-more-sheet-grid">
+      <div className="admin-more-sheet-grid gcome-menu-list">
         <button
           type="button"
-          className="more-sheet-item"
-          onClick={() => { toggleTheme?.(); setIsMoreMenuOpen(false); }}
+          className="more-sheet-item gcome-menu-item"
+          onClick={() => toggleTheme?.()}
         >
           <div className="more-item-icon icon-purple">
             {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
           </div>
           <div className="more-item-text">
-            <strong>{theme === "dark" ? "Passer en Mode Clair ☀️" : "Activer le Mode Sombre (Dark) 🌙"}</strong>
-            <small>Basculer l'affichage clair ou sombre Neo</small>
+            <strong>{theme === "dark" ? "Mode Sombre activé" : "Activer le Mode Sombre"}</strong>
+            <small>Basculez l'affichage clair ou sombre</small>
           </div>
+          <span className={`gcome-toggle-pill ${theme === "dark" ? "is-on" : ""}`} aria-hidden="true">
+            <i />
+          </span>
         </button>
 
         <button
           type="button"
-          className="more-sheet-item"
+          className="more-sheet-item gcome-menu-item"
           onClick={() => { setIsCreatingOrder(true); setIsMoreMenuOpen(false); }}
         >
           <div className="more-item-icon icon-emerald">
@@ -984,70 +1033,76 @@ function AdminPageContent() {
             <strong>Nouvelle commande manuelle</strong>
             <small>Ajouter une commande téléphone / WhatsApp</small>
           </div>
+          <ChevronRight size={17} className="gcome-menu-chev" />
         </button>
 
         <button
           type="button"
-          className={`more-sheet-item ${section === "staff" ? "active" : ""}`}
+          className={`more-sheet-item gcome-menu-item ${section === "staff" ? "active" : ""}`}
           onClick={() => { go("staff"); setIsMoreMenuOpen(false); }}
         >
-          <div className="more-item-icon icon-emerald">
+          <div className="more-item-icon icon-orange">
             <Users size={20} />
           </div>
           <div className="more-item-text">
             <strong>Confirmateurs & Salaires</strong>
             <small>Équipe, commissions, appels & journal live</small>
           </div>
+          <ChevronRight size={17} className="gcome-menu-chev" />
         </button>
 
         <button
           type="button"
-          className={`more-sheet-item ${section === "ecom" ? "active" : ""}`}
+          className={`more-sheet-item gcome-menu-item ${section === "ecom" ? "active" : ""}`}
           onClick={() => { go("ecom"); setIsMoreMenuOpen(false); }}
         >
           <div className="more-item-icon icon-blue">
-            <PackageCheck size={20} />
+            <Truck size={20} />
           </div>
           <div className="more-item-text">
             <strong>E-com & DHD (EcoTrack)</strong>
             <small>Expédition et suivi transporteur</small>
           </div>
+          <ChevronRight size={17} className="gcome-menu-chev" />
         </button>
 
         <button
           type="button"
-          className={`more-sheet-item ${section === "abandoned" ? "active" : ""}`}
+          className={`more-sheet-item gcome-menu-item ${section === "abandoned" ? "active" : ""}`}
           onClick={() => { go("abandoned"); setIsMoreMenuOpen(false); }}
         >
-          <div className="more-item-icon icon-orange">
-            <ClipboardList size={20} />
+          <div className="more-item-icon icon-rose">
+            <ShoppingBag size={20} />
           </div>
           <div className="more-item-text">
             <strong>Commandes Abandonnées</strong>
             <small>Récupération des paniers</small>
           </div>
-          {abandonedCount !== undefined && abandonedCount > 0 && (
+          {abandonedCount !== undefined && abandonedCount > 0 ? (
             <span className="more-item-badge">{abandonedCount}</span>
+          ) : (
+            <ChevronRight size={17} className="gcome-menu-chev" />
           )}
         </button>
 
         <button
           type="button"
-          className={`more-sheet-item ${section === "returns" ? "active" : ""}`}
+          className={`more-sheet-item gcome-menu-item ${section === "returns" ? "active" : ""}`}
           onClick={() => { go("returns"); setIsMoreMenuOpen(false); }}
         >
-          <div className="more-item-icon icon-rose">
+          <div className="more-item-icon icon-emerald">
             <RotateCcw size={20} />
           </div>
           <div className="more-item-text">
             <strong>Retours & Stocks</strong>
             <small>Scanner au dépôt & litiges E-com</small>
           </div>
+          <ChevronRight size={17} className="gcome-menu-chev" />
         </button>
 
         <button
           type="button"
-          className={`more-sheet-item ${section === "sheet" ? "active" : ""}`}
+          className={`more-sheet-item gcome-menu-item ${section === "sheet" ? "active" : ""}`}
           onClick={() => { go("sheet"); setIsMoreMenuOpen(false); }}
         >
           <div className="more-item-icon icon-emerald">
@@ -1057,39 +1112,42 @@ function AdminPageContent() {
             <strong>Google Sheets</strong>
             <small>Synchronisation auto Leads & TikTok</small>
           </div>
+          <ChevronRight size={17} className="gcome-menu-chev" />
         </button>
 
         <button
           type="button"
-          className={`more-sheet-item ${section === "catalogue" ? "active" : ""}`}
+          className={`more-sheet-item gcome-menu-item ${section === "catalogue" ? "active" : ""}`}
           onClick={() => { go("catalogue"); setIsMoreMenuOpen(false); }}
         >
-          <div className="more-item-icon icon-blue">
-            <Package size={20} />
+          <div className="more-item-icon icon-purple">
+            <Sparkles size={20} />
           </div>
           <div className="more-item-text">
-            <strong>Catalogue & Stocks</strong>
-            <small>Gestion des produits et prix</small>
+            <strong>Produits & Studio IA</strong>
+            <small>Création automatique par photo & templates</small>
           </div>
+          <ChevronRight size={17} className="gcome-menu-chev" />
         </button>
 
         <button
           type="button"
-          className={`more-sheet-item ${section === "settings" ? "active" : ""}`}
+          className={`more-sheet-item gcome-menu-item ${section === "settings" ? "active" : ""}`}
           onClick={() => { go("settings"); setIsMoreMenuOpen(false); }}
         >
-          <div className="more-item-icon icon-purple">
+          <div className="more-item-icon icon-blue">
             <Smartphone size={20} />
           </div>
           <div className="more-item-text">
             <strong>App Mobile & Paramètres</strong>
-            <small>Installer sur smartphone & alertes Cha-Ching</small>
+            <small>Installer sur smartphone, Pixels & alertes</small>
           </div>
+          <ChevronRight size={17} className="gcome-menu-chev" />
         </button>
 
         <Link
           href="/"
-          className="more-sheet-item more-store-link"
+          className="more-sheet-item more-store-link gcome-menu-item"
           onClick={() => setIsMoreMenuOpen(false)}
         >
           <div className="more-item-icon icon-slate">
@@ -1099,7 +1157,27 @@ function AdminPageContent() {
             <strong>Retour à la boutique</strong>
             <small>Voir la boutique en ligne</small>
           </div>
+          <ChevronRight size={17} className="gcome-menu-chev" />
         </Link>
+
+        <div className="gcome-pro-banner">
+          <div>
+            <div className="gcome-pro-title">
+              <Crown size={16} /> <strong>Gcome Pro</strong>
+            </div>
+            <small>Boostez votre business & Studio IA</small>
+          </div>
+          <button
+            type="button"
+            className="gcome-pro-cta"
+            onClick={() => {
+              go("catalogue");
+              setIsMoreMenuOpen(false);
+            }}
+          >
+            Découvrir
+          </button>
+        </div>
       </div>
     </div>
   </div>

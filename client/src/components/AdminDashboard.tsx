@@ -18,12 +18,13 @@ import {
   Plus,
   RotateCcw,
   Search,
+  ShoppingBag,
   Sparkles,
   TrendingUp,
   UserCheck,
   XCircle,
 } from "lucide-react";
-import { formatDZD, type Order, type OrderStatus } from "@/lib/store-data";
+import { formatDZD, getCatalogProducts, type Order, type OrderStatus } from "@/lib/store-data";
 import { formatOrderDate, getOrderStats, parseOrderDate } from "@/lib/admin-orders";
 
 type Props = {
@@ -96,6 +97,41 @@ const statusMeta: Record<OrderStatus, { label: string; badgeClass: string; cardC
 
 const PAGE_SIZE = 40;
 
+function KpiSparkline({
+  color,
+  gradId,
+  points,
+}: {
+  color: string;
+  gradId: string;
+  points: string;
+}) {
+  return (
+    <svg
+      className="gcome-kpi-spark"
+      viewBox="0 0 180 42"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.01" />
+        </linearGradient>
+      </defs>
+      <path d={`${points} L 180 42 L 0 42 Z`} fill={`url(#${gradId})`} />
+      <path
+        d={points}
+        fill="none"
+        stroke={color}
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function AdminDashboard({
   orders,
   filtered,
@@ -124,6 +160,34 @@ export function AdminDashboard({
   const [nrpSubFilter, setNrpSubFilter] = useState<"all" | 1 | 2 | 3>("all");
   const [openNrpMenuOrderId, setOpenNrpMenuOrderId] = useState<string | null>(null);
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
+
+  const productImageByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const prod of getCatalogProducts()) {
+      if (!prod.image) continue;
+      if (prod.id) map.set(prod.id.toLowerCase(), prod.image);
+      if (prod.slug) map.set(prod.slug.toLowerCase(), prod.image);
+      if (prod.name) map.set(prod.name.toLowerCase().trim(), prod.image);
+      if (prod.arName) map.set(prod.arName.toLowerCase().trim(), prod.image);
+    }
+    return map;
+  }, []);
+
+  const resolveOrderImage = (order: Order): string | undefined => {
+    if (order.productId && productImageByKey.has(order.productId.toLowerCase())) {
+      return productImageByKey.get(order.productId.toLowerCase());
+    }
+    const cleanProd = (order.product || "").split("×")[0].split("(")[0].trim().toLowerCase();
+    if (cleanProd && productImageByKey.has(cleanProd)) {
+      return productImageByKey.get(cleanProd);
+    }
+    for (const [key, img] of productImageByKey.entries()) {
+      if (cleanProd && (cleanProd.includes(key) || key.includes(cleanProd))) {
+        return img;
+      }
+    }
+    return undefined;
+  };
 
   useEffect(() => {
     setVisibleLimit(PAGE_SIZE);
@@ -174,12 +238,12 @@ export function AdminDashboard({
 
   return (
     <div className="admin-app-dashboard">
-      {/* ===== KPI CARDS 3D ===== */}
+      {/* ===== KPI CARDS GCOME ===== */}
       <section className="app-kpi-grid">
         <div className="app-kpi-card kpi-gradient-purple">
           <div className="app-kpi-header">
+            <span className="app-kpi-icon-pill"><TrendingUp size={17} /></span>
             <span className="app-kpi-title">Total Commandes</span>
-            <span className="app-kpi-icon-pill"><TrendingUp size={16} /></span>
           </div>
           <div className="app-kpi-body">
             <strong className="app-kpi-num">{stats.count}</strong>
@@ -187,12 +251,18 @@ export function AdminDashboard({
               {period === "Toutes les dates" ? "Période globale" : period}
             </span>
           </div>
+          <KpiSparkline
+            color="#7c3aed"
+            gradId="spark-purple"
+            points="M0 32 C 25 28, 40 36, 70 26 C 100 16, 125 24, 150 14 C 165 8, 172 10, 180 6"
+          />
         </div>
 
         <div className="app-kpi-card kpi-gradient-orange">
           <div className="app-kpi-header">
+            <span className="app-kpi-icon-pill pulse-orange"><Bell size={17} /></span>
             <span className="app-kpi-title">À traiter d'urgence</span>
-            <span className="app-kpi-icon-pill pulse-orange"><Bell size={16} /></span>
+            {stats.pending > 0 && <span className="gcome-urgent-tri" aria-hidden="true">▲</span>}
           </div>
           <div className="app-kpi-body">
             <strong className="app-kpi-num">{stats.pending}</strong>
@@ -200,12 +270,17 @@ export function AdminDashboard({
               {stats.pending ? "Nouvelles en attente d'appel" : "Toutes traitées ! 🎉"}
             </span>
           </div>
+          <KpiSparkline
+            color="#f59e0b"
+            gradId="spark-orange"
+            points="M0 34 C 30 30, 50 22, 85 26 C 115 30, 140 16, 165 18 C 172 19, 176 15, 180 12"
+          />
         </div>
 
         <div className="app-kpi-card kpi-gradient-mint">
           <div className="app-kpi-header">
+            <span className="app-kpi-icon-pill"><CheckCircle2 size={17} /></span>
             <span className="app-kpi-title">Taux Confirmation</span>
-            <span className="app-kpi-icon-pill"><Sparkles size={16} /></span>
           </div>
           <div className="app-kpi-body">
             <strong className="app-kpi-num">
@@ -215,17 +290,27 @@ export function AdminDashboard({
               {stats.count ? `${stats.confirmedCount} confirmée(s) sur ${stats.count}` : "0 commande"}
             </span>
           </div>
+          <KpiSparkline
+            color="#10b981"
+            gradId="spark-mint"
+            points="M0 30 C 35 28, 55 34, 88 24 C 118 16, 140 22, 165 12 C 172 9, 176 8, 180 5"
+          />
         </div>
 
         <div className="app-kpi-card kpi-gradient-blue">
           <div className="app-kpi-header">
+            <span className="app-kpi-icon-pill"><Package size={17} /></span>
             <span className="app-kpi-title">Montant Confirmé</span>
-            <span className="app-kpi-icon-pill"><CheckCircle2 size={16} /></span>
           </div>
           <div className="app-kpi-body">
             <strong className="app-kpi-num">{formatDZD(stats.confirmedAmount)}</strong>
             <span className="app-kpi-sub">Prêt pour expédition COD</span>
           </div>
+          <KpiSparkline
+            color="#2563eb"
+            gradId="spark-blue"
+            points="M0 35 C 28 32, 60 27, 92 22 C 122 18, 146 21, 168 11 C 174 8, 177 7, 180 5"
+          />
         </div>
       </section>
 
@@ -244,21 +329,8 @@ export function AdminDashboard({
               {onCreateOrder && (
                 <button
                   type="button"
+                  className="gcome-new-order-btn"
                   onClick={onCreateOrder}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    padding: "9px 15px",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(16, 185, 129, 0.45)",
-                    background: "linear-gradient(135deg, #10b981, #059669)",
-                    color: "#fff",
-                    fontWeight: 800,
-                    fontSize: "13px",
-                    cursor: "pointer",
-                    boxShadow: "0 4px 14px rgba(16, 185, 129, 0.3)",
-                  }}
                 >
                   <Plus size={16} />
                   <span>Nouvelle commande</span>
@@ -603,11 +675,11 @@ export function AdminDashboard({
                     </div>
                   )}
 
-                  {/* Customer Block with Sleek (Compact) Call & WhatsApp Buttons */}
-                  <div className="aoc-customer-box">
+                  {/* Customer Block with Sleek Call & WhatsApp Buttons */}
+                  <div className="aoc-customer-box gcome-customer-box">
                     <div className="aoc-customer-left">
-                      <div className="aoc-avatar">
-                        {order.customer ? order.customer.slice(0, 2).toUpperCase() : "CL"}
+                      <div className="aoc-avatar gcome-bag-avatar">
+                        <ShoppingBag size={20} />
                       </div>
 
                       <div className="aoc-customer-details">
@@ -634,11 +706,11 @@ export function AdminDashboard({
                       </div>
                     </div>
 
-                    {/* Compact Call + WhatsApp Action Group */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                    {/* Sleek Equal Pill Call + WhatsApp Action Group */}
+                    <div className="gcome-contact-row">
                       <button
                         type="button"
-                        className="aoc-call-compact-btn"
+                        className="aoc-call-compact-btn gcome-call-pill"
                         onClick={() => (onCallOrder ? onCallOrder(order) : onCall(order.phone))}
                         aria-label={`Appeler ${order.customer || order.phone}`}
                         title="Appeler la cliente (enregistré dans l'historique)"
@@ -650,21 +722,9 @@ export function AdminDashboard({
                       {onWhatsAppOrder && (
                         <button
                           type="button"
+                          className="gcome-wa-pill"
                           onClick={() => onWhatsAppOrder(order)}
                           title="Envoyer un message WhatsApp pré-rempli à la cliente"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "5px",
-                            padding: "7px 11px",
-                            borderRadius: "10px",
-                            border: "1px solid rgba(37, 211, 102, 0.35)",
-                            background: "rgba(37, 211, 102, 0.12)",
-                            color: "#065f46",
-                            fontSize: "0.76rem",
-                            fontWeight: 800,
-                            cursor: "pointer",
-                          }}
                         >
                           <MessageCircle size={14} />
                           <span>WhatsApp</span>
@@ -699,13 +759,24 @@ export function AdminDashboard({
                       Boolean(order.note) &&
                       (order.note!.includes("عرض قطعتين") || order.note!.includes("1 achetée + 2ème gratuite"));
 
+                    const prodThumb = resolveOrderImage(order);
+
                     return (
                       <>
-                        <div className="aoc-product-row">
+                        <div className="aoc-product-row gcome-product-row">
                           <div className="aoc-prod-main">
-                            <div className="aoc-prod-badge">
-                              <Package size={15} />
-                            </div>
+                            {prodThumb ? (
+                              <img
+                                src={prodThumb}
+                                alt={displayTitle}
+                                className="gcome-prod-thumb"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="aoc-prod-badge">
+                                <Package size={16} />
+                              </div>
+                            )}
                             <div className="aoc-prod-name-wrap">
                               <strong className="aoc-prod-title">{displayTitle}</strong>
                               <div className="aoc-prod-meta-tags">
@@ -717,7 +788,7 @@ export function AdminDashboard({
                                       </span>
                                     )}
                                     <span className="aoc-chip aoc-chip-qty">
-                                      <b>1 achetée + 2ème gratuite</b>
+                                      <b>1 achetée + 2ème gratuite 🎁</b>
                                     </span>
                                   </>
                                 ) : (
@@ -727,12 +798,12 @@ export function AdminDashboard({
                                     </span>
                                     {order.color && (
                                       <span className="aoc-chip aoc-chip-color">
-                                        Couleur : <b>{order.color}</b>
+                                        <b>{order.color}</b>
                                       </span>
                                     )}
                                     {order.size && order.size.trim() !== "" && (
                                       <span className="aoc-chip aoc-chip-size">
-                                        Taille : <b>{order.size}</b>
+                                        <b>{order.size}</b>
                                       </span>
                                     )}
                                   </>
@@ -741,9 +812,14 @@ export function AdminDashboard({
                             </div>
                           </div>
 
-                          <div className="aoc-price-tag">
+                          <div className="aoc-price-tag gcome-price-tag">
                             <small>Total à encaisser</small>
-                            <strong>{formatDZD(order.total)}</strong>
+                            <div className="gcome-price-line">
+                              <strong>{formatDZD(order.total)}</strong>
+                              <span className="gcome-price-trend" aria-hidden="true">
+                                <TrendingUp size={13} />
+                              </span>
+                            </div>
                           </div>
                         </div>
 
@@ -762,16 +838,16 @@ export function AdminDashboard({
                     {order.status !== "confirmee" ? (
                       <button
                         type="button"
-                        className="aoc-btn aoc-btn-confirm"
+                        className="aoc-btn aoc-btn-confirm gcome-confirm-full"
                         onClick={() => onUpdateStatus?.(order.id, "confirmee")}
                       >
-                        <CheckCircle2 size={15} />
-                        <span>Confirmer</span>
+                        <CheckCircle2 size={16} />
+                        <span>Confirmer la commande</span>
                       </button>
                     ) : (
-                      <div className="aoc-tag-confirmed">
-                        <CheckCircle2 size={15} />
-                        <span>Confirmée</span>
+                      <div className="aoc-tag-confirmed gcome-confirm-full">
+                        <CheckCircle2 size={16} />
+                        <span>Commande confirmée</span>
                       </div>
                     )}
 
