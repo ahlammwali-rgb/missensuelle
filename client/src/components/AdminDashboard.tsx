@@ -118,23 +118,23 @@ function KpiSparkline({
   return (
     <svg
       className="gcome-kpi-spark"
-      viewBox="0 0 180 42"
+      viewBox="0 0 180 46"
       preserveAspectRatio="none"
       aria-hidden="true"
     >
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.34" />
-          <stop offset="65%" stopColor={color} stopOpacity="0.12" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.01" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.45" />
+          <stop offset="55%" stopColor={color} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.42" />
         </linearGradient>
       </defs>
-      <path d={`${points} L 180 42 L 0 42 Z`} fill={`url(#${gradId})`} />
+      <path d={`${points} L 180 46 L 0 46 Z`} fill={`url(#${gradId})`} />
       <path
         d={points}
         fill="none"
         stroke={color}
-        strokeWidth="2.6"
+        strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
