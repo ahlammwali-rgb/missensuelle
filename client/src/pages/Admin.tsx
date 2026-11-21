@@ -1298,35 +1298,24 @@ function AdminPageContent() {
           <ChevronRight size={17} className="gcome-menu-chev" />
         </button>
 
-        <button
-          type="button"
-          className={`more-sheet-item gcome-menu-item ${section === "settings" ? "active" : ""}`}
-          onClick={() => { go("settings"); setIsMoreMenuOpen(false); }}
-        >
-          <div className="more-item-icon icon-indigo">
-            <Smartphone size={19} />
-          </div>
-          <div className="more-item-text">
-            <strong>App Mobile & Paramètres</strong>
-            <small>Installer sur smartphone, Pixels & alertes</small>
-          </div>
-          <ChevronRight size={17} className="gcome-menu-chev" />
-        </button>
-
-        <Link
-          href="/"
-          className="more-sheet-item more-store-link gcome-menu-item"
-          onClick={() => setIsMoreMenuOpen(false)}
-        >
-          <div className="more-item-icon icon-slate">
-            <ExternalLink size={19} />
-          </div>
-          <div className="more-item-text">
-            <strong>Retour à la boutique</strong>
-            <small>Voir la boutique en ligne</small>
-          </div>
-          <ChevronRight size={17} className="gcome-menu-chev" />
-        </Link>
+        <div className="gcome-menu-quick-row">
+          <button
+            type="button"
+            className={`gcome-menu-quick-pill ${section === "settings" ? "active" : ""}`}
+            onClick={() => { go("settings"); setIsMoreMenuOpen(false); }}
+          >
+            <Smartphone size={15} />
+            <span>App &amp; Paramètres</span>
+          </button>
+          <Link
+            href="/"
+            className="gcome-menu-quick-pill"
+            onClick={() => setIsMoreMenuOpen(false)}
+          >
+            <ExternalLink size={15} />
+            <span>Voir la boutique</span>
+          </Link>
+        </div>
 
         <div className="gcome-pro-banner">
           <svg className="gcome-pro-wave" viewBox="0 0 360 110" preserveAspectRatio="none" fill="none" aria-hidden="true">
@@ -1355,6 +1344,16 @@ function AdminPageContent() {
         </div>
       </div>
     </div>
+    <svg className="gcome-menu-bottom-wave" viewBox="0 0 430 110" preserveAspectRatio="none" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="gMenuBotWave" x1="0" y1="80" x2="430" y2="30" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#A855F7" stopOpacity="0.22" />
+          <stop offset="50%" stopColor="#6D28D9" stopOpacity="0.34" />
+          <stop offset="100%" stopColor="#F59E0B" stopOpacity="0.26" />
+        </linearGradient>
+      </defs>
+      <path d="M0 55C95 20 190 78 295 45C355 26 400 42 430 58V110H0V55Z" fill="url(#gMenuBotWave)" />
+    </svg>
   </div>
 )}{isCreatingOrder && (
   <CreateOrderModal

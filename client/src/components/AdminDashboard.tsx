@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlarmClock,
+  AlertTriangle,
   Bell,
   CheckCircle2,
   ChevronDown,
@@ -265,7 +266,7 @@ export function AdminDashboard({
           <div className="app-kpi-header">
             <span className="app-kpi-icon-pill pulse-orange"><Bell size={17} /></span>
             <span className="app-kpi-title">À traiter d'urgence</span>
-            {stats.pending > 0 && <span className="gcome-urgent-tri" aria-hidden="true">▲</span>}
+            {stats.pending > 0 && <span className="gcome-urgent-tri" aria-hidden="true"><AlertTriangle size={13} strokeWidth={2.5} /></span>}
           </div>
           <div className="app-kpi-body">
             <strong className="app-kpi-num">{stats.pending}</strong>
