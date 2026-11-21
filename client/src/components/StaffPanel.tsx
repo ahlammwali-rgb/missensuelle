@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Calendar,
@@ -43,6 +43,13 @@ function getTodayIsoDate(): string {
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+function getMonthStartIsoDate(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}-01`;
 }
 
 function addOneMonthIsoDate(startYmd: string): string {
@@ -166,12 +173,24 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
       notify("Statut de livraison et commission mis à jour 🎉", "victory");
     },
   });
+  const syncDeliveriesMutation = trpc.admin.syncDeliveredFromCarriers.useMutation({
+    onSuccess: async res => {
+      if (res.syncedCount > 0) {
+        await utils.admin.orders.invalidate();
+        await utils.admin.staffData.invalidate();
+      }
+    },
+  });
+  useEffect(() => {
+    syncDeliveriesMutation.mutate();
+  }, []);
 
   const [period, setPeriod] = useState<PeriodFilter>("salary_period");
   const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>("all");
   const [selectedActionFilter, setSelectedActionFilter] = useState<string>("all");
   const [logSearch, setLogSearch] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"performance" | "journal" | "deliveries">("performance");
+  const [deliveriesOnlyDelivered, setDeliveriesOnlyDelivered] = useState(false);
   const [expandedHistoryStaffId, setExpandedHistoryStaffId] = useState<string | null>(null);
 
   // Form state for adding/editing a confirmateur
@@ -187,8 +206,8 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
   const [productCommissions, setProductCommissions] = useState<Record<string, number>>({});
   const [selectedProductIdForCommission, setSelectedProductIdForCommission] = useState<string>("");
   const [selectedProductCommissionAmount, setSelectedProductCommissionAmount] = useState<number>(150);
-  const [salaryStartDate, setSalaryStartDate] = useState<string>(() => getTodayIsoDate());
-  const [salaryEndDate, setSalaryEndDate] = useState<string>(() => addOneMonthIsoDate(getTodayIsoDate()));
+  const [salaryStartDate, setSalaryStartDate] = useState<string>(() => getMonthStartIsoDate());
+  const [salaryEndDate, setSalaryEndDate] = useState<string>(() => addOneMonthIsoDate(getMonthStartIsoDate()));
   const [active, setActive] = useState(true);
 
   const isOwner = staffQuery.data?.isOwner ?? true;
@@ -243,7 +262,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
   };
 
   const openCreateForm = () => {
-    const today = getTodayIsoDate();
+    const monthStart = getMonthStartIsoDate();
     const defaultPerProduct: Record<string, number> = {};
     catalogProducts.forEach(p => {
       defaultPerProduct[p.id] = 150;
@@ -259,8 +278,8 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
     setProductCommissions(defaultPerProduct);
     setSelectedProductIdForCommission(catalogProducts[0]?.id || "");
     setSelectedProductCommissionAmount(150);
-    setSalaryStartDate(today);
-    setSalaryEndDate(addOneMonthIsoDate(today));
+    setSalaryStartDate(monthStart);
+    setSalaryEndDate(addOneMonthIsoDate(monthStart));
     setActive(true);
     setIsFormOpen(true);
   };
@@ -317,6 +336,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
 
   // Compute detailed statistics per staff member (plus "owner" so nothing is missed)
   const staffStats = useMemo(() => {
+    const monthStart = getMonthStartIsoDate();
     const profiles: Array<StaffMember & { isOwnerProfile?: boolean }> = [
       ...staffList,
       {
@@ -328,14 +348,16 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
         baseSalary: 0,
         commissionPerDelivered: 0,
         upsellBonusPerDelivered: 0,
+        salaryStartDate: monthStart,
+        salaryEndDate: addOneMonthIsoDate(monthStart),
         active: true,
-        createdAt: new Date().toISOString(),
+        createdAt: `${monthStart}T00:00:00.000Z`,
         isOwnerProfile: true,
       },
     ];
 
     return profiles.map(member => {
-      const effectiveStart = member.salaryStartDate || member.createdAt?.slice(0, 10) || getTodayIsoDate();
+      const effectiveStart = member.salaryStartDate || member.createdAt?.slice(0, 10) || monthStart;
       const effectiveEnd = member.salaryEndDate || addOneMonthIsoDate(effectiveStart);
 
       const memberLogs = activityLogs.filter(
@@ -355,7 +377,8 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
 
       const isOrderForMember = (o: CheckoutOrder) =>
         matchesIdentity(o.confirmedById, o.confirmedByName) ||
-        ((!o.confirmedById || o.confirmedById === "owner") && matchesIdentity(o.assignedToId, o.assignedToName));
+        ((!o.confirmedById || o.confirmedById === "owner") && matchesIdentity(o.assignedToId, o.assignedToName)) ||
+        (Boolean(member.isOwnerProfile) && !o.confirmedById && !o.confirmedByName && !o.assignedToId && !o.assignedToName);
 
       // Orders assigned to or confirmed by this member in the selected period
       const assignedOrders = orders.filter(
@@ -369,6 +392,10 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
           isOrderForMember(o) &&
           (o.status === "confirmee" || o.status === "transferee" || o.isDelivered) &&
           matchesPeriod(o.confirmedAt || o.createdAt, period, effectiveStart, effectiveEnd)
+      );
+
+      const allTimeDeliveredOrders = orders.filter(
+        o => isOrderForMember(o) && Boolean(o.isDelivered) && !o.returnReceived
       );
 
       const deliveredOrders = orders.filter(
@@ -434,6 +461,16 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
         });
       });
 
+      const allTimeDeliveredDetails = allTimeDeliveredOrders.map(order => {
+        const orderProds = resolveOrderProducts(order);
+        const orderComm = orderProds.reduce((s, p) => s + getMemberProductCommission(member, p.id), 0);
+        return {
+          order,
+          commission: orderComm,
+          productsLabel: orderProds.map(p => p.name).join(" + "),
+        };
+      });
+
       const productBreakdown = Array.from(breakdownMap.values());
       const upsellBonusTotal = deliveredUpsellOrders.length * (member.upsellBonusPerDelivered || 0);
       const totalPay = member.baseSalary + commissionTotal + upsellBonusTotal;
@@ -470,6 +507,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
         confirmedCount: confirmedOrders.length,
         pendingConfirmedCount: pendingConfirmedOrders.length,
         deliveredCount: deliveredOrders.length,
+        allTimeDeliveredCount: allTimeDeliveredOrders.length,
         upsellCount: upsellOrders.length,
         deliveredUpsellCount: deliveredUpsellOrders.length,
         nrpCount: nrpOrders.length,
@@ -488,6 +526,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
         totalPay,
         productBreakdown,
         deliveredOrderDetails,
+        allTimeDeliveredDetails,
       };
     });
   }, [staffList, activityLogs, orders, period, catalogProducts]);
@@ -831,9 +870,11 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
     });
   }, [activityLogs, period, selectedStaffFilter, selectedActionFilter, logSearch]);
 
-  // Confirmed / Transferred orders for quick delivery & commission validation
+  // Confirmed / Transferred orders for quick delivery & commission validation (delivered first)
   const shippableOrConfirmedOrders = useMemo(() => {
-    return orders.filter(o => o.status === "confirmee" || o.status === "transferee" || o.isDelivered);
+    return orders
+      .filter(o => o.status === "confirmee" || o.status === "transferee" || o.isDelivered)
+      .sort((a, b) => (b.isDelivered ? 1 : 0) - (a.isDelivered ? 1 : 0));
   }, [orders]);
 
   const teamTotals = useMemo(() => {
@@ -842,16 +883,18 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
     const totalVirtual = nonOwners.reduce((sum, s) => sum + s.virtualCommissionTotal, 0);
     const totalDelivered = nonOwners.reduce((sum, s) => sum + s.deliveredCount, 0);
     const totalConfirmed = nonOwners.reduce((sum, s) => sum + s.confirmedCount, 0);
+    const storeTotalDelivered = orders.filter(o => Boolean(o.isDelivered) && !o.returnReceived).length;
     const avgDeliveryRate = totalConfirmed > 0 ? Math.round((totalDelivered / totalConfirmed) * 100) : 0;
     return {
       totalAcquired,
       totalVirtual,
       totalDelivered,
+      storeTotalDelivered,
       avgDeliveryRate,
       activeCount: nonOwners.filter(s => s.member.active).length,
       totalCount: nonOwners.length,
     };
-  }, [staffStats]);
+  }, [staffStats, orders]);
 
   return (
     <section className="admin-panel sp-shell">
@@ -878,6 +921,29 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
             <option value="month">📅 Ce mois calendaire</option>
             <option value="all">📅 Toutes les dates</option>
           </select>
+
+          <button
+            type="button"
+            className="button button-outline"
+            style={{ height: "40px", padding: "0 13px", fontSize: "12.5px", fontWeight: 800, borderRadius: "12px" }}
+            disabled={syncDeliveriesMutation.isPending}
+            onClick={() =>
+              syncDeliveriesMutation.mutate(undefined, {
+                onSuccess: res => {
+                  void utils.admin.orders.invalidate();
+                  void utils.admin.staffData.invalidate();
+                  notify(
+                    res.syncedCount > 0
+                      ? `${res.syncedCount} colis livré(s) synchronisé(s) 🎉`
+                      : "Statuts livrés déjà à jour ✓"
+                  );
+                },
+              })
+            }
+          >
+            <RefreshCw size={14} className={syncDeliveriesMutation.isPending ? "animate-spin" : ""} />{" "}
+            {syncDeliveriesMutation.isPending ? "Sync…" : "Sync Livraisons"}
+          </button>
 
           {isOwner && (
             <button
@@ -907,8 +973,16 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
           </div>
           <div className="sp-kpi-card">
             <span className="sp-kpi-label">📦 Colis livrés</span>
-            <strong className="sp-kpi-value" style={{ color: "#059669" }}>{teamTotals.totalDelivered}</strong>
-            <span className="sp-kpi-sub">Taux livraison : {teamTotals.avgDeliveryRate}%</span>
+            <strong className="sp-kpi-value" style={{ color: "#059669" }}>
+              {teamTotals.storeTotalDelivered > teamTotals.totalDelivered
+                ? `${teamTotals.totalDelivered} / ${teamTotals.storeTotalDelivered}`
+                : teamTotals.totalDelivered}
+            </strong>
+            <span className="sp-kpi-sub">
+              {teamTotals.storeTotalDelivered > teamTotals.totalDelivered
+                ? `Boutique : ${teamTotals.storeTotalDelivered} livrés`
+                : `Taux livraison : ${teamTotals.avgDeliveryRate}%`}
+            </span>
           </div>
           <div className="sp-kpi-card">
             <span className="sp-kpi-label">👥 Confirmateurs</span>
@@ -974,7 +1048,15 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
           <div className="sp-cards-grid">
             {staffStats.map(st => {
               const m = st.member;
-              if (m.isOwnerProfile && st.callsCount === 0 && st.confirmedCount === 0 && st.editsCount === 0 && staffList.length > 0) {
+              if (
+                m.isOwnerProfile &&
+                st.callsCount === 0 &&
+                st.confirmedCount === 0 &&
+                st.editsCount === 0 &&
+                st.deliveredCount === 0 &&
+                st.allTimeDeliveredCount === 0 &&
+                staffList.length > 0
+              ) {
                 return null;
               }
               const archivedMonths = Array.isArray(m.payrollHistory) ? m.payrollHistory : [];
@@ -1250,58 +1332,87 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                     </details>
                   )}
 
-                  {/* Collapsible Delivered Orders List on this Salary Period */}
-                  {!m.isOwnerProfile && (
-                    <details className="sp-accordion" open={st.deliveredOrderDetails.length > 0 && st.deliveredOrderDetails.length <= 5}>
-                      <summary>
-                        <span>📦 Commandes livrées ({st.deliveredOrderDetails.length})</span>
-                        <ChevronDown size={14} />
-                      </summary>
-                      <div className="sp-accordion-body">
-                        {st.deliveredOrderDetails.length === 0 ? (
-                          <div style={{ fontSize: "11.5px", color: "#64748b", padding: "4px 2px" }}>
-                            Aucune commande livrée sur cette période ({formatDateFr(st.effectiveStart)} ➔ {formatDateFr(st.effectiveEnd)}).
-                          </div>
-                        ) : (
-                          st.deliveredOrderDetails.slice(0, 25).map(item => (
-                            <div
-                              key={item.order.id}
-                              onClick={() => onOpenOrderHistory(item.order)}
-                              role="button"
-                              tabIndex={0}
-                              onKeyDown={e => {
-                                if (e.key === "Enter" || e.key === " ") onOpenOrderHistory(item.order);
-                              }}
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                gap: "8px",
-                                fontSize: "11.5px",
-                                padding: "6px 8px",
-                                borderRadius: "8px",
-                                background: "rgba(16, 185, 129, 0.08)",
-                                border: "1px solid rgba(16, 185, 129, 0.22)",
-                                cursor: "pointer",
-                              }}
-                            >
-                              <div style={{ minWidth: 0 }}>
-                                <strong>{item.order.id}</strong> · {item.order.customer}{" "}
-                                <small style={{ opacity: 0.75 }}>({item.order.wilaya})</small>
-                                <div style={{ fontSize: "10.5px", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                  {item.productsLabel || item.order.product}
+                  {/* Collapsible Delivered Orders List on this Salary Period (visible for BOTH confirmateurs and Admin/Patron) */}
+                  {(() => {
+                    const shownOrdersList =
+                      st.deliveredOrderDetails.length > 0
+                        ? st.deliveredOrderDetails
+                        : period === "salary_period"
+                          ? st.allTimeDeliveredDetails
+                          : st.deliveredOrderDetails;
+                    const showingOutsideCycleFallback =
+                      st.deliveredOrderDetails.length === 0 && st.allTimeDeliveredDetails.length > 0 && period === "salary_period";
+                    return (
+                      <details className="sp-accordion" open={shownOrdersList.length > 0}>
+                        <summary>
+                          <span>
+                            📦 Commandes livrées ({st.deliveredOrderDetails.length}
+                            {st.allTimeDeliveredCount > st.deliveredOrderDetails.length ? ` / ${st.allTimeDeliveredCount} total` : ""})
+                          </span>
+                          <ChevronDown size={14} />
+                        </summary>
+                        <div className="sp-accordion-body">
+                          {showingOutsideCycleFallback && (
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap", padding: "6px 8px", borderRadius: "8px", background: "rgba(245, 158, 11, 0.14)", fontSize: "11px", color: "#b45309", fontWeight: 700 }}>
+                              <span>⚠️ {st.allTimeDeliveredCount} livrée(s) hors dates ({formatDateFr(st.effectiveStart)} ➔ {formatDateFr(st.effectiveEnd)}) :</span>
+                              <button
+                                type="button"
+                                onClick={() => setPeriod("all")}
+                                style={{ padding: "3px 8px", borderRadius: "999px", border: "none", background: "#d97706", color: "#fff", fontSize: "10.5px", fontWeight: 800, cursor: "pointer" }}
+                              >
+                                Afficher tout
+                              </button>
+                            </div>
+                          )}
+                          {shownOrdersList.length === 0 ? (
+                            <div style={{ fontSize: "11.5px", color: "var(--app-text-muted, #64748b)", padding: "4px 2px" }}>
+                              Aucune commande livrée sur cette période ({formatDateFr(st.effectiveStart)} ➔ {formatDateFr(st.effectiveEnd)}).
+                            </div>
+                          ) : (
+                            shownOrdersList.slice(0, 35).map(item => (
+                              <div
+                                key={item.order.id}
+                                onClick={() => onOpenOrderHistory(item.order)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={e => {
+                                  if (e.key === "Enter" || e.key === " ") onOpenOrderHistory(item.order);
+                                }}
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  fontSize: "11.5px",
+                                  padding: "6px 8px",
+                                  borderRadius: "8px",
+                                  background: "rgba(16, 185, 129, 0.08)",
+                                  border: "1px solid rgba(16, 185, 129, 0.22)",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                <div style={{ minWidth: 0 }}>
+                                  <strong>{item.order.id}</strong> · {item.order.customer}{" "}
+                                  <small style={{ opacity: 0.75 }}>({item.order.wilaya})</small>
+                                  <div style={{ fontSize: "10.5px", color: "var(--app-text-muted, #64748b)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {item.productsLabel || item.order.product}
+                                  </div>
+                                </div>
+                                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                  {!m.isOwnerProfile ? (
+                                    <strong style={{ color: "#10b981", display: "block" }}>+{formatDZD(item.commission)}</strong>
+                                  ) : (
+                                    <strong style={{ color: "#10b981", display: "block" }}>✓ Livrée</strong>
+                                  )}
+                                  <small style={{ fontSize: "10px", opacity: 0.75 }}>{formatDZD(item.order.total)}</small>
                                 </div>
                               </div>
-                              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                                <strong style={{ color: "#059669", display: "block" }}>+{formatDZD(item.commission)}</strong>
-                                <small style={{ fontSize: "10px", opacity: 0.75 }}>{formatDZD(item.order.total)}</small>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </details>
-                  )}
+                            ))
+                          )}
+                        </div>
+                      </details>
+                    );
+                  })()}
 
                   {/* Total Banner */}
                   {!m.isOwnerProfile && (
@@ -1594,19 +1705,63 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
             style={{
               padding: "12px 16px",
               borderRadius: "12px",
-              background: "rgba(16, 185, 129, 0.08)",
-              border: "1px solid rgba(16, 185, 129, 0.25)",
+              background: "rgba(16, 185, 129, 0.1)",
+              border: "1px solid rgba(16, 185, 129, 0.3)",
               fontSize: "13px",
-              color: "#065f46",
+              color: "var(--app-text, #065f46)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "10px",
             }}
           >
-            💡 <strong>Synchronisation Automatique + Commission par Produit :</strong> Dès qu'un colis passe au statut{" "}
-            <strong>« Livré »</strong> sur E-com Delivery, la commission spécifique du produit (ou des 2 produits si Cross-Sell) est{" "}
-            <strong>créditée automatiquement</strong> au confirmateur. Vous pouvez aussi cocher/décocher manuellement un colis comme « Livré » ci-dessous.
+            <div>
+              💡 <strong>Synchronisation Automatique + Commission par Produit :</strong> Dès qu'un colis passe au statut{" "}
+              <strong>« Livré »</strong> sur E-com Delivery / EcoTrack, la commission est{" "}
+              <strong>créditée automatiquement</strong>.
+            </div>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => setDeliveriesOnlyDelivered(false)}
+                style={{
+                  padding: "5px 11px",
+                  borderRadius: "999px",
+                  border: "1px solid rgba(16, 185, 129, 0.45)",
+                  background: !deliveriesOnlyDelivered ? "#10b981" : "transparent",
+                  color: !deliveriesOnlyDelivered ? "#fff" : "#10b981",
+                  fontSize: "11.5px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Toutes ({shippableOrConfirmedOrders.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeliveriesOnlyDelivered(true)}
+                style={{
+                  padding: "5px 11px",
+                  borderRadius: "999px",
+                  border: "1px solid rgba(16, 185, 129, 0.45)",
+                  background: deliveriesOnlyDelivered ? "#10b981" : "transparent",
+                  color: deliveriesOnlyDelivered ? "#fff" : "#10b981",
+                  fontSize: "11.5px",
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                ✓ Livrées ({shippableOrConfirmedOrders.filter(o => o.isDelivered).length})
+              </button>
+            </div>
           </div>
 
           <div style={{ display: "grid", gap: "8px" }}>
-            {shippableOrConfirmedOrders.map(order => (
+            {(deliveriesOnlyDelivered
+              ? shippableOrConfirmedOrders.filter(o => o.isDelivered)
+              : shippableOrConfirmedOrders
+            ).map(order => (
               <div
                 key={order.id}
                 style={{

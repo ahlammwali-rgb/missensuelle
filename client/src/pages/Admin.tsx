@@ -244,15 +244,23 @@ function AdminPageContent() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileDeliveriesScope, setProfileDeliveriesScope] = useState<"auto" | "cycle" | "all" | "store">("auto");
   const [searchPopupQuery, setSearchPopupQuery] = useState("");
   const staffDataQuery = trpc.admin.staffData.useQuery(undefined, { enabled: isProfileModalOpen, retry: false, refetchOnWindowFocus: false });
   const syncProfileDeliveries = trpc.admin.syncDeliveredFromCarriers.useMutation({
     onSuccess: res => {
       if (res.syncedCount > 0) {
         void utils.admin.orders.invalidate();
+        void utils.admin.staffData.invalidate();
       }
     },
   });
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      syncProfileDeliveries.mutate();
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, []);
   useEffect(() => {
     if (isProfileModalOpen) {
       syncProfileDeliveries.mutate();
@@ -1398,9 +1406,18 @@ function AdminPageContent() {
   const evolvedSalary = daysElapsed >= 30 ? baseSalary : Math.round((baseSalary / 30) * daysElapsed);
   const progressPct = Math.round((daysElapsed / 30) * 100);
 
-  const matchesIdentity = (id: string | undefined, memberName: string | undefined) =>
-    (myProfile && (id === myProfile.id || memberName?.trim().toLowerCase() === myProfile.name.trim().toLowerCase())) ||
-    (!myProfile && memberName?.trim().toLowerCase() === currentActorName.trim().toLowerCase());
+  const matchesIdentity = (id: string | undefined, memberName: string | undefined) => {
+    if (myProfile) {
+      return (
+        id === myProfile.id ||
+        (Boolean(memberName) && memberName!.trim().toLowerCase() === myProfile.name.trim().toLowerCase())
+      );
+    }
+    if (isOwner && (id === "owner" || memberName?.trim().toLowerCase() === "admin (patron)")) {
+      return true;
+    }
+    return Boolean(memberName) && memberName!.trim().toLowerCase() === currentActorName.trim().toLowerCase();
+  };
 
   const isMine = (o: CheckoutOrder) =>
     matchesIdentity(o.confirmedById, o.confirmedByName) ||
@@ -1427,16 +1444,40 @@ function AdminPageContent() {
   const myConfirmedPending = serverOrders.filter(
     o => isMine(o) && (o.status === "confirmee" || o.status === "transferee") && !o.isDelivered && !o.returnReceived
   );
-  const myDelivered = serverOrders.filter(
+  const myDeliveredInCycle = serverOrders.filter(
     o =>
       isMine(o) &&
       Boolean(o.isDelivered) &&
       !o.returnReceived &&
       inSalaryCycle(o.deliveredAt || o.confirmedAt || o.createdAt)
   );
+  const myDeliveredAll = serverOrders.filter(
+    o => isMine(o) && Boolean(o.isDelivered) && !o.returnReceived
+  );
+  const storeDeliveredAll = serverOrders.filter(
+    o => Boolean(o.isDelivered) && !o.returnReceived
+  );
+
+  const effectiveScope: "cycle" | "all" | "store" =
+    profileDeliveriesScope !== "auto"
+      ? profileDeliveriesScope
+      : myDeliveredInCycle.length > 0
+        ? "cycle"
+        : myDeliveredAll.length > 0
+          ? "all"
+          : isOwner
+            ? "store"
+            : "all";
+
+  const shownDelivered =
+    effectiveScope === "store" && isOwner
+      ? storeDeliveredAll
+      : effectiveScope === "all"
+        ? myDeliveredAll
+        : myDeliveredInCycle;
 
   const virtualCommission = myConfirmedPending.reduce((sum, o) => sum + calcOrderComm(o), 0);
-  const realCommission = myDelivered.reduce((sum, o) => sum + calcOrderComm(o), 0);
+  const realCommission = myDeliveredInCycle.reduce((sum, o) => sum + calcOrderComm(o), 0);
   const totalAcquis = evolvedSalary + realCommission;
 
   return (
@@ -1508,9 +1549,11 @@ function AdminPageContent() {
           </div>
 
           <div style={{ background: "rgba(16,185,129,0.10)", border: "1px solid rgba(16,185,129,0.35)", borderRadius: 16, padding: 12 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 800, color: "#047857", marginBottom: 4 }}>✅ Commission réelle</div>
-            <div style={{ fontSize: 19, fontWeight: 900, color: "#059669" }}>{formatDZD(realCommission)}</div>
-            <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>{myDelivered.length} cmd livrée(s)</div>
+            <div style={{ fontSize: 11.5, fontWeight: 800, color: "#10b981", marginBottom: 4 }}>✅ Commission réelle</div>
+            <div style={{ fontSize: 19, fontWeight: 900, color: "#10b981" }}>{formatDZD(realCommission)}</div>
+            <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
+              {myDeliveredInCycle.length} sur cycle · {myDeliveredAll.length} total
+            </div>
           </div>
         </div>
 
@@ -1523,25 +1566,117 @@ function AdminPageContent() {
           <strong style={{ fontSize: 20, fontWeight: 900, color: "#fde047" }}>{formatDZD(totalAcquis)}</strong>
         </div>
 
-        {/* Liste des commandes livrées du confirmateur */}
-        <div style={{ border: "1px solid rgba(16,185,129,0.28)", borderRadius: 16, padding: 12, background: "rgba(16,185,129,0.04)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <strong style={{ fontSize: 12.5, color: "#047857" }}>
-              📦 Mes commandes livrées ({myDelivered.length})
+        {/* Liste des commandes livrées du confirmateur / boutique */}
+        <div style={{ border: "1px solid rgba(16,185,129,0.28)", borderRadius: 16, padding: 12, background: "rgba(16,185,129,0.05)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+            <strong style={{ fontSize: 12.5, color: "#10b981" }}>
+              📦 Commandes livrées ({shownDelivered.length})
             </strong>
-            {syncProfileDeliveries.isPending && (
-              <small style={{ fontSize: 11, color: "#64748b" }}>Synchronisation…</small>
+            <button
+              type="button"
+              disabled={syncProfileDeliveries.isPending}
+              onClick={() =>
+                syncProfileDeliveries.mutate(undefined, {
+                  onSuccess: res => {
+                    void utils.admin.orders.invalidate();
+                    void utils.admin.staffData.invalidate();
+                    notify(
+                      res.syncedCount > 0
+                        ? `${res.syncedCount} commande(s) livrée(s) synchronisée(s) 🎉`
+                        : "Livraisons déjà à jour ✓"
+                    );
+                  },
+                })
+              }
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "3px 9px",
+                borderRadius: 999,
+                border: "1px solid rgba(16,185,129,0.45)",
+                background: "rgba(16,185,129,0.12)",
+                color: "#10b981",
+                fontSize: 11,
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              <RefreshCw size={11} className={syncProfileDeliveries.isPending ? "animate-spin" : ""} />
+              <span>{syncProfileDeliveries.isPending ? "Sync…" : "Actualiser"}</span>
+            </button>
+          </div>
+
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+            <button
+              type="button"
+              onClick={() => setProfileDeliveriesScope("cycle")}
+              style={{
+                padding: "3px 9px",
+                borderRadius: 999,
+                border: "1px solid rgba(16,185,129,0.35)",
+                background: effectiveScope === "cycle" ? "#10b981" : "transparent",
+                color: effectiveScope === "cycle" ? "#fff" : "#10b981",
+                fontSize: 11,
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              Ce cycle ({myDeliveredInCycle.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setProfileDeliveriesScope("all")}
+              style={{
+                padding: "3px 9px",
+                borderRadius: 999,
+                border: "1px solid rgba(16,185,129,0.35)",
+                background: effectiveScope === "all" ? "#10b981" : "transparent",
+                color: effectiveScope === "all" ? "#fff" : "#10b981",
+                fontSize: 11,
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              Mes livrées ({myDeliveredAll.length})
+            </button>
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() => setProfileDeliveriesScope("store")}
+                style={{
+                  padding: "3px 9px",
+                  borderRadius: 999,
+                  border: "1px solid rgba(139,92,246,0.4)",
+                  background: effectiveScope === "store" ? "#7c3aed" : "transparent",
+                  color: effectiveScope === "store" ? "#fff" : "#a78bfa",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                }}
+              >
+                Boutique ({storeDeliveredAll.length})
+              </button>
             )}
           </div>
-          {myDelivered.length === 0 ? (
-            <div style={{ fontSize: 12, color: "#64748b" }}>
-              Aucune commande livrée trouvée sur ce cycle.
+
+          {shownDelivered.length === 0 ? (
+            <div style={{ fontSize: 12, color: "var(--app-text-muted, #64748b)" }}>
+              Aucune commande livrée trouvée pour cette vue. Cliquez sur « Actualiser » pour synchroniser les livraisons transporteurs.
             </div>
           ) : (
-            <div style={{ display: "grid", gap: 6, maxHeight: 190, overflowY: "auto" }}>
-              {myDelivered.slice(0, 30).map(order => (
+            <div style={{ display: "grid", gap: 6, maxHeight: 210, overflowY: "auto" }}>
+              {shownDelivered.slice(0, 50).map(order => (
                 <div
                   key={order.id}
+                  onClick={() => {
+                    setHistoryOrderId(order.id);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" || e.key === " ") setHistoryOrderId(order.id);
+                  }}
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
@@ -1549,20 +1684,25 @@ function AdminPageContent() {
                     gap: 8,
                     padding: "7px 10px",
                     borderRadius: 10,
-                    background: "var(--surface, #fff)",
-                    border: "1px solid rgba(16,185,129,0.22)",
+                    background: "var(--app-surface, #fff)",
+                    border: "1px solid rgba(16,185,129,0.24)",
                     fontSize: 12,
+                    cursor: "pointer",
                   }}
                 >
                   <div style={{ minWidth: 0 }}>
                     <strong>{order.id}</strong> · {order.customer}{" "}
                     <small style={{ opacity: 0.75 }}>({order.wilaya})</small>
-                    <div style={{ fontSize: 11, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {order.product}
+                    <div style={{ fontSize: 11, color: "var(--app-text-muted, #64748b)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {order.product}{order.confirmedByName ? ` · ✓ ${order.confirmedByName}` : ""}
                     </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <strong style={{ color: "#059669", display: "block" }}>+{formatDZD(calcOrderComm(order))}</strong>
+                    {!isOwner || effectiveScope !== "store" ? (
+                      <strong style={{ color: "#10b981", display: "block" }}>+{formatDZD(calcOrderComm(order))}</strong>
+                    ) : (
+                      <strong style={{ color: "#10b981", display: "block" }}>✓ Livrée</strong>
+                    )}
                     <small style={{ fontSize: 10.5, opacity: 0.75 }}>{formatDZD(order.total)}</small>
                   </div>
                 </div>

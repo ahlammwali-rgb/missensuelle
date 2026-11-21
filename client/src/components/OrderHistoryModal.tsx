@@ -160,7 +160,7 @@ export function OrderHistoryModal({ order, onClose, onCall, onWhatsApp }: Props)
   const editCount = events.filter(e => e.type === "edit").length;
 
   return (
-    <div className="modal-layer" style={{ zIndex: 1100 }}>
+    <div className="modal-layer" style={{ zIndex: 10050 }}>
       <button className="modal-backdrop" onClick={onClose} aria-label="Fermer l'historique" />
       <div
         className="order-modal"
