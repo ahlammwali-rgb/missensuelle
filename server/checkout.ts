@@ -309,10 +309,10 @@ export function updateMemoryOrderStatus(
       found.cancelReason = meta.cancelReason;
     }
 
-    if (status === "confirmee") {
+    if (status === "confirmee" || (status === "transferee" && !found.confirmedById)) {
       found.confirmedById = actorId;
       found.confirmedByName = actorName;
-      found.confirmedAt = nowIso;
+      found.confirmedAt = found.confirmedAt || nowIso;
     }
 
     const fromLabel =

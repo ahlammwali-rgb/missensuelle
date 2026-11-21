@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Truck,
   PackageCheck,
@@ -57,7 +57,9 @@ export function TransferredOrdersPanel({
 }: TransferredOrdersPanelProps) {
   const [search, setSearch] = useState("");
   const [filterSituation, setFilterSituation] = useState<string>("all");
+  const [filterCarrier, setFilterCarrier] = useState<"all" | "ecotrack" | "ecom" | "other">("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const syncedDeliveredIdsRef = useRef<Set<string>>(new Set());
   const [selectedTimelineOrder, setSelectedTimelineOrder] = useState<{
     order: CheckoutOrder;
     tracking?: TrackingData;
@@ -125,6 +127,38 @@ export function TransferredOrdersPanel({
   );
   const isTrackingFetching = trackingQuery.isFetching || ecotrackTrackingQuery.isFetching;
 
+  const getOrderCarrier = (o: CheckoutOrder): "ecotrack" | "ecom" | "other" => {
+    if (ecoShipments[o.id] || o.carrier === "ecotrack") return "ecotrack";
+    if (ecomShipments[o.id] || o.carrier === "ecom") return "ecom";
+    return "other";
+  };
+
+  useEffect(() => {
+    if (!onRefreshOrders) return;
+    let needsRefresh = false;
+    for (const o of transferredOrders) {
+      if (o.isDelivered || syncedDeliveredIdsRef.current.has(o.id)) continue;
+      const sh = ecoShipments[o.id] || ecomShipments[o.id] || shipments[o.id];
+      const trk = sh?.tracking ? trackingMap[sh.tracking] : null;
+      if (!trk) continue;
+      const sit = `${trk.situation || ""} ${trk.etat_logistique || ""}`.toLowerCase();
+      if (
+        sit.includes("livr") ||
+        sit.includes("encaiss") ||
+        sit.includes("recouvr") ||
+        sit.includes("paye") ||
+        Boolean(trk.encaisser) ||
+        Boolean(trk.recouvert)
+      ) {
+        syncedDeliveredIdsRef.current.add(o.id);
+        needsRefresh = true;
+      }
+    }
+    if (needsRefresh) {
+      onRefreshOrders();
+    }
+  }, [transferredOrders, ecoShipments, ecomShipments, shipments, trackingMap, onRefreshOrders]);
+
   const copyText = async (text: string, label: string, id: string) => {
     try {
       if (navigator.clipboard?.writeText) {
@@ -173,10 +207,27 @@ export function TransferredOrdersPanel({
     window.location.href = `tel:${clean}`;
   };
 
-  // Filtered by search and situation
+  const carrierCounts = useMemo(() => {
+    let ecotrack = 0;
+    let ecom = 0;
+    let other = 0;
+    for (const o of transferredOrders) {
+      const c = getOrderCarrier(o);
+      if (c === "ecotrack") ecotrack++;
+      else if (c === "ecom") ecom++;
+      else other++;
+    }
+    return { all: transferredOrders.length, ecotrack, ecom, other };
+  }, [transferredOrders, ecoShipments, ecomShipments]);
+
+  // Filtered by search, carrier and situation
   const filteredOrders = useMemo(() => {
     return transferredOrders.filter(o => {
-      const sh = shipments[o.id];
+      if (filterCarrier !== "all" && getOrderCarrier(o) !== filterCarrier) {
+        return false;
+      }
+
+      const sh = ecoShipments[o.id] || ecomShipments[o.id] || shipments[o.id];
       const trk = sh?.tracking ? trackingMap[sh.tracking] : null;
       const sit = (trk?.situation || "EnCours").toLowerCase();
 
@@ -196,7 +247,7 @@ export function TransferredOrdersPanel({
         .includes(q);
       return matchOrder || matchTrk;
     });
-  }, [transferredOrders, shipments, trackingMap, search, filterSituation]);
+  }, [transferredOrders, shipments, ecoShipments, ecomShipments, trackingMap, search, filterSituation, filterCarrier]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -431,6 +482,44 @@ export function TransferredOrdersPanel({
             </button>
           )}
         </div>
+
+        <div
+          className="trans-carrier-filters"
+          role="group"
+          aria-label="Filtrer par société de livraison"
+          style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}
+        >
+          {[
+            { id: "all" as const, label: `Toutes (${carrierCounts.all})` },
+            { id: "ecotrack" as const, label: `🚚 ${ecoCarrierName} (${carrierCounts.ecotrack})` },
+            { id: "ecom" as const, label: `📦 E-com Delivery (${carrierCounts.ecom})` },
+            ...(carrierCounts.other > 0
+              ? [{ id: "other" as const, label: `📋 Autres (${carrierCounts.other})` }]
+              : []),
+          ].map(opt => {
+            const active = filterCarrier === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setFilterCarrier(opt.id)}
+                style={{
+                  height: 36,
+                  padding: "0 12px",
+                  borderRadius: 10,
+                  border: active ? "1.5px solid #2563eb" : "1px solid rgba(148, 163, 184, 0.35)",
+                  background: active ? "rgba(37, 99, 235, 0.12)" : "var(--surface, #fff)",
+                  color: active ? "#1d4ed8" : "inherit",
+                  fontSize: 12.5,
+                  fontWeight: active ? 800 : 600,
+                  cursor: "pointer",
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Orders List / Empty State */}
@@ -439,7 +528,7 @@ export function TransferredOrdersPanel({
           <PackageCheck size={48} className="transferred-empty-icon" />
           <h3>Aucune commande transférée trouvée</h3>
           <p>
-            {search || filterSituation !== "all"
+            {search || filterSituation !== "all" || filterCarrier !== "all"
               ? "Aucun résultat pour vos filtres de recherche."
               : "Dès que vous validez une commande et cliquez sur Transférer, elle apparaîtra ici avec son suivi direct."}
           </p>

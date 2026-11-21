@@ -246,6 +246,83 @@ export const appRouter = router({
         const actor = resolveActor(ctx.user);
         return markOrderDelivered(input.id, input.isDelivered, actor);
       }),
+    syncDeliveredFromCarriers: adminProcedure.mutation(async () => {
+      let syncedCount = 0;
+      try {
+        const orders = await listCheckoutOrders();
+        const pendingOrders = orders.filter(
+          o => !o.isDelivered && !o.returnReceived && (o.status === "transferee" || o.status === "confirmee")
+        );
+        if (pendingOrders.length === 0) return { syncedCount: 0 };
+
+        const [ecomStatus, ecoStatus] = await Promise.all([
+          getEcomStatus().catch(() => null),
+          getEcoTrackStatus().catch(() => null),
+        ]);
+
+        if (ecomStatus?.configured) {
+          const ecomShipments = ecomStatus.shipments || {};
+          const ecomTrackings = pendingOrders
+            .map(o => ecomShipments[o.id]?.tracking)
+            .filter((t): t is string => Boolean(t));
+          if (ecomTrackings.length > 0) {
+            const batch = await getEcomTrackingBatch(ecomTrackings.slice(0, 100)).catch(() => ({} as Record<string, any>));
+            for (const order of pendingOrders) {
+              const trkNum = ecomShipments[order.id]?.tracking;
+              const trkData = trkNum ? batch[trkNum] : undefined;
+              if (!trkData) continue;
+              const sit = `${trkData.situation || ""} ${trkData.etat_logistique || ""}`.toLowerCase();
+              if (
+                sit.includes("livr") ||
+                sit.includes("encaiss") ||
+                sit.includes("recouvr") ||
+                Boolean(trkData.encaisser) ||
+                Boolean(trkData.recouvert)
+              ) {
+                await markOrderDelivered(order.dbId, true, {
+                  actorId: "system",
+                  actorName: "E-com Delivery (Auto)",
+                });
+                syncedCount++;
+              }
+            }
+          }
+        }
+
+        if (ecoStatus?.configured) {
+          const ecoShipments = ecoStatus.shipments || {};
+          const ecoTrackings = pendingOrders
+            .map(o => ecoShipments[o.id]?.tracking)
+            .filter((t): t is string => Boolean(t));
+          if (ecoTrackings.length > 0) {
+            const batch = await getEcoTrackTrackingBatch(ecoTrackings.slice(0, 100)).catch(() => ({} as Record<string, any>));
+            for (const order of pendingOrders) {
+              if (order.isDelivered) continue;
+              const trkNum = ecoShipments[order.id]?.tracking;
+              const trkData = trkNum ? batch[trkNum] : undefined;
+              if (!trkData) continue;
+              const sit = `${trkData.situation || ""} ${trkData.etat_logistique || ""}`.toLowerCase();
+              if (
+                sit.includes("livr") ||
+                sit.includes("encaiss") ||
+                sit.includes("paye") ||
+                Boolean(trkData.encaisser) ||
+                Boolean(trkData.recouvert)
+              ) {
+                await markOrderDelivered(order.dbId, true, {
+                  actorId: "system",
+                  actorName: "EcoTrack (Auto)",
+                });
+                syncedCount++;
+              }
+            }
+          }
+        }
+      } catch {
+        // Ignore sync error
+      }
+      return { syncedCount };
+    }),
     setOrderCarrier: adminProcedure
       .input(z.object({ id: z.number().int().positive(), carrier: orderCarrierSchema }))
       .mutation(({ ctx, input }) => {

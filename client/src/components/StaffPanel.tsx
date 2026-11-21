@@ -349,25 +349,35 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
       const editsCount = memberLogs.filter(l => l.type === "edit").length;
       const warningsCount = memberLogs.filter(l => Boolean(l.warning)).length;
 
+      const matchesIdentity = (id: string | undefined, memberName: string | undefined) =>
+        id === member.id ||
+        (Boolean(memberName) && memberName!.trim().toLowerCase() === member.name.trim().toLowerCase());
+
+      const isOrderForMember = (o: CheckoutOrder) =>
+        matchesIdentity(o.confirmedById, o.confirmedByName) ||
+        ((!o.confirmedById || o.confirmedById === "owner") && matchesIdentity(o.assignedToId, o.assignedToName));
+
       // Orders assigned to or confirmed by this member in the selected period
       const assignedOrders = orders.filter(
         o =>
-          (o.assignedToId === member.id ||
-            o.confirmedById === member.id ||
-            (o.assignedToName && o.assignedToName.toLowerCase() === member.name.toLowerCase()) ||
-            (o.confirmedByName && o.confirmedByName.toLowerCase() === member.name.toLowerCase())) &&
+          (isOrderForMember(o) || matchesIdentity(o.assignedToId, o.assignedToName)) &&
           matchesPeriod(o.confirmedAt || o.lastCalledAt || o.createdAt, period, effectiveStart, effectiveEnd)
       );
 
       const confirmedOrders = orders.filter(
         o =>
-          (o.confirmedById === member.id ||
-            (o.confirmedByName && o.confirmedByName.toLowerCase() === member.name.toLowerCase())) &&
+          isOrderForMember(o) &&
           (o.status === "confirmee" || o.status === "transferee" || o.isDelivered) &&
           matchesPeriod(o.confirmedAt || o.createdAt, period, effectiveStart, effectiveEnd)
       );
 
-      const deliveredOrders = confirmedOrders.filter(o => Boolean(o.isDelivered) && !o.returnReceived);
+      const deliveredOrders = orders.filter(
+        o =>
+          isOrderForMember(o) &&
+          Boolean(o.isDelivered) &&
+          !o.returnReceived &&
+          matchesPeriod(o.deliveredAt || o.confirmedAt || o.createdAt, period, effectiveStart, effectiveEnd)
+      );
       const upsellOrders = orders.filter(
         o =>
           (o.upsellById === member.id ||
@@ -1236,6 +1246,59 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                             </div>
                           );
                         })}
+                      </div>
+                    </details>
+                  )}
+
+                  {/* Collapsible Delivered Orders List on this Salary Period */}
+                  {!m.isOwnerProfile && (
+                    <details className="sp-accordion" open={st.deliveredOrderDetails.length > 0 && st.deliveredOrderDetails.length <= 5}>
+                      <summary>
+                        <span>📦 Commandes livrées ({st.deliveredOrderDetails.length})</span>
+                        <ChevronDown size={14} />
+                      </summary>
+                      <div className="sp-accordion-body">
+                        {st.deliveredOrderDetails.length === 0 ? (
+                          <div style={{ fontSize: "11.5px", color: "#64748b", padding: "4px 2px" }}>
+                            Aucune commande livrée sur cette période ({formatDateFr(st.effectiveStart)} ➔ {formatDateFr(st.effectiveEnd)}).
+                          </div>
+                        ) : (
+                          st.deliveredOrderDetails.slice(0, 25).map(item => (
+                            <div
+                              key={item.order.id}
+                              onClick={() => onOpenOrderHistory(item.order)}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={e => {
+                                if (e.key === "Enter" || e.key === " ") onOpenOrderHistory(item.order);
+                              }}
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                gap: "8px",
+                                fontSize: "11.5px",
+                                padding: "6px 8px",
+                                borderRadius: "8px",
+                                background: "rgba(16, 185, 129, 0.08)",
+                                border: "1px solid rgba(16, 185, 129, 0.22)",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <div style={{ minWidth: 0 }}>
+                                <strong>{item.order.id}</strong> · {item.order.customer}{" "}
+                                <small style={{ opacity: 0.75 }}>({item.order.wilaya})</small>
+                                <div style={{ fontSize: "10.5px", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                  {item.productsLabel || item.order.product}
+                                </div>
+                              </div>
+                              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                <strong style={{ color: "#059669", display: "block" }}>+{formatDZD(item.commission)}</strong>
+                                <small style={{ fontSize: "10px", opacity: 0.75 }}>{formatDZD(item.order.total)}</small>
+                              </div>
+                            </div>
+                          ))
+                        )}
                       </div>
                     </details>
                   )}

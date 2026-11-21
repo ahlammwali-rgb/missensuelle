@@ -107,6 +107,18 @@ function AdminPageContent() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [searchPopupQuery, setSearchPopupQuery] = useState("");
   const staffDataQuery = trpc.admin.staffData.useQuery(undefined, { enabled: isProfileModalOpen, retry: false, refetchOnWindowFocus: false });
+  const syncProfileDeliveries = trpc.admin.syncDeliveredFromCarriers.useMutation({
+    onSuccess: res => {
+      if (res.syncedCount > 0) {
+        void utils.admin.orders.invalidate();
+      }
+    },
+  });
+  useEffect(() => {
+    if (isProfileModalOpen) {
+      syncProfileDeliveries.mutate();
+    }
+  }, [isProfileModalOpen]);
   const ordersQuery = trpc.admin.orders.useQuery(undefined, { refetchInterval: 15000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false });
   const abandonedQuery = trpc.admin.abandonedOrders.useQuery(undefined, { refetchInterval: 15000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false });
   const utils = trpc.useUtils();
@@ -1149,9 +1161,24 @@ function AdminPageContent() {
   const evolvedSalary = daysElapsed >= 30 ? baseSalary : Math.round((baseSalary / 30) * daysElapsed);
   const progressPct = Math.round((daysElapsed / 30) * 100);
 
+  const matchesIdentity = (id: string | undefined, memberName: string | undefined) =>
+    (myProfile && (id === myProfile.id || memberName?.trim().toLowerCase() === myProfile.name.trim().toLowerCase())) ||
+    (!myProfile && memberName?.trim().toLowerCase() === currentActorName.trim().toLowerCase());
+
   const isMine = (o: CheckoutOrder) =>
-    (myProfile && (o.confirmedById === myProfile.id || o.confirmedByName?.toLowerCase() === myProfile.name.toLowerCase())) ||
-    (!myProfile && o.confirmedByName?.toLowerCase() === currentActorName.toLowerCase());
+    matchesIdentity(o.confirmedById, o.confirmedByName) ||
+    ((!o.confirmedById || o.confirmedById === "owner") && matchesIdentity(o.assignedToId, o.assignedToName));
+
+  const endStr = myProfile?.salaryEndDate;
+  const endDate = endStr ? new Date(`${endStr}T23:59:59.999`) : null;
+  const inSalaryCycle = (iso: string | undefined) => {
+    if (!startStr || !iso) return true;
+    const ms = new Date(iso).getTime();
+    if (Number.isNaN(ms)) return true;
+    if (ms < startDate.getTime()) return false;
+    if (endDate && ms > endDate.getTime()) return false;
+    return true;
+  };
 
   const calcOrderComm = (o: CheckoutOrder) => {
     const unit = o.productId && typeof prodComms[o.productId] === "number" ? prodComms[o.productId] : defaultComm;
@@ -1164,7 +1191,11 @@ function AdminPageContent() {
     o => isMine(o) && (o.status === "confirmee" || o.status === "transferee") && !o.isDelivered && !o.returnReceived
   );
   const myDelivered = serverOrders.filter(
-    o => isMine(o) && Boolean(o.isDelivered) && !o.returnReceived
+    o =>
+      isMine(o) &&
+      Boolean(o.isDelivered) &&
+      !o.returnReceived &&
+      inSalaryCycle(o.deliveredAt || o.confirmedAt || o.createdAt)
   );
 
   const virtualCommission = myConfirmedPending.reduce((sum, o) => sum + calcOrderComm(o), 0);
@@ -1247,12 +1278,60 @@ function AdminPageContent() {
         </div>
 
         {/* Total Acquis */}
-        <div style={{ background: "linear-gradient(135deg, #1e1b4b, #4c1d95)", color: "#fff", borderRadius: 16, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ background: "linear-gradient(135deg, #1e1b4b, #4c1d95)", color: "#fff", borderRadius: 16, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div>
             <div style={{ fontSize: 11.5, opacity: 0.85 }}>Total acquis à ce jour (Salaire + Réelle)</div>
             <div style={{ fontSize: 11, color: "#fcd34d", marginTop: 2 }}>Avec virtuelle : {formatDZD(totalAcquis + virtualCommission)}</div>
           </div>
           <strong style={{ fontSize: 20, fontWeight: 900, color: "#fde047" }}>{formatDZD(totalAcquis)}</strong>
+        </div>
+
+        {/* Liste des commandes livrées du confirmateur */}
+        <div style={{ border: "1px solid rgba(16,185,129,0.28)", borderRadius: 16, padding: 12, background: "rgba(16,185,129,0.04)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <strong style={{ fontSize: 12.5, color: "#047857" }}>
+              📦 Mes commandes livrées ({myDelivered.length})
+            </strong>
+            {syncProfileDeliveries.isPending && (
+              <small style={{ fontSize: 11, color: "#64748b" }}>Synchronisation…</small>
+            )}
+          </div>
+          {myDelivered.length === 0 ? (
+            <div style={{ fontSize: 12, color: "#64748b" }}>
+              Aucune commande livrée trouvée sur ce cycle.
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 6, maxHeight: 190, overflowY: "auto" }}>
+              {myDelivered.slice(0, 30).map(order => (
+                <div
+                  key={order.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "7px 10px",
+                    borderRadius: 10,
+                    background: "var(--surface, #fff)",
+                    border: "1px solid rgba(16,185,129,0.22)",
+                    fontSize: 12,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <strong>{order.id}</strong> · {order.customer}{" "}
+                    <small style={{ opacity: 0.75 }}>({order.wilaya})</small>
+                    <div style={{ fontSize: 11, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {order.product}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <strong style={{ color: "#059669", display: "block" }}>+{formatDZD(calcOrderComm(order))}</strong>
+                    <small style={{ fontSize: 10.5, opacity: 0.75 }}>{formatDZD(order.total)}</small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
