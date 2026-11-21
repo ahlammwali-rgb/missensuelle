@@ -4722,13 +4722,14 @@ html.dark .gcome-brand.is-large .gcome-brand-sub,
 }
 .gcome-profile-pill,
 .gcome-avatar-badge {
+  position: relative;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   width: 34px;
   height: 34px;
   border-radius: 50% !important;
-  border: 2px solid rgba(255, 255, 255, 0.92) !important;
+  border: 2px solid rgba(255, 255, 255, 0.94) !important;
   background: linear-gradient(135deg, #6d28d9 0%, #8b5cf6 100%) !important;
   color: #fff !important;
   font-size: 12px;
@@ -4736,6 +4737,63 @@ html.dark .gcome-brand.is-large .gcome-brand-sub,
   cursor: pointer;
   flex-shrink: 0;
   box-shadow: 0 5px 14px rgba(109, 40, 217, 0.3);
+}
+.gcome-avatar-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #fff;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.45);
+}
+
+/* Ambient Organic Wave Layers (Screens 1, 2, 3) */
+.admin-shell.gcome-shell {
+  isolation: isolate;
+}
+.gcome-backdrop-waves {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+.gcome-wave-bg-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 145px;
+  opacity: 0.92;
+}
+.gcome-wave-bg-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 135px;
+  opacity: 0.95;
+}
+html.dark .gcome-wave-bg-top,
+.dark .gcome-wave-bg-top,
+html.dark .gcome-wave-bg-bottom,
+.dark .gcome-wave-bg-bottom {
+  opacity: 0.45;
+}
+@media (min-width: 769px) {
+  .gcome-backdrop-waves {
+    left: 256px;
+  }
 }
 .gcome-notif-bell {
   position: relative;
@@ -4891,10 +4949,10 @@ html.dark .gcome-mobile-bell,
   width: 96px;
   height: 82px;
 }
-@media (max-width: 1120px) {
+@media (max-width: 1024px) {
   .gcome-mobile-hero-slot {
     display: block;
-    margin-bottom: 14px;
+    margin-bottom: 6px;
   }
   .gcome-shell .app-stock-sidebar .gcome-hero-card {
     display: none;
@@ -5037,20 +5095,35 @@ html.dark .gcome-mobile-bell,
 }
 .gcome-shell .app-status-tab {
   border-radius: 999px !important;
+  height: 38px !important;
+  padding: 0 14px !important;
   border: 1px solid rgba(124, 58, 237, 0.14) !important;
   background: var(--app-surface) !important;
   box-shadow: 0 4px 12px rgba(76, 29, 149, 0.05);
 }
-.gcome-shell .app-status-tab.active {
+.gcome-shell .app-status-carousel .app-status-tab.active {
   background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%) !important;
   color: #fff !important;
   border-color: transparent !important;
   box-shadow: 0 8px 18px rgba(109, 40, 217, 0.32) !important;
 }
-.gcome-shell .app-status-tab.active .app-tab-count {
-  background: rgba(255, 255, 255, 0.22) !important;
+.gcome-shell .app-status-carousel .app-status-tab.active .app-tab-count {
+  background: rgba(255, 255, 255, 0.24) !important;
   color: #fff !important;
 }
+.gcome-status-orb {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: inset -2px -2px 3px rgba(0, 0, 0, 0.18), 0 0 8px currentColor;
+}
+.orb-nouvelle { background: radial-gradient(circle at 35% 30%, #fde047, #f59e0b); color: rgba(245, 158, 11, 0.55); }
+.orb-confirmee { background: radial-gradient(circle at 35% 30%, #6ee7b7, #10b981); color: rgba(16, 185, 129, 0.55); }
+.orb-transferee { background: radial-gradient(circle at 35% 30%, #c4b5fd, #7c3aed); color: rgba(124, 58, 237, 0.55); }
+.orb-reportee { background: radial-gradient(circle at 35% 30%, #93c5fd, #2563eb); color: rgba(37, 99, 235, 0.55); }
+.orb-ne_repond_pas { background: radial-gradient(circle at 35% 30%, #fdba74, #ea580c); color: rgba(234, 88, 12, 0.55); }
+.orb-annulee { background: radial-gradient(circle at 35% 30%, #fca5a5, #ef4444); color: rgba(239, 68, 68, 0.55); }
 
 /* Order Card Mockup Upgrade (Screen 1) */
 .gcome-shell .app-order-card {
@@ -5127,50 +5200,56 @@ html.dark .gcome-shell .gcome-wa-pill,
   color: #6ee7b7 !important;
 }
 .gcome-shell .aoc-product-row.gcome-product-row {
-  flex-direction: row !important;
+  display: grid !important;
+  grid-template-columns: 74px minmax(0, 1fr) !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  flex-wrap: nowrap !important;
-  gap: 10px !important;
+  gap: 12px !important;
   border-radius: 18px !important;
-  padding: 11px 13px !important;
+  padding: 11px 12px !important;
   background: var(--app-surface-sub) !important;
   border: 1px solid rgba(124, 58, 237, 0.11) !important;
 }
-.gcome-shell .gcome-product-row .aoc-prod-main {
-  min-width: 0 !important;
-  flex: 1 1 auto !important;
-}
-.gcome-shell .gcome-prod-thumb {
-  width: 60px;
-  height: 60px;
-  border-radius: 14px;
+.gcome-shell .gcome-prod-thumb,
+.gcome-shell .gcome-prod-thumb-fallback {
+  width: 74px !important;
+  height: 78px !important;
+  border-radius: 15px !important;
   object-fit: cover;
-  border: 1px solid rgba(124, 58, 237, 0.16);
+  border: 1px solid rgba(124, 58, 237, 0.16) !important;
   flex-shrink: 0;
   background: #fff;
+  box-shadow: 0 6px 14px rgba(76, 29, 149, 0.08);
+}
+.gcome-shell .gcome-prod-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
 }
 .gcome-shell .aoc-price-tag.gcome-price-tag {
-  align-items: flex-end !important;
-  text-align: right !important;
-  border-top: 0 !important;
-  padding-top: 0 !important;
+  align-items: flex-start !important;
+  text-align: left !important;
+  border-top: 1px dashed rgba(124, 58, 237, 0.14) !important;
+  padding-top: 6px !important;
   flex-shrink: 0 !important;
+  gap: 2px;
 }
 .gcome-price-line {
-  display: inline-flex;
+  width: 100%;
+  display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
 }
 .gcome-price-line strong {
-  color: #4c1d95 !important;
-  font-size: 19px !important;
+  color: #3b0764 !important;
+  font-size: 20px !important;
   font-weight: 900 !important;
   white-space: nowrap;
 }
 html.dark .gcome-price-line strong,
 .dark .gcome-price-line strong {
-  color: #c4b5fd !important;
+  color: #e9d5ff !important;
 }
 .gcome-price-trend {
   width: 24px;
@@ -5396,64 +5475,97 @@ html.dark .gcome-shell .badge-status-nouvelle,
     padding: 10px 8px !important;
     font-size: 12.5px !important;
   }
+  .gcome-shell .app-filter-bar {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  .gcome-shell .app-period-select {
+    align-self: flex-start !important;
+    width: auto !important;
+    min-width: 168px !important;
+    height: 38px !important;
+    padding: 0 30px 0 12px !important;
+  }
+  .gcome-shell .admin-sidebar {
+    background: rgba(255, 255, 255, 0.94) !important;
+  }
+  html.dark .gcome-shell .admin-sidebar,
+  .dark .gcome-shell .admin-sidebar {
+    background: rgba(15, 18, 36, 0.96) !important;
+  }
   .gcome-shell .admin-more-menu-sheet {
-    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(94px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 @media (max-width: 400px) {
   .gcome-brand.is-compact .gcome-brand-name {
-    font-size: 15.5px;
+    font-size: 16px;
   }
   .gcome-brand.is-compact .gcome-brand-sub {
-    display: none;
+    font-size: 7.8px;
   }
   .admin-shell.gcome-shell .admin-mobile-quick-top .neo-darkmode-btn {
-    padding: 4px 7px !important;
+    padding: 5px 8px !important;
     font-size: 10.5px !important;
-    min-height: 30px !important;
+    min-height: 31px !important;
   }
-  .gcome-profile-pill,
-  .gcome-mobile-bell {
-    width: 30px !important;
-    height: 30px !important;
+  .gcome-profile-pill {
+    width: 31px !important;
+    height: 31px !important;
     font-size: 11px !important;
   }
 }
 
-/* Menu & Autres Espaces Drawer (Screen 3) */
+/* Menu & Autres Espaces Drawer (Screen 3 - 100% Mockup Faithful) */
 .gcome-shell .admin-more-menu-overlay.gcome-menu-overlay {
   z-index: 920 !important;
   flex-direction: column !important;
   justify-content: flex-end !important;
   align-items: center !important;
   padding-top: env(safe-area-inset-top, 0px);
-  background: radial-gradient(circle at 10% 6%, rgba(168, 85, 247, 0.35) 0%, transparent 45%),
-              radial-gradient(circle at 92% 4%, rgba(251, 191, 36, 0.25) 0%, transparent 38%),
-              linear-gradient(180deg, rgba(237, 233, 254, 0.96) 0%, rgba(245, 243, 255, 0.94) 30%, rgba(15, 23, 42, 0.55) 100%) !important;
-  backdrop-filter: blur(14px) !important;
+  background: linear-gradient(180deg, #ede9fe 0%, #f5f3ff 35%, #f5f3ff 100%) !important;
+  backdrop-filter: none !important;
 }
 html.dark .gcome-shell .admin-more-menu-overlay.gcome-menu-overlay,
 .dark .gcome-shell .admin-more-menu-overlay.gcome-menu-overlay {
-  background: radial-gradient(circle at 10% 6%, rgba(124, 58, 237, 0.32) 0%, transparent 45%),
-              radial-gradient(circle at 92% 4%, rgba(245, 158, 11, 0.16) 0%, transparent 38%),
-              linear-gradient(180deg, rgba(15, 18, 36, 0.97) 0%, rgba(10, 12, 26, 0.95) 100%) !important;
+  background: linear-gradient(180deg, #0b0e1e 0%, #0f1224 100%) !important;
 }
 .gcome-menu-top-banner {
+  position: relative;
   width: 100%;
   max-width: 540px;
-  padding: 16px 20px 14px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.gcome-menu-wave-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+html.dark .gcome-menu-wave-svg,
+.dark .gcome-menu-wave-svg {
+  opacity: 0.45;
+}
+.gcome-menu-top-inner {
+  position: relative;
+  z-index: 1;
+  padding: 14px 18px 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  flex-shrink: 0;
 }
 .gcome-menu-settings-btn {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  border: 1px solid rgba(124, 58, 237, 0.2);
-  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(124, 58, 237, 0.16);
+  background: rgba(255, 255, 255, 0.88);
   color: #1e1b4b;
   display: inline-flex;
   align-items: center;
@@ -5464,7 +5576,7 @@ html.dark .gcome-shell .admin-more-menu-overlay.gcome-menu-overlay,
 }
 html.dark .gcome-menu-settings-btn,
 .dark .gcome-menu-settings-btn {
-  background: rgba(30, 27, 75, 0.72);
+  background: rgba(30, 27, 75, 0.78);
   color: #e9d5ff;
   border-color: rgba(139, 92, 246, 0.35);
 }
@@ -5473,26 +5585,37 @@ html.dark .gcome-menu-settings-btn,
   min-height: 0 !important;
   max-height: none !important;
   max-width: 540px !important;
+  width: 100% !important;
   border-radius: 30px 30px 0 0 !important;
-  background: linear-gradient(180deg, #ffffff 0%, #f8f6ff 100%) !important;
-  box-shadow: 0 -14px 44px rgba(76, 29, 149, 0.18) !important;
-  padding: 12px 16px 28px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.9) !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f7f4ff 70%, #ede9fe 100%) !important;
+  box-shadow: 0 -12px 36px rgba(76, 29, 149, 0.14) !important;
+  padding: 14px 14px 24px !important;
+  gap: 10px !important;
 }
 html.dark .gcome-shell .admin-more-menu-sheet.gcome-menu-sheet,
 .dark .gcome-shell .admin-more-menu-sheet.gcome-menu-sheet {
+  border-top-color: rgba(139, 92, 246, 0.3) !important;
   background: linear-gradient(180deg, #13172b 0%, #0d1020 100%) !important;
+}
+.gcome-shell .gcome-menu-sheet .admin-more-sheet-title-row {
+  padding: 0 4px 4px;
 }
 .gcome-shell .gcome-menu-sheet .admin-more-sheet-title-row h3 {
   font-size: 17px !important;
   font-weight: 900 !important;
   letter-spacing: -0.02em;
 }
+.gcome-shell .gcome-menu-list {
+  gap: 7px !important;
+}
 .gcome-shell .gcome-menu-item {
-  border-radius: 20px !important;
-  padding: 11px 13px !important;
+  border-radius: 18px !important;
+  padding: 8px 12px !important;
+  gap: 12px !important;
   background: #ffffff !important;
-  border: 1px solid rgba(124, 58, 237, 0.1) !important;
-  box-shadow: 0 6px 18px rgba(76, 29, 149, 0.055) !important;
+  border: 1px solid rgba(124, 58, 237, 0.09) !important;
+  box-shadow: 0 6px 16px rgba(76, 29, 149, 0.05) !important;
 }
 html.dark .gcome-shell .gcome-menu-item,
 .dark .gcome-shell .gcome-menu-item {
@@ -5500,30 +5623,56 @@ html.dark .gcome-shell .gcome-menu-item,
   border-color: rgba(139, 92, 246, 0.2) !important;
 }
 .gcome-shell .gcome-menu-item .more-item-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  box-shadow: 0 6px 14px rgba(76, 29, 149, 0.12);
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  box-shadow: 0 6px 14px rgba(76, 29, 149, 0.13);
 }
 .gcome-shell .gcome-menu-item .more-item-icon.icon-purple {
-  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  background: linear-gradient(135deg, #ede9fe 0%, #c4b5fd 100%);
   color: #6d28d9;
 }
-.gcome-shell .gcome-menu-item .more-item-icon.icon-emerald {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+.gcome-shell .gcome-menu-item .more-item-icon.icon-mint {
+  background: linear-gradient(135deg, #d1fae5 0%, #6ee7b7 100%);
   color: #059669;
 }
 .gcome-shell .gcome-menu-item .more-item-icon.icon-orange {
-  background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
+  background: linear-gradient(135deg, #ffedd5 0%, #fdba74 100%);
   color: #ea580c;
 }
 .gcome-shell .gcome-menu-item .more-item-icon.icon-blue {
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 100%);
   color: #2563eb;
 }
 .gcome-shell .gcome-menu-item .more-item-icon.icon-rose {
-  background: linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%);
+  background: linear-gradient(135deg, #ffe4e6 0%, #fda4af 100%);
   color: #e11d48;
+}
+.gcome-shell .gcome-menu-item .more-item-icon.icon-lime {
+  background: linear-gradient(135deg, #ecfccb 0%, #bef264 100%);
+  color: #4d7c0f;
+}
+.gcome-shell .gcome-menu-item .more-item-icon.icon-emerald {
+  background: linear-gradient(135deg, #d1fae5 0%, #5eead4 100%);
+  color: #047857;
+}
+.gcome-shell .gcome-menu-item .more-item-icon.icon-violet {
+  background: linear-gradient(135deg, #f3e8ff 0%, #e879f9 45%, #a855f7 100%);
+  color: #fff;
+}
+.gcome-shell .gcome-menu-item .more-item-icon.icon-indigo {
+  background: linear-gradient(135deg, #e0e7ff 0%, #a5b4fc 100%);
+  color: #4338ca;
+}
+.gcome-shell .gcome-abandoned-badge {
+  background: #ef4444 !important;
+  color: #fff !important;
+  min-width: 24px;
+  height: 22px;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 900;
+  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.42);
 }
 .gcome-menu-chev {
   color: #94a3b8;
@@ -5555,11 +5704,12 @@ html.dark .gcome-shell .gcome-menu-item,
   transform: translateX(20px);
 }
 .gcome-pro-banner {
-  margin-top: 6px;
+  position: relative;
+  margin-top: 4px;
   padding: 13px 15px;
   border-radius: 22px;
-  background: radial-gradient(circle at 82% 20%, rgba(236, 72, 153, 0.35) 0%, transparent 45%),
-              linear-gradient(135deg, #4c1d95 0%, #6d28d9 58%, #7c3aed 100%);
+  background: radial-gradient(circle at 84% 18%, rgba(236, 72, 153, 0.36) 0%, transparent 45%),
+              linear-gradient(135deg, #4c1d95 0%, #6d28d9 56%, #7c3aed 100%);
   color: #fff;
   display: flex;
   align-items: center;
@@ -5568,7 +5718,17 @@ html.dark .gcome-shell .gcome-menu-item,
   box-shadow: 0 14px 28px rgba(91, 33, 182, 0.34);
   overflow: hidden;
 }
+.gcome-pro-wave {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
 .gcome-pro-copy {
+  position: relative;
+  z-index: 1;
   min-width: 0;
 }
 .gcome-pro-title {
@@ -5584,10 +5744,12 @@ html.dark .gcome-shell .gcome-menu-item,
 .gcome-pro-banner small {
   display: block;
   font-size: 11.5px;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.92);
   margin-top: 2px;
 }
 .gcome-pro-right {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -5599,7 +5761,7 @@ html.dark .gcome-shell .gcome-menu-item,
   filter: drop-shadow(0 6px 12px rgba(15, 23, 42, 0.28));
 }
 .gcome-pro-cta {
-  padding: 9px 15px;
+  padding: 9px 16px;
   border-radius: 999px;
   border: 0;
   background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);

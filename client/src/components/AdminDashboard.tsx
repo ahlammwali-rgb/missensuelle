@@ -317,12 +317,6 @@ export function AdminDashboard({
         </div>
       </section>
 
-      {heroBanner && (
-        <div className="gcome-mobile-hero-slot">
-          {heroBanner}
-        </div>
-      )}
-
       {/* ===== MAIN GRID: ORDERS + SIDEBAR ===== */}
       <section className="app-main-grid">
         <div className="app-orders-container">
@@ -396,6 +390,12 @@ export function AdminDashboard({
             </p>
           )}
 
+          {heroBanner && (
+            <div className="gcome-mobile-hero-slot">
+              {heroBanner}
+            </div>
+          )}
+
           {/* Status Tabs Carousel */}
           <div className="app-status-carousel" role="tablist">
             <button
@@ -416,7 +416,7 @@ export function AdminDashboard({
                   className={`app-status-tab tab-${status} ${activeStatus === status ? "active" : ""}`}
                   onClick={() => setActiveStatus(status)}
                 >
-                  <span className="app-tab-icon">{meta.icon}</span>
+                  <span className={`gcome-status-orb orb-${status}`} aria-hidden="true" />
                   <span>{meta.label}</span>
                   <b className="app-tab-count">{count}</b>
                 </button>
@@ -773,19 +773,19 @@ export function AdminDashboard({
                     return (
                       <>
                         <div className="aoc-product-row gcome-product-row">
-                          <div className="aoc-prod-main">
-                            {prodThumb ? (
-                              <img
-                                src={prodThumb}
-                                alt={displayTitle}
-                                className="gcome-prod-thumb"
-                                loading="lazy"
-                              />
-                            ) : (
-                              <div className="aoc-prod-badge">
-                                <Package size={16} />
-                              </div>
-                            )}
+                          {prodThumb ? (
+                            <img
+                              src={prodThumb}
+                              alt={displayTitle}
+                              className="gcome-prod-thumb"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="aoc-prod-badge gcome-prod-thumb-fallback">
+                              <Package size={22} />
+                            </div>
+                          )}
+                          <div className="gcome-prod-content">
                             <div className="aoc-prod-name-wrap">
                               <strong className="aoc-prod-title">{displayTitle}</strong>
                               <div className="aoc-prod-meta-tags">
@@ -819,15 +819,15 @@ export function AdminDashboard({
                                 )}
                               </div>
                             </div>
-                          </div>
 
-                          <div className="aoc-price-tag gcome-price-tag">
-                            <small>Total à encaisser</small>
-                            <div className="gcome-price-line">
-                              <strong>{formatDZD(order.total)}</strong>
-                              <span className="gcome-price-trend" aria-hidden="true">
-                                <TrendingUp size={13} />
-                              </span>
+                            <div className="aoc-price-tag gcome-price-tag">
+                              <small>Total à encaisser</small>
+                              <div className="gcome-price-line">
+                                <strong>{formatDZD(order.total)}</strong>
+                                <span className="gcome-price-trend" aria-hidden="true">
+                                  <TrendingUp size={13} />
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
