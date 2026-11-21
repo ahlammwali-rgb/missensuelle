@@ -257,33 +257,66 @@ export function EcoTrackPanel({
             </div>
           </div>
         ) : (
-          <div className="ecom-connected-bar">
-            <span>
-              Plateforme : <b dir="ltr">{status.baseUrl}</b> · Token : <b dir="ltr">{status.tokenPreview}</b>
-            </span>
-            <div>
+          <div className="ecom-connected-bar" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <span>
+                Plateforme : <b dir="ltr">{status.baseUrl}</b> · Token : <b dir="ltr">{status.tokenPreview}</b>
+              </span>
+              <div>
+                <button
+                  className="button button-outline"
+                  onClick={() => {
+                    setBaseUrl(status.baseUrl);
+                    setLabel(status.label || "");
+                    setEditing(true);
+                  }}
+                >
+                  Modifier
+                </button>
+                <button
+                  className="button button-light"
+                  onClick={() =>
+                    clearCredentials.mutate(undefined, {
+                      onSuccess: () => {
+                        void utils.ecotrack.status.invalidate();
+                        notify("EcoTrack déconnecté");
+                      },
+                    })
+                  }
+                >
+                  Déconnecter
+                </button>
+              </div>
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 8,
+                padding: "8px 12px",
+                borderRadius: 10,
+                background: "rgba(37, 99, 235, 0.08)",
+                border: "1px dashed rgba(37, 99, 235, 0.35)",
+                fontSize: 12,
+              }}
+            >
+              <span>
+                🔄 <strong>Sync auto DHD active (toutes les 5 min)</strong> · URL Webhook temps réel :{" "}
+                <code dir="ltr">{`${window.location.origin}/api/ecotrack/webhook`}</code>
+              </span>
               <button
-                className="button button-outline"
+                type="button"
+                className="button button-light"
+                style={{ padding: "4px 10px", fontSize: 11.5 }}
                 onClick={() => {
-                  setBaseUrl(status.baseUrl);
-                  setLabel(status.label || "");
-                  setEditing(true);
+                  const url = `${window.location.origin}/api/ecotrack/webhook`;
+                  void navigator.clipboard?.writeText(url);
+                  notify("URL Webhook DHD copiée ✦");
                 }}
               >
-                Modifier
-              </button>
-              <button
-                className="button button-light"
-                onClick={() =>
-                  clearCredentials.mutate(undefined, {
-                    onSuccess: () => {
-                      void utils.ecotrack.status.invalidate();
-                      notify("EcoTrack déconnecté");
-                    },
-                  })
-                }
-              >
-                Déconnecter
+                Copier URL Webhook
               </button>
             </div>
           </div>

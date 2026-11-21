@@ -773,25 +773,161 @@ export async function validateEcoTrackOrder(tracking: string) {
 
 const ECOTRACK_STATUS_LABELS: Record<string, string> = {
   prete_a_expedier: "Prêt à expédier",
+  pret_a_expedier: "Prêt à expédier",
   en_preparation: "En préparation",
+  expedie: "Expédié",
   vers_hub: "En transit vers Hub",
   en_hub: "Au Hub",
+  au_bureau: "Au Bureau (Stop Desk)",
   vers_wilaya: "En transit vers Wilaya",
   en_livraison: "En cours de livraison",
+  sorti_en_livraison: "En cours de livraison",
+  tentative_echouee: "Tentative échouée",
+  ne_repond_pas: "Ne répond pas",
+  reporte: "Reporté",
   suspendu: "Suspendu",
+  livre: "Livrée",
   livree: "Livrée",
+  livre_non_encaisse: "Livrée (Non encaissée)",
   livree_non_encaissee: "Livrée (Non encaissée)",
+  livre_encaisse: "Livrée & Encaissée",
   livree_encaissee: "Livrée & Encaissée",
+  encaisse: "Encaissée",
   encaissee: "Encaissée",
+  encaisse_non_paye: "Livrée & Encaissée",
+  encaisse_paye: "Livrée & Encaissée (Payée)",
   paye: "Payé",
+  paye_et_archive: "Livrée & Payée",
   retour_en_cours: "Retour en cours",
   retourne: "Retourné",
+  retour_client: "Retourné",
+  retour_hub: "Retour au Hub",
+  retour_expediteur: "Retourné expéditeur",
+  annule: "Annulée",
   annulee: "Annulée",
+  refuse: "Refusé",
+  refusee: "Refusé",
 };
 
 function formatEcoStatusLabel(raw?: string): string {
-  const key = (raw || "").trim().toLowerCase();
+  const key = (raw || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\s-]+/g, "_");
   return ECOTRACK_STATUS_LABELS[key] || raw || "En suivi";
+}
+
+type RawEcoTrackingNode = {
+  tracking?: string;
+  tracking_number?: string;
+  code?: string;
+  status?: string;
+  status_label?: string;
+  situation?: string;
+  etat?: string;
+  raw_status?: string;
+  order_id?: string;
+  OrderInfo?: RawEcoTrackingNode;
+  activity?: Array<{
+    reason?: string;
+    details?: string;
+    description?: string;
+    comment?: string;
+    station?: string;
+    location?: string;
+    driver?: string;
+    date?: string;
+    time?: string;
+    status?: string;
+    raw_status?: string;
+  }>;
+  history?: RawEcoTrackingNode["activity"];
+};
+
+function buildEcoTrackingItem(trk: string, rawNode: RawEcoTrackingNode): EcomTrackingInfo {
+  const info = rawNode.OrderInfo ?? rawNode;
+  const rawStatus =
+    info.status_label || info.raw_status || info.situation || info.etat || info.status || "";
+  const sit = formatEcoStatusLabel(info.status || rawStatus);
+  const low = `${info.status || ""} ${rawStatus} ${sit}`
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const events = Array.isArray(info.activity)
+    ? info.activity
+    : Array.isArray(info.history)
+      ? info.history
+      : [];
+  return {
+    tracking: trk,
+    situation: sit,
+    etat_logistique: info.status || rawStatus || sit,
+    encaisser:
+      low.includes("livr") ||
+      low.includes("encaiss") ||
+      low.includes("paye") ||
+      low.includes("recouvr"),
+    recouvert: low.includes("encaiss") || low.includes("paye") || low.includes("recouvr"),
+    historique: events.map(a => ({
+      date: [a.date, a.time].filter(Boolean).join(" "),
+      ville: a.station || a.location || "",
+      situation: a.reason || a.raw_status || (a.status ? formatEcoStatusLabel(a.status) : sit),
+      commentaire: a.details || a.description || a.comment || (a.driver ? `Livreur : ${a.driver}` : undefined),
+    })),
+  };
+}
+
+function extractEcoEntries(
+  resp: unknown,
+  expectedTrackings: string[]
+): Array<[string, RawEcoTrackingNode]> {
+  const entries: Array<[string, RawEcoTrackingNode]> = [];
+  if (!resp || typeof resp !== "object") return entries;
+  const root = resp as Record<string, unknown>;
+  const inner =
+    root.data && typeof root.data === "object" && !Array.isArray(root.data) && Array.isArray((root.data as Record<string, unknown>).data)
+      ? (root.data as Record<string, unknown>).data
+      : root.data !== undefined
+        ? root.data
+        : resp;
+
+  if (Array.isArray(inner)) {
+    for (const row of inner) {
+      if (!row || typeof row !== "object") continue;
+      const node = row as RawEcoTrackingNode;
+      const trk = String(node.tracking || node.tracking_number || node.code || "").trim();
+      if (trk) entries.push([trk, node]);
+    }
+    return entries;
+  }
+
+  if (inner && typeof inner === "object") {
+    const obj = inner as Record<string, unknown>;
+    const directTrk = String(
+      (obj as RawEcoTrackingNode).tracking ||
+        (obj as RawEcoTrackingNode).tracking_number ||
+        ((obj as RawEcoTrackingNode).OrderInfo?.tracking ?? "")
+    ).trim();
+    if (directTrk && ((obj as RawEcoTrackingNode).status || (obj as RawEcoTrackingNode).OrderInfo)) {
+      entries.push([directTrk, obj as RawEcoTrackingNode]);
+      return entries;
+    }
+    if (expectedTrackings.length === 1 && ((obj as RawEcoTrackingNode).status || (obj as RawEcoTrackingNode).activity || (obj as RawEcoTrackingNode).history)) {
+      entries.push([expectedTrackings[0], obj as RawEcoTrackingNode]);
+      return entries;
+    }
+    for (const [key, val] of Object.entries(obj)) {
+      if (!val || typeof val !== "object" || key === "success" || key === "message") continue;
+      const node = val as RawEcoTrackingNode;
+      const trk = String(node.tracking || node.OrderInfo?.tracking || key).trim();
+      if (trk && !/^\d+$/.test(trk)) {
+        entries.push([trk, node]);
+      }
+    }
+  }
+  return entries;
 }
 
 export async function getEcoTrackTrackingBatch(
@@ -815,55 +951,128 @@ export async function getEcoTrackTrackingBatch(
   }
   if (!toFetch.length) return result;
 
-  // Query in chunks of 40 via /api/v1/get/orders/status
+  const storeEntries = (pairs: Array<[string, RawEcoTrackingNode]>) => {
+    for (const [trk, node] of pairs) {
+      const item = buildEcoTrackingItem(trk, node);
+      ecoTrackingCache.set(trk, { at: Date.now(), data: item });
+      result[trk] = item;
+    }
+  };
+
+  // 1) Primary batch query via /api/v1/get/orders/status
   for (let i = 0; i < toFetch.length; i += 40) {
     const chunk = toFetch.slice(i, i + 40);
     try {
-      const resp = await ecoRequest<{
-        data?: Record<
-          string,
-          {
-            status?: string;
-            order_id?: string;
-            activity?: Array<{
-              reason?: string;
-              details?: string;
-              station?: string;
-              driver?: string;
-              date?: string;
-              time?: string;
-            }>;
-          }
-        >;
-      }>("/api/v1/get/orders/status", {
+      const resp = await ecoRequest<unknown>("/api/v1/get/orders/status", {
         creds,
         query: {
           api_token: creds.token,
           trackings: chunk.join(","),
         },
       });
-      for (const [trk, info] of Object.entries(resp.data ?? {})) {
-        const sit = formatEcoStatusLabel(info.status);
-        const low = `${info.status || ""} ${sit}`.toLowerCase();
-        const item: EcomTrackingInfo = {
-          tracking: trk,
-          situation: sit,
-          etat_logistique: info.status,
-          encaisser: low.includes("encaiss") || low.includes("paye") || low.includes("livree"),
-          recouvert: low.includes("encaiss") || low.includes("paye"),
-          historique: (info.activity ?? []).map(a => ({
-            date: [a.date, a.time].filter(Boolean).join(" "),
-            ville: a.station || "",
-            situation: a.reason || sit,
-            commentaire: a.details || (a.driver ? `Livreur : ${a.driver}` : undefined),
-          })),
-        };
-        ecoTrackingCache.set(trk, { at: Date.now(), data: item });
-        result[trk] = item;
-      }
+      storeEntries(extractEcoEntries(resp, chunk));
     } catch {
-      // Ignore transient tracking error
+      // Fall back to /api/v1/get/orders below
     }
   }
+
+  // 2) Fallback for trackings still missing: /api/v1/get/orders
+  const missingAfterStatus = toFetch.filter(t => !result[t]);
+  for (let i = 0; i < missingAfterStatus.length; i += 40) {
+    const chunk = missingAfterStatus.slice(i, i + 40);
+    try {
+      const resp = await ecoRequest<unknown>("/api/v1/get/orders", {
+        creds,
+        query: {
+          api_token: creds.token,
+          tracking: chunk.join(","),
+        },
+      });
+      storeEntries(extractEcoEntries(resp, chunk));
+    } catch {
+      // Continue to per-tracking lookup
+    }
+  }
+
+  // 3) Final fallback per tracking (up to 15): /api/v1/get/tracking/info
+  const stillMissing = toFetch.filter(t => !result[t]).slice(0, 15);
+  for (const trk of stillMissing) {
+    try {
+      const resp = await ecoRequest<unknown>("/api/v1/get/tracking/info", {
+        creds,
+        query: {
+          api_token: creds.token,
+          tracking: trk,
+        },
+      });
+      storeEntries(extractEcoEntries(resp, [trk]));
+    } catch {
+      // Ignore individual lookup failure
+    }
+  }
+
   return result;
+}
+
+export async function recordEcoTrackWebhookStatus(payload: Record<string, unknown>): Promise<{
+  ok: boolean;
+  tracking?: string;
+  orderId?: string;
+  situation?: string;
+  isDelivered?: boolean;
+}> {
+  await loadState();
+  const dataObj =
+    payload.data && typeof payload.data === "object"
+      ? (payload.data as Record<string, unknown>)
+      : payload.order && typeof payload.order === "object"
+        ? (payload.order as Record<string, unknown>)
+        : payload;
+  const tracking = String(
+    dataObj.tracking ||
+      dataObj.tracking_number ||
+      dataObj.code ||
+      payload.tracking ||
+      payload.tracking_number ||
+      ""
+  ).trim();
+  if (!tracking) return { ok: false };
+
+  const rawStatus = String(
+    dataObj.status ||
+      dataObj.new_status ||
+      dataObj.etat ||
+      dataObj.situation ||
+      payload.status ||
+      payload.event ||
+      ""
+  ).trim();
+  const item = buildEcoTrackingItem(tracking, {
+    tracking,
+    status: rawStatus || "en_livraison",
+    status_label: String(dataObj.status_label || ""),
+    activity: Array.isArray(dataObj.activity) ? (dataObj.activity as RawEcoTrackingNode["activity"]) : undefined,
+  });
+  ecoTrackingCache.set(tracking, { at: Date.now(), data: item });
+
+  const matchedEntry = Object.entries(state.shipments).find(
+    ([, sh]) => sh.tracking.trim().toLowerCase() === tracking.toLowerCase()
+  );
+  const low = `${rawStatus} ${item.situation}`
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const isDelivered =
+    low.includes("livr") ||
+    low.includes("encaiss") ||
+    low.includes("paye") ||
+    low.includes("recouvr");
+
+  return {
+    ok: true,
+    tracking,
+    orderId: matchedEntry?.[0],
+    situation: item.situation,
+    isDelivered,
+  };
 }
