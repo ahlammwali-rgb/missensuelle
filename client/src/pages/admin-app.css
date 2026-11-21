@@ -4607,21 +4607,20 @@ html.dark .phone-line {
    GCOME SAAS VISUAL UPGRADE (LIGHT & DARK MODE, MOBILE & DESKTOP)
    ========================================================================== */
 .admin-shell.gcome-shell {
-  --app-bg: #f5f3ff;
+  --app-bg: #f6f4ff;
   --app-surface: #ffffff;
   --app-surface-sub: #f6f3ff;
   --app-border: rgba(124, 58, 237, 0.14);
   --app-brand: #6d28d9;
   --app-brand-gradient: linear-gradient(135deg, #6d28d9 0%, #7c3aed 55%, #8b5cf6 100%);
-  background-color: #f5f3ff !important;
+  background-color: #f6f4ff !important;
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 430 160' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='tp' x1='0' y1='0' x2='170' y2='130' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%236D28D9' stop-opacity='0.62'/%3E%3Cstop offset='55%25' stop-color='%23A855F7' stop-opacity='0.28'/%3E%3Cstop offset='100%25' stop-color='%23F5F3FF' stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient id='tg' x1='0' y1='90' x2='185' y2='0' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%23FACC15' stop-opacity='0.78'/%3E%3Cstop offset='55%25' stop-color='%23F59E0B' stop-opacity='0.48'/%3E%3Cstop offset='100%25' stop-color='%23DDD6FE' stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient id='tr' x1='290' y1='0' x2='430' y2='105' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0%25' stop-color='%23DDD6FE' stop-opacity='0'/%3E%3Cstop offset='55%25' stop-color='%23FBBF24' stop-opacity='0.34'/%3E%3Cstop offset='100%25' stop-color='%237C3AED' stop-opacity='0.42'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 0H170C132 42 88 54 48 92C25 114 10 136 0 148V0Z' fill='url(%23tp)'/%3E%3Cpath d='M0 112C38 96 72 64 108 38C138 16 164 4 195 0H128C86 28 52 58 20 82C8 91 3 96 0 98V112Z' fill='url(%23tg)'/%3E%3Cpath d='M300 0H430V98C396 76 364 56 332 34C316 23 307 10 300 0Z' fill='url(%23tr)'/%3E%3C/svg%3E"),
-    radial-gradient(circle at 10% 4%, rgba(167, 139, 250, 0.16) 0%, transparent 38%),
-    radial-gradient(circle at 92% 6%, rgba(251, 191, 36, 0.14) 0%, transparent 32%),
-    linear-gradient(180deg, #f7f5ff 0%, #ffffff 42%, #f4f1ff 100%) !important;
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat !important;
-  background-position: top center, 0 0, 0 0, 0 0 !important;
-  background-size: 100% 155px, 100% 100%, 100% 100%, 100% 100% !important;
+    radial-gradient(circle at 12% 10%, rgba(167, 139, 250, 0.14) 0%, transparent 38%),
+    radial-gradient(circle at 92% 24%, rgba(192, 132, 252, 0.22) 0%, transparent 34%),
+    radial-gradient(circle at 86% 88%, rgba(168, 85, 247, 0.18) 0%, transparent 40%),
+    linear-gradient(180deg, #faf8ff 0%, #ffffff 48%, #f3eeff 100%) !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% 100% !important;
 }
 
 html.dark .admin-shell.gcome-shell,
@@ -4668,14 +4667,20 @@ html.dark .admin-shell.gcome-shell,
   gap: 4px;
 }
 .gcome-brand.has-crown-above .gcome-brand-text {
-  padding-top: 7px;
+  padding-top: 11px;
 }
 .gcome-brand.has-crown-above .gcome-brand-crown {
   position: absolute;
-  top: -11px;
-  left: 16px;
-  transform: rotate(-4deg);
-  filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.45));
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 2px 5px rgba(245, 158, 11, 0.45));
+}
+.gcome-brand.no-bag.is-compact .gcome-brand-name {
+  font-size: 21px;
+}
+.gcome-brand.no-bag.is-compact .gcome-brand-sub {
+  font-size: 8.5px;
 }
 .gcome-brand-name {
   font-size: 21px;
@@ -4687,7 +4692,7 @@ html.dark .admin-shell.gcome-shell,
   font-size: 17px;
 }
 .gcome-brand.is-large .gcome-brand-name {
-  font-size: 26px;
+  font-size: 29px;
 }
 .gcome-brand-crown {
   color: #f59e0b;
@@ -4704,8 +4709,8 @@ html.dark .admin-shell.gcome-shell,
   font-size: 8.5px;
 }
 .gcome-brand.is-large .gcome-brand-sub {
-  font-size: 11.5px;
-  color: #475569;
+  font-size: 12px;
+  color: #1e293b;
 }
 html.dark .gcome-brand.is-large .gcome-brand-sub,
 .dark .gcome-brand.is-large .gcome-brand-sub {
@@ -5650,10 +5655,10 @@ html.dark .gcome-shell .badge-status-nouvelle,
 }
 @media (max-width: 400px) {
   .gcome-brand.is-compact .gcome-brand-name {
-    font-size: 15.5px;
+    font-size: 19px;
   }
   .gcome-brand.is-compact .gcome-brand-sub {
-    display: none;
+    font-size: 8px;
   }
   .admin-shell.gcome-shell .admin-mobile-quick-top .neo-darkmode-btn {
     padding: 4px 8px !important;
@@ -5680,12 +5685,12 @@ html.dark .gcome-shell .badge-status-nouvelle,
     height: 70px !important;
   }
   .gcome-pro-rocket-svg {
-    width: 40px !important;
-    height: 40px !important;
+    width: 56px !important;
+    height: 56px !important;
   }
   .gcome-pro-cta {
-    padding: 8px 12px !important;
-    font-size: 11.5px !important;
+    padding: 7px 18px !important;
+    font-size: 12px !important;
   }
   .admin-shell.gcome-shell .admin-mobile-nav.gcome-bottom-dock button,
   .admin-shell.gcome-shell .admin-mobile-nav.gcome-bottom-dock button span {
@@ -5830,7 +5835,7 @@ html.dark .gcome-shell .gcome-menu-item,
   left: 0;
   right: 0;
   width: 100%;
-  height: 125px;
+  height: 92px;
   pointer-events: none;
   z-index: 940;
 }
@@ -5915,7 +5920,7 @@ html.dark .gcome-shell .gcome-menu-item,
   max-width: 100%;
   box-sizing: border-box;
   margin-top: 4px;
-  padding: 13px 14px;
+  padding: 14px 16px;
   border-radius: 22px;
   background: radial-gradient(circle at 84% 18%, rgba(236, 72, 153, 0.36) 0%, transparent 45%),
               linear-gradient(135deg, #4c1d95 0%, #6d28d9 56%, #7c3aed 100%);
@@ -5923,8 +5928,8 @@ html.dark .gcome-shell .gcome-menu-item,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  box-shadow: 0 14px 28px rgba(91, 33, 182, 0.34);
+  gap: 10px;
+  box-shadow: 0 14px 28px rgba(91, 33, 182, 0.32);
   overflow: hidden;
 }
 .gcome-pro-wave {
@@ -5940,12 +5945,15 @@ html.dark .gcome-shell .gcome-menu-item,
   z-index: 1;
   flex: 1 1 auto;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 .gcome-pro-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 16.5px;
+  gap: 7px;
+  font-size: 17px;
   color: #ffffff;
 }
 .gcome-pro-crown {
@@ -5955,7 +5963,7 @@ html.dark .gcome-shell .gcome-menu-item,
 }
 .gcome-pro-banner small {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.92);
   margin-top: 2px;
 }
@@ -5964,25 +5972,27 @@ html.dark .gcome-shell .gcome-menu-item,
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
   flex-shrink: 0;
 }
 .gcome-pro-rocket-svg {
-  width: 52px;
-  height: 52px;
-  filter: drop-shadow(0 6px 14px rgba(15, 23, 42, 0.32));
+  width: 68px;
+  height: 68px;
+  filter: drop-shadow(0 8px 16px rgba(15, 23, 42, 0.32));
 }
 .gcome-pro-cta {
-  padding: 9px 16px;
+  margin-top: 10px;
+  align-self: center;
+  padding: 8px 24px;
   border-radius: 999px;
   border: 0;
   background: linear-gradient(135deg, #fde047 0%, #f59e0b 100%);
   color: #1e1b4b;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 900;
   cursor: pointer;
   flex-shrink: 0;
-  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.38);
+  box-shadow: 0 7px 18px rgba(245, 158, 11, 0.42);
 }
 
 

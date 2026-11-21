@@ -3,13 +3,13 @@ import {
   AlarmClock,
   AlertTriangle,
   Bell,
+  Calendar,
   CheckCircle2,
   ChevronDown,
   Clock,
   Copy,
   Edit3,
   ExternalLink,
-  Filter,
   History,
   MapPin,
   MessageCircle,
@@ -381,7 +381,7 @@ export function AdminDashboard({
             </div>
 
             <div className="app-period-select">
-              <Filter size={15} />
+              <Calendar size={15} />
               <select value={period} onChange={event => setPeriod(event.target.value)}>
                 <option>Toutes les dates</option>
                 <option>Aujourd'hui</option>

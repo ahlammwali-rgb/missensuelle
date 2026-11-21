@@ -252,22 +252,15 @@ export function GcomeBottomWaveBar() {
   const uid = useId().replace(/:/g, "");
   return (
     <div className="gcome-bottom-wave-backdrop" aria-hidden="true">
-      <svg className="gcome-wave-bg-bottom" viewBox="0 0 430 130" preserveAspectRatio="none" fill="none">
+      <svg className="gcome-wave-bg-bottom" viewBox="0 0 430 110" preserveAspectRatio="none" fill="none">
         <defs>
-          <linearGradient id={`wbMain-${uid}`} x1="0" y1="130" x2="430" y2="20" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.88" />
-            <stop offset="28%" stopColor="#EC4899" stopOpacity="0.82" />
-            <stop offset="68%" stopColor="#6D28D9" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#4C1D95" stopOpacity="0.96" />
-          </linearGradient>
-          <linearGradient id={`wbAccent-${uid}`} x1="0" y1="60" x2="430" y2="125" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#FDE047" stopOpacity="0.82" />
-            <stop offset="48%" stopColor="#A855F7" stopOpacity="0.68" />
-            <stop offset="100%" stopColor="#5B21B6" stopOpacity="0.9" />
+          <linearGradient id={`wbSoft-${uid}`} x1="0" y1="0" x2="430" y2="110" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#DDD6FE" stopOpacity="0.22" />
+            <stop offset="50%" stopColor="#C4B5FD" stopOpacity="0.34" />
+            <stop offset="100%" stopColor="#DDD6FE" stopOpacity="0.45" />
           </linearGradient>
         </defs>
-        <path d="M0 54C78 14 165 46 242 66C318 86 378 60 430 14V130H0V54Z" fill={`url(#wbMain-${uid})`} />
-        <path d="M0 84C92 108 184 66 274 52C348 40 396 62 430 82V130H0V84Z" fill={`url(#wbAccent-${uid})`} />
+        <path d="M0 45C95 18 190 48 295 34C360 25 400 32 430 42V110H0V45Z" fill={`url(#wbSoft-${uid})`} />
       </svg>
     </div>
   );
@@ -278,20 +271,28 @@ export function GcomeMenuWaves() {
   return (
     <svg className="gcome-menu-wave-svg" viewBox="0 0 430 165" preserveAspectRatio="none" fill="none" aria-hidden="true">
       <defs>
-        <linearGradient id={`mwPurple-${uid}`} x1="250" y1="30" x2="430" y2="160" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#A855F7" stopOpacity="0.16" />
-          <stop offset="50%" stopColor="#7C3AED" stopOpacity="0.72" />
-          <stop offset="100%" stopColor="#4C1D95" stopOpacity="0.9" />
+        <linearGradient id={`mwPeach-${uid}`} x1="165" y1="15" x2="365" y2="145" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#FDE68A" stopOpacity="0.58" />
+          <stop offset="55%" stopColor="#FB923C" stopOpacity="0.68" />
+          <stop offset="100%" stopColor="#F59E0B" stopOpacity="0.82" />
         </linearGradient>
-        <linearGradient id={`mwGold-${uid}`} x1="250" y1="0" x2="430" y2="120" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#FDE047" stopOpacity="0.52" />
-          <stop offset="55%" stopColor="#F59E0B" stopOpacity="0.78" />
-          <stop offset="100%" stopColor="#EA580C" stopOpacity="0.6" />
+        <linearGradient id={`mwPurple-${uid}`} x1="210" y1="75" x2="430" y2="165" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#9333EA" stopOpacity="0.25" />
+          <stop offset="48%" stopColor="#6D28D9" stopOpacity="0.85" />
+          <stop offset="100%" stopColor="#4C1D95" stopOpacity="0.96" />
+        </linearGradient>
+        <linearGradient id={`mwTopMist-${uid}`} x1="0" y1="0" x2="220" y2="120" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#C4B5FD" stopOpacity="0.32" />
+          <stop offset="100%" stopColor="#F5F3FF" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d="M235 165C290 118 338 88 386 44C406 25 420 10 430 0V165H235Z" fill={`url(#mwGold-${uid})`} />
-      <path d="M268 165C322 118 370 104 430 72V165H268Z" fill={`url(#mwPurple-${uid})`} />
-      <path d="M0 0H105C68 28 36 40 0 56V0Z" fill="#8B5CF6" fillOpacity="0.18" />
+      {/* Left soft lilac corner whisper */}
+      <path d="M0 0H185C120 48 62 72 0 105V0Z" fill={`url(#mwTopMist-${uid})`} />
+      {/* Warm sweeping peach/gold arc matching right screen top */}
+      <path d="M180 165C228 112 268 78 332 52C374 34 406 20 430 0V165H180Z" fill={`url(#mwPeach-${uid})`} />
+      {/* Bold royal violet wave crest rising from lower-right edge */}
+      <path d="M235 165C298 114 352 104 430 62V165H235Z" fill={`url(#mwPurple-${uid})`} />
+      <path d="M206 165C264 134 326 122 396 140C412 144 422 152 430 165H206Z" fill="#DDD6FE" fillOpacity="0.45" />
     </svg>
   );
 }
