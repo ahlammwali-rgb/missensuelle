@@ -4988,25 +4988,27 @@ html.dark .gcome-shell .app-kpi-card,
   position: relative;
 }
 .gcome-shell .app-kpi-icon-pill {
-  width: 38px;
-  height: 38px;
-  border-radius: 13px;
-  box-shadow: 0 6px 14px rgba(109, 40, 217, 0.12);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.85), 0 6px 14px rgba(109, 40, 217, 0.14);
 }
 .gcome-shell .kpi-gradient-purple .app-kpi-icon-pill {
-  background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%) !important;
+  border-radius: 14px;
+  background: radial-gradient(circle at 30% 25%, #f5f3ff 0%, #ddd6fe 100%) !important;
   color: #6d28d9 !important;
 }
 .gcome-shell .kpi-gradient-orange .app-kpi-icon-pill {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
+  background: radial-gradient(circle at 30% 25%, #fffbeb 0%, #fde68a 100%) !important;
   color: #d97706 !important;
 }
 .gcome-shell .kpi-gradient-mint .app-kpi-icon-pill {
-  background: linear-gradient(135deg, #d1fae5 0%, #6ee7b7 100%) !important;
-  color: #059669 !important;
+  background: rgba(16, 185, 129, 0.13) !important;
+  box-shadow: 0 6px 14px rgba(16, 185, 129, 0.18) !important;
 }
 .gcome-shell .kpi-gradient-blue .app-kpi-icon-pill {
-  background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 100%) !important;
+  border-radius: 14px;
+  background: radial-gradient(circle at 30% 25%, #eff6ff 0%, #bfdbfe 100%) !important;
   color: #2563eb !important;
 }
 .gcome-shell .app-kpi-title {
@@ -5314,14 +5316,18 @@ html.dark .gcome-price-line strong,
   grid-column: 1 / -1 !important;
   width: 100% !important;
   justify-content: center !important;
-  height: 44px !important;
+  height: 46px !important;
   border-radius: 999px !important;
-  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 55%, #6d28d9 100%) !important;
+  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 52%, #6d28d9 100%) !important;
   color: #fff !important;
   border: 0 !important;
   font-size: 14px !important;
   font-weight: 900 !important;
-  box-shadow: 0 10px 24px rgba(109, 40, 217, 0.34) !important;
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.35), 0 10px 26px rgba(109, 40, 217, 0.36) !important;
+}
+.gcome-bolt-icon {
+  font-size: 13px;
+  line-height: 1;
 }
 .gcome-shell .aoc-tag-confirmed.gcome-confirm-full {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
@@ -5569,13 +5575,14 @@ html.dark .gcome-shell .badge-status-nouvelle,
     padding: 0 30px 0 12px !important;
   }
   .gcome-shell .admin-sidebar {
-    background: rgba(255, 255, 255, 0.72) !important;
-    border-bottom: 1px solid rgba(124, 58, 237, 0.08) !important;
+    background: rgba(255, 255, 255, 0.42) !important;
+    border-bottom: 0 !important;
+    box-shadow: none !important;
   }
   html.dark .gcome-shell .admin-sidebar,
   .dark .gcome-shell .admin-sidebar {
-    background: rgba(15, 18, 36, 0.92) !important;
-    border-bottom-color: rgba(139, 92, 246, 0.22) !important;
+    background: rgba(15, 18, 36, 0.78) !important;
+    border-bottom: 1px solid rgba(139, 92, 246, 0.18) !important;
   }
   .gcome-shell .admin-more-menu-sheet {
     padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important;
@@ -5705,10 +5712,10 @@ html.dark .gcome-shell .gcome-menu-item,
   border-color: rgba(139, 92, 246, 0.2) !important;
 }
 .gcome-shell .gcome-menu-item .more-item-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  box-shadow: 0 6px 14px rgba(76, 29, 149, 0.13);
+  width: 40px;
+  height: 40px;
+  border-radius: 50% !important;
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.9), 0 6px 16px rgba(76, 29, 149, 0.16);
 }
 .gcome-menu-quick-row {
   display: grid;
@@ -5750,41 +5757,41 @@ html.dark .gcome-menu-quick-pill,
   left: 0;
   right: 0;
   width: 100%;
-  height: 92px;
+  height: 118px;
   pointer-events: none;
   z-index: 940;
 }
 .gcome-shell .gcome-menu-item .more-item-icon.icon-purple {
-  background: linear-gradient(135deg, #ede9fe 0%, #c4b5fd 100%);
-  color: #6d28d9;
+  background: radial-gradient(circle at 30% 25%, #f5f3ff 0%, #ddd6fe 100%);
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.9), 0 6px 15px rgba(109, 40, 217, 0.2);
 }
 .gcome-shell .gcome-menu-item .more-item-icon.icon-mint {
-  background: linear-gradient(135deg, #d1fae5 0%, #6ee7b7 100%);
-  color: #059669;
+  background: radial-gradient(circle at 30% 25%, #ecfdf5 0%, #a7f3d0 100%);
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.9), 0 6px 15px rgba(16, 185, 129, 0.22);
 }
 .gcome-shell .gcome-menu-item .more-item-icon.icon-orange {
-  background: linear-gradient(135deg, #ffedd5 0%, #fdba74 100%);
-  color: #ea580c;
+  background: radial-gradient(circle at 30% 25%, #fff7ed 0%, #fed7aa 100%);
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.9), 0 6px 15px rgba(234, 88, 12, 0.22);
 }
 .gcome-shell .gcome-menu-item .more-item-icon.icon-blue {
-  background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 100%);
-  color: #2563eb;
+  background: radial-gradient(circle at 30% 25%, #eff6ff 0%, #bfdbfe 100%);
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.9), 0 6px 15px rgba(37, 99, 235, 0.22);
 }
 .gcome-shell .gcome-menu-item .more-item-icon.icon-rose {
-  background: linear-gradient(135deg, #ffe4e6 0%, #fda4af 100%);
-  color: #e11d48;
+  background: radial-gradient(circle at 30% 25%, #fff1f2 0%, #fecdd3 100%);
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.9), 0 6px 15px rgba(225, 29, 72, 0.22);
 }
 .gcome-shell .gcome-menu-item .more-item-icon.icon-lime {
-  background: linear-gradient(135deg, #ecfccb 0%, #bef264 100%);
-  color: #4d7c0f;
+  background: radial-gradient(circle at 30% 25%, #f7fee7 0%, #d9f99d 100%);
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.9), 0 6px 15px rgba(77, 124, 15, 0.22);
 }
 .gcome-shell .gcome-menu-item .more-item-icon.icon-emerald {
-  background: linear-gradient(135deg, #d1fae5 0%, #5eead4 100%);
-  color: #047857;
+  background: radial-gradient(circle at 30% 25%, #ecfdf5 0%, #99f6e4 100%);
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.9), 0 6px 15px rgba(5, 150, 105, 0.22);
 }
 .gcome-shell .gcome-menu-item .more-item-icon.icon-violet {
-  background: linear-gradient(135deg, #f3e8ff 0%, #e879f9 45%, #a855f7 100%);
-  color: #fff;
+  background: radial-gradient(circle at 30% 25%, #d8b4fe 0%, #9333ea 100%);
+  box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.55), 0 6px 16px rgba(147, 51, 234, 0.34);
 }
 .gcome-shell .gcome-menu-item .more-item-icon.icon-indigo {
   background: linear-gradient(135deg, #e0e7ff 0%, #a5b4fc 100%);
@@ -5861,11 +5868,13 @@ html.dark .gcome-menu-quick-pill,
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 16px;
-  color: #fde047;
+  font-size: 16.5px;
+  color: #ffffff;
 }
 .gcome-pro-crown {
-  filter: drop-shadow(0 2px 5px rgba(250, 204, 21, 0.45));
+  color: #fde047;
+  fill: #facc15;
+  filter: drop-shadow(0 2px 5px rgba(250, 204, 21, 0.55));
 }
 .gcome-pro-banner small {
   display: block;
@@ -5882,9 +5891,9 @@ html.dark .gcome-menu-quick-pill,
   flex-shrink: 0;
 }
 .gcome-pro-rocket-svg {
-  width: 44px;
-  height: 44px;
-  filter: drop-shadow(0 6px 12px rgba(15, 23, 42, 0.28));
+  width: 52px;
+  height: 52px;
+  filter: drop-shadow(0 6px 14px rgba(15, 23, 42, 0.32));
 }
 .gcome-pro-cta {
   padding: 9px 16px;

@@ -27,6 +27,13 @@ import {
 } from "lucide-react";
 import { formatDZD, getCatalogProducts, type Order, type OrderStatus } from "@/lib/store-data";
 import { formatOrderDate, getOrderStats, parseOrderDate } from "@/lib/admin-orders";
+import {
+  GcomeKpiBellIcon,
+  GcomeKpiChartIcon,
+  GcomeKpiCheckIcon,
+  GcomeKpiWalletIcon,
+  GcomeWhatsAppLogo,
+} from "@/components/GcomeIcons";
 
 type Props = {
   orders: Order[];
@@ -246,7 +253,7 @@ export function AdminDashboard({
       <section className="app-kpi-grid">
         <div className="app-kpi-card kpi-gradient-purple">
           <div className="app-kpi-header">
-            <span className="app-kpi-icon-pill"><TrendingUp size={17} /></span>
+            <span className="app-kpi-icon-pill"><GcomeKpiChartIcon /></span>
             <span className="app-kpi-title">Total Commandes</span>
           </div>
           <div className="app-kpi-body">
@@ -264,7 +271,7 @@ export function AdminDashboard({
 
         <div className="app-kpi-card kpi-gradient-orange">
           <div className="app-kpi-header">
-            <span className="app-kpi-icon-pill pulse-orange"><Bell size={17} /></span>
+            <span className="app-kpi-icon-pill pulse-orange"><GcomeKpiBellIcon /></span>
             <span className="app-kpi-title">À traiter d'urgence</span>
             {stats.pending > 0 && <span className="gcome-urgent-tri" aria-hidden="true"><AlertTriangle size={13} strokeWidth={2.5} /></span>}
           </div>
@@ -283,7 +290,7 @@ export function AdminDashboard({
 
         <div className="app-kpi-card kpi-gradient-mint">
           <div className="app-kpi-header">
-            <span className="app-kpi-icon-pill"><CheckCircle2 size={17} /></span>
+            <span className="app-kpi-icon-pill"><GcomeKpiCheckIcon /></span>
             <span className="app-kpi-title">Taux Confirmation</span>
           </div>
           <div className="app-kpi-body">
@@ -303,7 +310,7 @@ export function AdminDashboard({
 
         <div className="app-kpi-card kpi-gradient-blue">
           <div className="app-kpi-header">
-            <span className="app-kpi-icon-pill"><Package size={17} /></span>
+            <span className="app-kpi-icon-pill"><GcomeKpiWalletIcon /></span>
             <span className="app-kpi-title">Montant Confirmé</span>
           </div>
           <div className="app-kpi-body">
@@ -523,7 +530,11 @@ export function AdminDashboard({
                   <div className="aoc-top">
                     <div className="aoc-status-badge-wrap" style={{ display: "flex", flexWrap: "wrap", gap: "6px", alignItems: "center" }}>
                       <span className={`aoc-status-pill ${meta.badgeClass}`}>
-                        <span className="aoc-status-glow-dot" />
+                        {isNew ? (
+                          <span className="gcome-bolt-icon" aria-hidden="true">⚡</span>
+                        ) : (
+                          <span className="aoc-status-glow-dot" />
+                        )}
                         <span className="aoc-status-text">{statusLabel}</span>
                       </span>
                       {order.status === "transferee" && (
@@ -736,7 +747,7 @@ export function AdminDashboard({
                           onClick={() => onWhatsAppOrder(order)}
                           title="Envoyer un message WhatsApp pré-rempli à la cliente"
                         >
-                          <MessageCircle size={14} />
+                          <GcomeWhatsAppLogo />
                           <span>WhatsApp</span>
                         </button>
                       )}
