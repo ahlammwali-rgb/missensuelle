@@ -948,7 +948,7 @@ function AdminPageContent() {
     </div>
   );
 
-  return <div className="admin-shell gcome-shell"><aside className="admin-sidebar"><div className="admin-brand-mobile-row"><Link href="/" className="wordmark admin-wordmark gcome-logo-link"><GcomeBrand compact crownAbove hideBag /></Link><div className="admin-mobile-quick-top"><button type="button" className="neo-darkmode-btn mobile-top-theme-btn" onClick={toggleTheme} title={theme === "dark" ? "Passer en Mode Clair" : "Passer en Mode Sombre"} aria-label="Basculer Mode Clair / Sombre">{theme === "dark" ? (<><Sun size={13} className="neo-sun-glow" /><span>Clair</span></>) : (<><Moon size={13} className="neo-moon-glow" /><span>Dark</span></>)}</button><button type="button" className="neo-darkmode-btn mobile-top-create-btn gcome-mobile-cmd-btn" onClick={() => setIsCreatingOrder(true)} title="Créer une nouvelle commande"><Plus size={13} /><span>Commande</span></button><button type="button" onClick={() => setIsProfileModalOpen(true)} title="Mon profil, salaire & commissions" aria-label="Mon profil et commissions" className="gcome-profile-pill"><span>{currentActorName.slice(0, 2).toUpperCase()}</span>{activeNewCount > 0 && <span className="gcome-avatar-count">{activeNewCount}</span>}</button></div></div><button type="button" className="admin-user gcome-sidebar-shop-card" onClick={() => setIsProfileModalOpen(true)} title="Voir mon salaire, évolution & commissions"><div className="admin-avatar">{currentActorName.slice(0, 2).toUpperCase()}</div><div><strong>{currentActorName}</strong><span>{isOwner ? "Boutique Active • Voir profil" : "Confirmateur • Voir salaire"}</span></div></button><nav className="admin-nav"><span className="admin-nav-label">Espace Boutique</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{activeNewCount}</b></button><button className={section === "staff" ? "active" : ""} onClick={() => go("staff")}><Users size={18} />Confirmateurs & Salaires</button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com & DHD <b>{confirmedCount}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue & Studio IA <b>{catalogCount}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button onClick={() => go("staff")}><BarChart3 size={18} />Rapports & Performances</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "staff" ? "Confirmateurs, Salaires & Journal d'Activité" : section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Studio Produits & Landing Pages" : section === "ecom" ? "E-com Delivery & DHD (EcoTrack)" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : `Bonjour, ${currentActorName} 👑`}</h1></div><div className="admin-top-actions">
+  return <div className="admin-shell gcome-shell"><aside className="admin-sidebar"><div className="admin-brand-mobile-row"><Link href="/" className="wordmark admin-wordmark gcome-logo-link"><img src="/gcome-dash-brand.png" alt="Gcome — Vendez · Gérez · Suivez" className="gcome-dash-brand-img" /><span className="gcome-dash-brand-dark-fallback"><GcomeBrand compact crownAbove hideBag /></span></Link><div className="admin-mobile-quick-top"><button type="button" className="neo-darkmode-btn mobile-top-theme-btn" onClick={toggleTheme} title={theme === "dark" ? "Passer en Mode Clair" : "Passer en Mode Sombre"} aria-label="Basculer Mode Clair / Sombre">{theme === "dark" ? (<><Sun size={13} className="neo-sun-glow" /><span>Clair</span></>) : (<><Moon size={13} className="neo-moon-glow" /><span>Dark</span></>)}</button><button type="button" className="neo-darkmode-btn mobile-top-create-btn gcome-mobile-cmd-btn" onClick={() => setIsCreatingOrder(true)} title="Créer une nouvelle commande"><Plus size={13} /><span>Commande</span></button><button type="button" onClick={() => setIsProfileModalOpen(true)} title="Mon profil, salaire & commissions" aria-label="Mon profil et commissions" className="gcome-profile-pill"><span>{currentActorName.slice(0, 2).toUpperCase()}</span>{activeNewCount > 0 && <span className="gcome-avatar-count">{activeNewCount}</span>}</button></div></div><button type="button" className="admin-user gcome-sidebar-shop-card" onClick={() => setIsProfileModalOpen(true)} title="Voir mon salaire, évolution & commissions"><div className="admin-avatar">{currentActorName.slice(0, 2).toUpperCase()}</div><div><strong>{currentActorName}</strong><span>{isOwner ? "Boutique Active • Voir profil" : "Confirmateur • Voir salaire"}</span></div></button><nav className="admin-nav"><span className="admin-nav-label">Espace Boutique</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{activeNewCount}</b></button><button className={section === "staff" ? "active" : ""} onClick={() => go("staff")}><Users size={18} />Confirmateurs & Salaires</button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com & DHD <b>{confirmedCount}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue & Studio IA <b>{catalogCount}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button onClick={() => go("staff")}><BarChart3 size={18} />Rapports & Performances</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "staff" ? "Confirmateurs, Salaires & Journal d'Activité" : section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Studio Produits & Landing Pages" : section === "ecom" ? "E-com Delivery & DHD (EcoTrack)" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : `Bonjour, ${currentActorName} 👑`}</h1></div><div className="admin-top-actions">
   <button type="button" className="neo-darkmode-btn" onClick={toggleTheme} title={theme === "dark" ? "Mode Clair" : "Mode Sombre"} aria-label="Basculer Mode Sombre">
   {theme === "dark" ? (
     <>
@@ -1096,21 +1096,38 @@ function AdminPageContent() {
 )}{isMoreMenuOpen && (
   <div className="admin-more-menu-overlay gcome-menu-overlay" onClick={() => setIsMoreMenuOpen(false)}>
     <div className="gcome-menu-top-banner" onClick={e => e.stopPropagation()}>
-      <GcomeMenuWaves />
-      <div className="gcome-menu-top-inner">
-        <GcomeBrand subtitle="Votre solution tout-en-un" large showCrown={false} />
-        <button
-          type="button"
-          className="gcome-menu-settings-btn"
-          aria-label="Pixels et paramètres"
-          title="Pixels & paramètres"
-          onClick={() => {
-            go("settings");
-            setIsMoreMenuOpen(false);
-          }}
-        >
-          <Settings2 size={20} />
-        </button>
+      <img
+        src="/gcome-menu-top.png"
+        alt="Gcome — Votre solution tout-en-un"
+        className="gcome-menu-banner-img"
+      />
+      <button
+        type="button"
+        className="gcome-menu-settings-hotspot"
+        aria-label="Pixels et paramètres"
+        title="Pixels & paramètres"
+        onClick={() => {
+          go("settings");
+          setIsMoreMenuOpen(false);
+        }}
+      />
+      <div className="gcome-menu-dark-fallback">
+        <GcomeMenuWaves />
+        <div className="gcome-menu-top-inner">
+          <GcomeBrand subtitle="Votre solution tout-en-un" large showCrown={false} />
+          <button
+            type="button"
+            className="gcome-menu-settings-btn"
+            aria-label="Pixels et paramètres"
+            title="Pixels & paramètres"
+            onClick={() => {
+              go("settings");
+              setIsMoreMenuOpen(false);
+            }}
+          >
+            <Settings2 size={20} />
+          </button>
+        </div>
       </div>
     </div>
     <div className="admin-more-menu-sheet gcome-menu-sheet" onClick={e => e.stopPropagation()}>

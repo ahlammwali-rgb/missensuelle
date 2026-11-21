@@ -4961,18 +4961,23 @@ html.dark .gcome-mobile-bell,
   }
 }
 
-/* KPI Cards + Sparklines (Screen 2) */
+/* KPI Cards + Sparklines (Screen 1 Exact Match) */
 .gcome-shell .app-kpi-card {
-  padding: 15px 16px 36px;
+  padding: 14px 14px 54px;
+  min-height: 172px;
   border-radius: 22px !important;
-  background: rgba(255, 255, 255, 0.96) !important;
-  border: 1px solid rgba(139, 92, 246, 0.13) !important;
-  box-shadow: 0 12px 28px -8px rgba(76, 29, 149, 0.09) !important;
+  background: rgba(255, 255, 255, 0.97) !important;
+  border: 1.5px solid rgba(139, 92, 246, 0.22) !important;
+  box-shadow: 0 12px 28px -8px rgba(76, 29, 149, 0.12) !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  overflow: hidden;
 }
 html.dark .gcome-shell .app-kpi-card,
 .dark .gcome-shell .app-kpi-card {
   background: var(--app-surface) !important;
-  border-color: rgba(139, 92, 246, 0.22) !important;
+  border-color: rgba(139, 92, 246, 0.26) !important;
 }
 .gcome-shell .app-kpi-header,
 .gcome-shell .app-kpi-body {
@@ -4986,68 +4991,90 @@ html.dark .gcome-shell .app-kpi-card,
   flex-direction: column;
   align-items: flex-start;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   position: relative;
 }
 .gcome-shell .app-kpi-icon-pill {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.85), 0 6px 14px rgba(109, 40, 217, 0.14);
 }
 .gcome-shell .kpi-gradient-purple .app-kpi-icon-pill {
-  border-radius: 14px;
+  border-radius: 12px;
   background: radial-gradient(circle at 30% 25%, #f5f3ff 0%, #ddd6fe 100%) !important;
   color: #6d28d9 !important;
 }
 .gcome-shell .kpi-gradient-orange .app-kpi-icon-pill {
-  background: radial-gradient(circle at 30% 25%, #fffbeb 0%, #fde68a 100%) !important;
+  background: radial-gradient(circle, rgba(251, 146, 60, 0.24) 0%, rgba(255, 237, 213, 0) 74%) !important;
+  box-shadow: none !important;
   color: #d97706 !important;
 }
 .gcome-shell .kpi-gradient-mint .app-kpi-icon-pill {
-  background: rgba(16, 185, 129, 0.13) !important;
-  box-shadow: 0 6px 14px rgba(16, 185, 129, 0.18) !important;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.22) 0%, rgba(16, 185, 129, 0) 74%) !important;
+  box-shadow: none !important;
 }
 .gcome-shell .kpi-gradient-blue .app-kpi-icon-pill {
-  border-radius: 14px;
+  border-radius: 12px;
   background: radial-gradient(circle at 30% 25%, #eff6ff 0%, #bfdbfe 100%) !important;
   color: #2563eb !important;
 }
 .gcome-shell .app-kpi-title {
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: #1e1b4b;
-  line-height: 1.25;
+  color: #0f172a;
+  line-height: 1.2;
+  max-width: 108px;
 }
 html.dark .gcome-shell .app-kpi-title,
 .dark .gcome-shell .app-kpi-title {
-  color: #cbd5e1;
+  color: #e2e8f0;
 }
 .gcome-shell .app-kpi-num {
-  font-size: clamp(20px, 4.8vw, 27px);
+  font-size: clamp(19px, 5vw, 26px);
   font-weight: 900;
-  margin-bottom: 2px;
+  color: #080b18;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  margin: 1px 0 4px;
   white-space: nowrap;
+}
+html.dark .gcome-shell .app-kpi-num,
+.dark .gcome-shell .app-kpi-num {
+  color: #f8fafc;
 }
 .gcome-shell .app-kpi-sub {
   font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+  line-height: 1.25;
   position: relative;
   z-index: 2;
+}
+html.dark .gcome-shell .app-kpi-sub,
+.dark .gcome-shell .app-kpi-sub {
+  color: #94a3b8;
 }
 .gcome-urgent-tri {
   position: absolute;
   top: 0;
   right: 0;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: rgba(245, 158, 11, 0.14);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  color: #ea580c;
+  width: 27px;
+  height: 27px;
+  border-radius: 9px;
+  background: rgba(254, 215, 170, 0.58);
+  border: 1px solid rgba(245, 158, 11, 0.34);
+  color: #dc2626;
   display: grid;
   place-items: center;
+}
+html.dark .gcome-urgent-tri,
+.dark .gcome-urgent-tri {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.45);
+  color: #fbbf24;
 }
 .gcome-kpi-spark {
   position: absolute;
@@ -5055,21 +5082,39 @@ html.dark .gcome-shell .app-kpi-title,
   right: 0;
   bottom: 0;
   width: 100%;
-  height: 60px;
+  height: 58px;
   pointer-events: none;
   opacity: 1;
 }
 .gcome-shell .kpi-gradient-purple {
-  box-shadow: 0 14px 28px -10px rgba(109, 40, 217, 0.24) !important;
+  background: radial-gradient(circle at 86% 96%, rgba(139, 92, 246, 0.16), rgba(255, 255, 255, 0.98) 65%) !important;
+  border-color: rgba(168, 85, 247, 0.25) !important;
+  box-shadow: 0 12px 28px -8px rgba(109, 40, 217, 0.17), inset 0 -14px 24px -10px rgba(139, 92, 246, 0.14) !important;
 }
 .gcome-shell .kpi-gradient-orange {
-  box-shadow: 0 14px 28px -10px rgba(245, 158, 11, 0.26) !important;
+  background: radial-gradient(circle at 86% 96%, rgba(251, 146, 60, 0.20), rgba(255, 255, 255, 0.98) 65%) !important;
+  border-color: rgba(245, 158, 11, 0.36) !important;
+  box-shadow: 0 12px 28px -8px rgba(245, 158, 11, 0.21), inset 0 -14px 24px -10px rgba(245, 158, 11, 0.16) !important;
 }
 .gcome-shell .kpi-gradient-mint {
-  box-shadow: 0 14px 28px -10px rgba(16, 185, 129, 0.24) !important;
+  background: radial-gradient(circle at 86% 96%, rgba(16, 185, 129, 0.17), rgba(255, 255, 255, 0.98) 65%) !important;
+  border-color: rgba(52, 211, 153, 0.30) !important;
+  box-shadow: 0 12px 28px -8px rgba(16, 185, 129, 0.18), inset 0 -14px 24px -10px rgba(16, 185, 129, 0.14) !important;
 }
 .gcome-shell .kpi-gradient-blue {
-  box-shadow: 0 14px 28px -10px rgba(37, 99, 235, 0.24) !important;
+  background: radial-gradient(circle at 86% 96%, rgba(59, 130, 246, 0.18), rgba(255, 255, 255, 0.98) 65%) !important;
+  border-color: rgba(96, 165, 250, 0.32) !important;
+  box-shadow: 0 12px 28px -8px rgba(37, 99, 235, 0.18), inset 0 -14px 24px -10px rgba(59, 130, 246, 0.14) !important;
+}
+html.dark .gcome-shell .kpi-gradient-purple,
+.dark .gcome-shell .kpi-gradient-purple,
+html.dark .gcome-shell .kpi-gradient-orange,
+.dark .gcome-shell .kpi-gradient-orange,
+html.dark .gcome-shell .kpi-gradient-mint,
+.dark .gcome-shell .kpi-gradient-mint,
+html.dark .gcome-shell .kpi-gradient-blue,
+.dark .gcome-shell .kpi-gradient-blue {
+  background: var(--app-surface) !important;
 }
 
 /* Flux Commandes Toolbar & Status Pills */
@@ -5185,11 +5230,11 @@ html.dark .gcome-shell .app-head-badge,
 .orb-ne_repond_pas { background: radial-gradient(circle at 35% 30%, #fdba74, #ea580c); color: rgba(234, 88, 12, 0.55); }
 .orb-annulee { background: radial-gradient(circle at 35% 30%, #fca5a5, #ef4444); color: rgba(239, 68, 68, 0.55); }
 
-/* Order Card Mockup Upgrade (Screen 1) */
+/* Order Card Mockup Upgrade + Left Status Ribbon */
 .gcome-shell .app-order-card {
   border-radius: 24px !important;
   border: 1px solid rgba(124, 58, 237, 0.14) !important;
-  border-left: 1px solid rgba(124, 58, 237, 0.14) !important;
+  border-left: 6px solid #8b5cf6 !important;
   padding: 16px !important;
   box-shadow: 0 14px 34px -10px rgba(76, 29, 149, 0.12) !important;
 }
@@ -5198,8 +5243,29 @@ html.dark .gcome-shell .app-head-badge,
   padding-bottom: 4px !important;
 }
 .gcome-shell .app-order-card.card-status-nouvelle {
-  border-color: rgba(245, 158, 11, 0.32) !important;
+  border-color: rgba(245, 158, 11, 0.30) !important;
+  border-left: 6px solid #f59e0b !important;
   background: linear-gradient(180deg, rgba(254, 243, 199, 0.55) 0%, var(--app-surface) 84px) !important;
+}
+.gcome-shell .app-order-card.card-status-confirmee {
+  border-color: rgba(16, 185, 129, 0.26) !important;
+  border-left: 6px solid #10b981 !important;
+}
+.gcome-shell .app-order-card.card-status-transferee {
+  border-color: rgba(139, 92, 246, 0.26) !important;
+  border-left: 6px solid #8b5cf6 !important;
+}
+.gcome-shell .app-order-card.card-status-reportee {
+  border-color: rgba(59, 130, 246, 0.26) !important;
+  border-left: 6px solid #3b82f6 !important;
+}
+.gcome-shell .app-order-card.card-status-ne_repond_pas {
+  border-color: rgba(234, 88, 12, 0.28) !important;
+  border-left: 6px solid #ea580c !important;
+}
+.gcome-shell .app-order-card.card-status-annulee {
+  border-color: rgba(239, 68, 68, 0.26) !important;
+  border-left: 6px solid #ef4444 !important;
 }
 html.dark .gcome-shell .app-order-card.card-status-nouvelle,
 .dark .gcome-shell .app-order-card.card-status-nouvelle {
@@ -5478,10 +5544,19 @@ html.dark .gcome-shell .badge-status-nouvelle,
     min-width: 0 !important;
     gap: 6px !important;
     flex-wrap: nowrap !important;
+    align-items: center !important;
   }
   .admin-shell.gcome-shell .gcome-logo-link {
     min-width: 0 !important;
     flex-shrink: 1 !important;
+  }
+  .gcome-dash-brand-img {
+    height: 54px;
+    width: auto;
+    max-width: 118px;
+    display: block;
+    object-fit: contain;
+    object-position: left center;
   }
   .admin-shell.gcome-shell .admin-content {
     padding: 4px 12px calc(92px + env(safe-area-inset-bottom, 0px)) !important;
@@ -5564,12 +5639,13 @@ html.dark .gcome-shell .badge-status-nouvelle,
     width: 100% !important;
   }
   .gcome-shell .app-kpi-card {
-    padding: 13px 12px 40px !important;
+    padding: 13px 13px 54px !important;
+    min-height: 174px !important;
     min-width: 0 !important;
     max-width: 100% !important;
   }
   .gcome-shell .app-kpi-num {
-    font-size: clamp(17px, 4.4vw, 23px) !important;
+    font-size: clamp(18px, 4.9vw, 24px) !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -5721,15 +5797,78 @@ html.dark .gcome-shell .admin-more-menu-overlay.gcome-menu-overlay,
 .gcome-shell .more-item-text small {
   overflow-wrap: anywhere;
 }
+.gcome-dash-brand-img {
+  height: 56px;
+  width: auto;
+  max-width: 126px;
+  display: block;
+  object-fit: contain;
+  object-position: left center;
+}
+.gcome-dash-brand-dark-fallback {
+  display: none;
+}
+html.dark .gcome-dash-brand-img,
+.dark .gcome-dash-brand-img {
+  display: none !important;
+}
+html.dark .gcome-dash-brand-dark-fallback,
+.dark .gcome-dash-brand-dark-fallback {
+  display: inline-flex !important;
+}
 .gcome-menu-top-banner {
   position: relative;
   width: 100%;
   max-width: 540px;
-  min-height: 98px;
-  display: flex;
-  align-items: center;
+  display: block;
+  background: linear-gradient(135deg, #f3ecff 0%, #fff7f0 100%);
   overflow: hidden;
   flex-shrink: 0;
+}
+.gcome-menu-banner-img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 606 / 246;
+  max-height: 185px;
+  display: block;
+  object-fit: cover;
+  object-position: center top;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.gcome-menu-settings-hotspot {
+  position: absolute;
+  top: 14%;
+  right: 2.5%;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 3;
+  -webkit-tap-highlight-color: transparent;
+}
+.gcome-menu-dark-fallback {
+  display: none;
+  position: relative;
+  width: 100%;
+  min-height: 98px;
+}
+html.dark .gcome-menu-banner-img,
+.dark .gcome-menu-banner-img,
+html.dark .gcome-menu-settings-hotspot,
+.dark .gcome-menu-settings-hotspot {
+  display: none !important;
+}
+html.dark .gcome-menu-top-banner,
+.dark .gcome-menu-top-banner {
+  background: transparent;
+}
+html.dark .gcome-menu-dark-fallback,
+.dark .gcome-menu-dark-fallback {
+  display: flex;
+  align-items: center;
 }
 .gcome-menu-wave-svg {
   position: absolute;
@@ -5774,6 +5913,9 @@ html.dark .gcome-menu-settings-btn,
   border-color: rgba(139, 92, 246, 0.35);
 }
 .gcome-shell .admin-more-menu-sheet.gcome-menu-sheet {
+  position: relative !important;
+  z-index: 2 !important;
+  margin-top: -16px !important;
   flex: 1 1 auto !important;
   min-height: 0 !important;
   max-height: none !important;
@@ -5790,6 +5932,7 @@ html.dark .gcome-menu-settings-btn,
 }
 html.dark .gcome-shell .admin-more-menu-sheet.gcome-menu-sheet,
 .dark .gcome-shell .admin-more-menu-sheet.gcome-menu-sheet {
+  margin-top: 0 !important;
   border-top-color: rgba(139, 92, 246, 0.3) !important;
   background: linear-gradient(180deg, #13172b 0%, #0d1020 100%) !important;
 }

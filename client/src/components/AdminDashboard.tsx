@@ -110,31 +110,40 @@ function KpiSparkline({
   color,
   gradId,
   points,
+  backPoints,
 }: {
   color: string;
   gradId: string;
   points: string;
+  backPoints: string;
 }) {
   return (
     <svg
       className="gcome-kpi-spark"
-      viewBox="0 0 180 46"
+      viewBox="0 0 180 54"
       preserveAspectRatio="none"
       aria-hidden="true"
     >
       <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.45" />
-          <stop offset="55%" stopColor={color} stopOpacity="0.28" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.42" />
+        <linearGradient id={`${gradId}-bg`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.08" />
+          <stop offset="60%" stopColor={color} stopOpacity="0.22" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.34" />
+        </linearGradient>
+        <linearGradient id={gradId} x1="0" y1="0.2" x2="1" y2="0.8">
+          <stop offset="0%" stopColor={color} stopOpacity="0.18" />
+          <stop offset="55%" stopColor={color} stopOpacity="0.42" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.62" />
         </linearGradient>
       </defs>
-      <path d={`${points} L 180 46 L 0 46 Z`} fill={`url(#${gradId})`} />
+      <path d={`${backPoints} L 180 54 L 0 54 Z`} fill={`url(#${gradId}-bg)`} />
+      <path d={`${points} L 180 54 L 0 54 Z`} fill={`url(#${gradId})`} />
       <path
         d={points}
         fill="none"
         stroke={color}
-        strokeWidth="3"
+        strokeOpacity="0.55"
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -263,9 +272,10 @@ export function AdminDashboard({
             </span>
           </div>
           <KpiSparkline
-            color="#7c3aed"
+            color="#8b5cf6"
             gradId="spark-purple"
-            points="M0 32 C 25 28, 40 36, 70 26 C 100 16, 125 24, 150 14 C 165 8, 172 10, 180 6"
+            backPoints="M0 44 C 24 41, 44 45, 76 34 C 102 25, 118 32, 146 20 C 162 13, 172 11, 180 8"
+            points="M0 48 C 28 45, 52 38, 86 24 C 110 15, 130 28, 152 17 C 165 11, 173 6, 180 4"
           />
         </div>
 
@@ -284,7 +294,8 @@ export function AdminDashboard({
           <KpiSparkline
             color="#f59e0b"
             gradId="spark-orange"
-            points="M0 34 C 30 30, 50 22, 85 26 C 115 30, 140 16, 165 18 C 172 19, 176 15, 180 12"
+            backPoints="M0 46 C 24 42, 46 34, 72 38 C 96 42, 116 28, 144 26 C 162 25, 171 17, 180 12"
+            points="M0 50 C 26 46, 48 39, 76 43 C 100 46, 122 33, 148 24 C 162 19, 172 15, 180 11"
           />
         </div>
 
@@ -304,7 +315,8 @@ export function AdminDashboard({
           <KpiSparkline
             color="#10b981"
             gradId="spark-mint"
-            points="M0 30 C 35 28, 55 34, 88 24 C 118 16, 140 22, 165 12 C 172 9, 176 8, 180 5"
+            backPoints="M0 46 C 32 45, 56 41, 90 30 C 118 22, 138 25, 162 13 C 171 9, 176 7, 180 5"
+            points="M0 50 C 30 48, 52 46, 86 38 C 114 31, 134 26, 156 16 C 168 10, 174 7, 180 4"
           />
         </div>
 
@@ -318,9 +330,10 @@ export function AdminDashboard({
             <span className="app-kpi-sub">Prêt pour expédition COD</span>
           </div>
           <KpiSparkline
-            color="#2563eb"
+            color="#3b82f6"
             gradId="spark-blue"
-            points="M0 35 C 28 32, 60 27, 92 22 C 122 18, 146 21, 168 11 C 174 8, 177 7, 180 5"
+            backPoints="M0 45 C 24 41, 48 44, 78 36 C 106 28, 128 33, 152 21 C 166 15, 173 14, 180 11"
+            points="M0 49 C 28 45, 52 47, 82 39 C 110 32, 132 35, 156 24 C 168 18, 174 16, 180 12"
           />
         </div>
       </section>
