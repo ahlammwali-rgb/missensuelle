@@ -276,22 +276,22 @@ export function GcomeBottomWaveBar() {
 export function GcomeMenuWaves() {
   const uid = useId().replace(/:/g, "");
   return (
-    <svg className="gcome-menu-wave-svg" viewBox="0 0 430 175" preserveAspectRatio="none" fill="none" aria-hidden="true">
+    <svg className="gcome-menu-wave-svg" viewBox="0 0 430 165" preserveAspectRatio="none" fill="none" aria-hidden="true">
       <defs>
-        <linearGradient id={`mwPurple-${uid}`} x1="170" y1="20" x2="430" y2="165" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#A855F7" stopOpacity="0.28" />
-          <stop offset="48%" stopColor="#7C3AED" stopOpacity="0.86" />
-          <stop offset="100%" stopColor="#4C1D95" stopOpacity="0.98" />
+        <linearGradient id={`mwPurple-${uid}`} x1="250" y1="30" x2="430" y2="160" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#A855F7" stopOpacity="0.16" />
+          <stop offset="50%" stopColor="#7C3AED" stopOpacity="0.72" />
+          <stop offset="100%" stopColor="#4C1D95" stopOpacity="0.9" />
         </linearGradient>
-        <linearGradient id={`mwGold-${uid}`} x1="210" y1="0" x2="430" y2="135" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#FDE047" stopOpacity="0.7" />
-          <stop offset="55%" stopColor="#F59E0B" stopOpacity="0.92" />
-          <stop offset="100%" stopColor="#EA580C" stopOpacity="0.78" />
+        <linearGradient id={`mwGold-${uid}`} x1="250" y1="0" x2="430" y2="120" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#FDE047" stopOpacity="0.52" />
+          <stop offset="55%" stopColor="#F59E0B" stopOpacity="0.78" />
+          <stop offset="100%" stopColor="#EA580C" stopOpacity="0.6" />
         </linearGradient>
       </defs>
-      <path d="M185 175C252 118 312 88 372 44C398 25 416 10 430 0V175H185Z" fill={`url(#mwGold-${uid})`} />
-      <path d="M225 175C294 114 356 102 430 68V175H225Z" fill={`url(#mwPurple-${uid})`} />
-      <path d="M0 0H145C96 42 52 56 0 76V0Z" fill="#7C3AED" fillOpacity="0.28" />
+      <path d="M235 165C290 118 338 88 386 44C406 25 420 10 430 0V165H235Z" fill={`url(#mwGold-${uid})`} />
+      <path d="M268 165C322 118 370 104 430 72V165H268Z" fill={`url(#mwPurple-${uid})`} />
+      <path d="M0 0H105C68 28 36 40 0 56V0Z" fill="#8B5CF6" fillOpacity="0.18" />
     </svg>
   );
 }
