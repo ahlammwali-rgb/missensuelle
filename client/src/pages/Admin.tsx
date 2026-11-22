@@ -10,7 +10,7 @@ import { categories, getCatalogProducts, getProductVariantOptions, saveCatalogPr
 import { AiLandingCreatorWizard } from "@/components/AiLandingCreatorWizard";
 import { StatusPill } from "@/components/StoreLayout";
 import { useTheme } from "@/contexts/ThemeContext";
-import { getPixelConfig, savePixelConfig, trackPixelEvent, hasGlobalTikTokPixel, hasGlobalFacebookPixel, type PixelConfig } from "@/lib/tracking";
+import { getPixelConfig, applyServerPixelConfig, trackPixelEvent, type PixelConfig } from "@/lib/tracking";
 import "./admin-responsive.css";
 import "./admin-app.css";
 import { PixelDiagnostics } from "@/components/PixelDiagnostics";
@@ -2946,18 +2946,44 @@ function ProductForm({
   );
 }
 
-function TrackingSettings({ notify }: { notify: (message: string) => void }) {
-  const globalTikTok = hasGlobalTikTokPixel();
-  const globalFacebook = hasGlobalFacebookPixel();
+function TrackingSettings({ notify }: { notify: (message: string, type?: "normal" | "urgent" | "victory" | "order") => void }) {
+  const utils = trpc.useUtils();
   const [config, setConfig] = useState<PixelConfig>(() => getPixelConfig());
+  const pixelQuery = trpc.admin.getPixelConfig.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const savePixelMutation = trpc.admin.setPixelConfig.useMutation({
+    onSuccess: saved => {
+      const normalized = applyServerPixelConfig(saved);
+      setConfig(normalized);
+      void utils.admin.getPixelConfig.invalidate();
+      notify("✅ Pixels enregistrés sur le serveur pour tous les visiteurs !");
+    },
+    onError: error => {
+      notify(error instanceof Error ? error.message : "Impossible d’enregistrer les pixels sur le serveur", "urgent");
+    },
+  });
+
+  useEffect(() => {
+    if (pixelQuery.data) {
+      const normalized = applyServerPixelConfig(pixelQuery.data);
+      setConfig(normalized);
+    }
+  }, [pixelQuery.data]);
+
   const update = (key: keyof PixelConfig, value: string) => setConfig(current => ({ ...current, [key]: value }));
   const save = () => {
-    try {
-      savePixelConfig(config);
-      notify("Pixels globaux du site · préférences enregistrées");
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Impossible d’enregistrer les préférences pixels");
+    const cleanFb = config.facebookPixelId.trim();
+    if (cleanFb && !/^\d{6,30}$/.test(cleanFb)) {
+      notify("L'ID du Pixel Facebook ne doit contenir que des chiffres (ex: 916933364742371).", "urgent");
+      return;
     }
+    savePixelMutation.mutate({
+      facebookPixelId: cleanFb,
+      tiktokPixelId: config.tiktokPixelId.trim(),
+      tiktokCode: config.tiktokCode.trim(),
+    });
   };
 
   return (
@@ -2969,7 +2995,7 @@ function TrackingSettings({ notify }: { notify: (message: string) => void }) {
         <h2>Connecte tes pixels<br /><em>sans perdre le signal.</em></h2>
         <p>Les événements ViewContent, InitiateCheckout et Purchase sont envoyés sur les pages produit et après validation COD.</p>
       </div>
-      <p className="tracking-config-notice">Meta et TikTok sont installés dans l’en-tête pour tous les visiteurs avec les identifiants du site. Ces identifiants globaux ne sont pas remplacés par le stockage local. Vérifie la réception dans le Gestionnaire d’événements de chaque plateforme.</p>
+      <p className="tracking-config-notice">Modifie et enregistre tes identifiants Meta &amp; TikTok ci-dessous : ils sont sauvegardés sur le serveur et appliqués immédiatement à tous les visiteurs du site (sans redéploiement).</p>
       <PixelDiagnostics />
       <div className="tracking-grid">
         <div className="tracking-card">
@@ -2979,13 +3005,18 @@ function TrackingSettings({ notify }: { notify: (message: string) => void }) {
               <h3>Meta Pixel</h3>
               <p>Facebook / Instagram</p>
             </div>
-            <span>{globalFacebook ? "Global" : "Optionnel"}</span>
+            <span>Global • Éditable</span>
           </div>
           <label>
             ID du pixel Facebook
-            <input readOnly={globalFacebook} value={config.facebookPixelId} onChange={e => update("facebookPixelId", e.target.value)} placeholder="Ex. 123456789012345" />
+            <input
+              value={config.facebookPixelId}
+              onChange={e => update("facebookPixelId", e.target.value)}
+              placeholder="Ex. 916933364742371"
+              inputMode="numeric"
+            />
           </label>
-          <small>Le pixel Meta global est configuré pour tous les visiteurs. Pour modifier cet identifiant global, il faut mettre à jour la configuration du site.</small>
+          <small>Saisis l'identifiant du Dataset / Pixel Meta (ex. 916933364742371) puis clique sur « Enregistrer les pixels » pour l'activer pour tous les visiteurs.</small>
         </div>
         <div className="tracking-card">
           <div className="tracking-card-head">
@@ -2994,17 +3025,25 @@ function TrackingSettings({ notify }: { notify: (message: string) => void }) {
               <h3>TikTok Pixel</h3>
               <p>ID ou code complet</p>
             </div>
-            <span>Optionnel</span>
+            <span>Global • Éditable</span>
           </div>
           <label>
             ID TikTok
-            <input readOnly={globalTikTok} value={config.tiktokPixelId} onChange={e => update("tiktokPixelId", e.target.value)} placeholder="Ex. CDEFGHIJKL123456" />
+            <input
+              value={config.tiktokPixelId}
+              onChange={e => update("tiktokPixelId", e.target.value)}
+              placeholder="Ex. CUD92NJC77U74NKABJI0"
+            />
           </label>
           <label>
-            Code TikTok fourni
-            <textarea disabled={globalTikTok} value={config.tiktokCode} onChange={e => update("tiktokCode", e.target.value)} placeholder="Colle ici le code que TikTok te donne…" />
+            Code TikTok fourni (optionnel)
+            <textarea
+              value={config.tiktokCode}
+              onChange={e => update("tiktokCode", e.target.value)}
+              placeholder="Colle ici le code TikTok uniquement si tu n'utilises pas d'ID…"
+            />
           </label>
-          <small>Le pixel global du site est déjà configuré par ID : aucun code supplémentaire n’est nécessaire. Pour changer cet ID global, il faut mettre à jour la configuration du site.</small>
+          <small>Tu peux modifier l'ID global TikTok directement ici et l'enregistrer pour tous les visiteurs.</small>
         </div>
       </div>
       <div className="event-map">
@@ -3021,19 +3060,21 @@ function TrackingSettings({ notify }: { notify: (message: string) => void }) {
       <div className="settings-actions">
         <button
           className="button button-light"
+          type="button"
           onClick={() => {
             if (!config.facebookPixelId && !config.tiktokPixelId && !config.tiktokCode) {
               notify("Renseigne et enregistre un pixel avant le test");
               return;
             }
+            applyServerPixelConfig(config);
             trackPixelEvent("ViewContent", { content_name: "Vérification du pixel", currency: "DZD" });
-            notify("Vérifie la réception dans Test Events — aucune commande créée");
+            notify("Événement test envoyé ! Vérifie « Tester les évènements » dans Facebook — aucune commande créée");
           }}
         >
           <Facebook size={16} />Tester l’événement
         </button>
-        <button className="button button-gradient" onClick={save}>
-          <Save size={16} />Enregistrer les pixels
+        <button className="button button-gradient" type="button" onClick={save} disabled={savePixelMutation.isPending}>
+          <Save size={16} />{savePixelMutation.isPending ? "Enregistrement…" : "Enregistrer les pixels"}
         </button>
       </div>
     </section>

@@ -80,6 +80,30 @@ export function savePixelConfig(config: PixelConfig) {
   initializePixels();
 }
 
+export function applyServerPixelConfig(config: PixelConfig): PixelConfig {
+  const normalized: PixelConfig = {
+    facebookPixelId: config.facebookPixelId.trim(),
+    tiktokPixelId: config.tiktokPixelId.trim(),
+    tiktokCode: config.tiktokCode.trim(),
+  };
+  if (typeof window === "undefined") return normalized;
+  const win = window as TrackingWindow;
+  const prev = win.__MISS_SITE_PIXEL_CONFIG;
+  win.__MISS_SITE_PIXEL_CONFIG = normalized;
+  if (prev?.facebookPixelId !== normalized.facebookPixelId) {
+    win.__missMetaStatus = undefined;
+  }
+  if (prev?.tiktokPixelId !== normalized.tiktokPixelId) {
+    win.__missTikTokStatus = undefined;
+  }
+  try {
+    localStorage.setItem(PIXEL_KEY, JSON.stringify(normalized));
+  } catch { /* ignore storage restrictions */ }
+  initializePixels();
+  win.dispatchEvent?.(new Event("miss-pixel-status"));
+  return normalized;
+}
+
 function reportMetaStatus(win: TrackingWindow, status: SDKStatus) {
   win.__missMetaStatus = status;
   win.dispatchEvent?.(new Event("miss-pixel-status"));

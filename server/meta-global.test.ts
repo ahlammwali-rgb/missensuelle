@@ -26,10 +26,10 @@ describe("Global Facebook pixel", () => {
   it("installs Facebook and TikTok independently of local preferences and without duplicate React initialization", () => {
     const { win, scripts } = page();
     initializePixels(); initializePixels();
-    expect(getPixelConfig().facebookPixelId).toBe("3938968343072960");
+    expect(getPixelConfig().facebookPixelId).toBe("916933364742371");
     expect(scripts.filter(script => script.dataset.missFacebookPixel)).toHaveLength(1);
     expect(scripts.find(script => script.dataset.missFacebookPixel)?.src).toBe("https://connect.facebook.net/en_US/fbevents.js");
-    expect(win.fbq.queue.filter((call: unknown[]) => call[0] === "init")).toEqual([["init", "3938968343072960"]]);
+    expect(win.fbq.queue.filter((call: unknown[]) => call[0] === "init")).toEqual([["init", "916933364742371"]]);
     expect(win.fbq.queue.filter((call: unknown[]) => call[1] === "PageView")).toHaveLength(1);
     expect(scripts.filter(script => script.dataset.missTiktokPixel)).toHaveLength(1);
     expect(win.ttq.filter((call: unknown[]) => call[0] === "page")).toHaveLength(1);
@@ -67,7 +67,7 @@ describe("Global Facebook pixel", () => {
   it("reports SDK errors rather than falsely claiming a connection", () => {
     const { scripts } = page();
     scripts.find(script => script.dataset.missFacebookPixel)?.onerror();
-    expect(getMetaPixelDiagnostics()).toMatchObject({ stage: "error", registered: false, pixelId: "3938968343072960" });
+    expect(getMetaPixelDiagnostics()).toMatchObject({ stage: "error", registered: false, pixelId: "916933364742371" });
     expect(getMetaPixelDiagnostics().error).toContain("bloqué");
   });
 
@@ -75,14 +75,14 @@ describe("Global Facebook pixel", () => {
     const { win, scripts } = page();
     scripts.find(script => script.dataset.missFacebookPixel)?.onload();
     expect(getMetaPixelDiagnostics()).toMatchObject({ stage: "loaded", registered: false });
-    win.fbq.getState = () => ({ pixels: [{ id: "3938968343072960" }] });
+    win.fbq.getState = () => ({ pixels: [{ id: "916933364742371" }] });
     expect(getMetaPixelDiagnostics().registered).toBe(true);
   });
 
   it("installs Facebook even when no TikTok pixel is configured", () => {
     const { win, scripts } = page({ ...sitePixelConfig, tiktokPixelId: "" });
     expect(scripts).toHaveLength(1);
-    expect(win.fbq.queue).toContainEqual(["init", "3938968343072960"]);
+    expect(win.fbq.queue).toContainEqual(["init", "916933364742371"]);
     expect(win.ttq).toBeUndefined();
   });
 });

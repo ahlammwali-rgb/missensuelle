@@ -180,6 +180,7 @@ const loadStore = async () => {
     saveStore();
   }
 };
+export const ensureCheckoutStoreReady = loadStore;
 export const triggerStoreSave = () =>
   schedulePersistentStoreSave(memoryOrders, memorySessions, getCounters);
 const saveStore = triggerStoreSave;

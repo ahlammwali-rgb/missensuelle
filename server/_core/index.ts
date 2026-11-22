@@ -5,7 +5,8 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { publicPlatformScript } from "./publicConfig";
 import { appRouter } from "../routers";
-import { listCheckoutOrders, markOrderDelivered, registerCheckoutHttpRoutes, startGoogleSheetAutoSync } from "../checkout";
+import { ensureCheckoutStoreReady, listCheckoutOrders, markOrderDelivered, registerCheckoutHttpRoutes, startGoogleSheetAutoSync } from "../checkout";
+import { getServerPixelConfig } from "../persistentStore";
 import { getEcoTrackStatus, getEcoTrackTrackingBatch, recordEcoTrackWebhookStatus } from "../ecotrackDelivery";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -21,9 +22,12 @@ async function startServer() {
   app.get("/api/platform/config.js", (_req, res) => {
     res.set("Cache-Control", "no-store").type("application/javascript").send(publicPlatformScript());
   });
-  app.get("/api/tracking/bootstrap.js", (_req, res) => {
-    res.set("Cache-Control", "no-store").type("application/javascript").send(publicTrackingScript());
-  });
+  const sendLiveBootstrap = async (_req: express.Request, res: express.Response) => {
+    await ensureCheckoutStoreReady().catch(() => {});
+    res.set("Cache-Control", "no-store").type("application/javascript").send(publicTrackingScript(getServerPixelConfig()));
+  };
+  app.get("/api/tracking/bootstrap.js", sendLiveBootstrap);
+  app.get(/^\/tracking\/bootstrap\.[a-f0-9]{16}\.js$/, sendLiveBootstrap);
   registerOAuthRoutes(app);
   registerCheckoutHttpRoutes(app);
   app.get("/api/ecotrack/webhook", (_req, res) => {

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { sitePixelConfig, type PublicPixelConfig } from "../shared/site-pixels";
 import type {
   AbandonedCheckout,
   CheckoutOrder,
@@ -80,11 +81,27 @@ type PersistedState = {
   staffMembers?: StaffMember[];
   staffActivityLogs?: StaffActivityLog[];
   catalogProducts?: Record<string, unknown>[];
+  pixelConfig?: PublicPixelConfig;
 };
 
 const memoryStaffMembers = new Map<string, StaffMember>();
 let memoryStaffActivityLogs: StaffActivityLog[] = [];
 let memoryCatalogProducts: Record<string, unknown>[] = [];
+let memoryPixelConfig: PublicPixelConfig | null = null;
+
+export function getServerPixelConfig(): PublicPixelConfig {
+  return memoryPixelConfig ? { ...memoryPixelConfig } : { ...sitePixelConfig };
+}
+
+export function setServerPixelConfig(config: Partial<PublicPixelConfig>): PublicPixelConfig {
+  const current = getServerPixelConfig();
+  memoryPixelConfig = {
+    facebookPixelId: typeof config.facebookPixelId === "string" ? config.facebookPixelId.trim() : current.facebookPixelId,
+    tiktokPixelId: typeof config.tiktokPixelId === "string" ? config.tiktokPixelId.trim() : current.tiktokPixelId,
+    tiktokCode: typeof config.tiktokCode === "string" ? config.tiktokCode.trim() : current.tiktokCode,
+  };
+  return { ...memoryPixelConfig };
+}
 
 export function getServerCatalogProducts(): Record<string, unknown>[] {
   return memoryCatalogProducts;
@@ -493,6 +510,20 @@ function mergeStateIntoMemory(
     );
   }
 
+  if (source.pixelConfig && typeof source.pixelConfig === "object") {
+    memoryPixelConfig = {
+      facebookPixelId: typeof source.pixelConfig.facebookPixelId === "string"
+        ? source.pixelConfig.facebookPixelId.trim()
+        : sitePixelConfig.facebookPixelId,
+      tiktokPixelId: typeof source.pixelConfig.tiktokPixelId === "string"
+        ? source.pixelConfig.tiktokPixelId.trim()
+        : sitePixelConfig.tiktokPixelId,
+      tiktokCode: typeof source.pixelConfig.tiktokCode === "string"
+        ? source.pixelConfig.tiktokCode.trim()
+        : sitePixelConfig.tiktokCode,
+    };
+  }
+
   const currentCounters = getCounters();
   const maxOrderId = memoryOrders.reduce(
     (max, o) => Math.max(max, (o.dbId ?? 0) + 1),
@@ -534,6 +565,7 @@ export async function ensurePersistentStoreLoaded(
           staffMembers: getStaffMembers(),
           staffActivityLogs: memoryStaffActivityLogs,
           catalogProducts: memoryCatalogProducts,
+          pixelConfig: memoryPixelConfig ?? undefined,
         });
       }
     })();
@@ -559,6 +591,7 @@ export function schedulePersistentStoreSave(
     staffMembers: getStaffMembers(),
     staffActivityLogs: memoryStaffActivityLogs,
     catalogProducts: memoryCatalogProducts,
+    pixelConfig: memoryPixelConfig ?? undefined,
   };
   writeLocalState(snapshot);
   saveQueue = saveQueue

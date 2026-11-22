@@ -30,6 +30,7 @@ import {
   convertAbandonedToOrder,
   deleteAbandonedCheckout,
   deleteAllAbandonedCheckouts,
+  ensureCheckoutStoreReady,
   listAbandonedCheckouts,
   purgeAbandonedWithoutPhone,
   listCheckoutOrders,
@@ -78,10 +79,12 @@ import {
   deleteStaffMember,
   findStaffMemberByCode,
   getNotificationPreferences,
+  getServerPixelConfig,
   getStaffActivityLogs,
   getStaffMembers,
   savePushSubscriptionRecord,
   setNotificationPreferences,
+  setServerPixelConfig,
   upsertStaffMember,
 } from "./persistentStore";
 import { triggerStoreSave } from "./checkout";
@@ -566,6 +569,28 @@ export const appRouter = router({
       )
       .mutation(({ input }) => {
         const updated = setNotificationPreferences(input);
+        triggerStoreSave();
+        return updated;
+      }),
+    getPixelConfig: adminProcedure.query(async () => {
+      await ensureCheckoutStoreReady();
+      return getServerPixelConfig();
+    }),
+    setPixelConfig: adminProcedure
+      .input(
+        z.object({
+          facebookPixelId: z
+            .string()
+            .trim()
+            .max(64)
+            .refine(v => v === "" || /^\d{6,30}$/.test(v), "ID Pixel Facebook invalide (chiffres uniquement)"),
+          tiktokPixelId: z.string().trim().max(128),
+          tiktokCode: z.string().trim().max(8000),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await ensureCheckoutStoreReady();
+        const updated = setServerPixelConfig(input);
         triggerStoreSave();
         return updated;
       }),
