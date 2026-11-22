@@ -103,13 +103,80 @@ export function setServerPixelConfig(config: Partial<PublicPixelConfig>): Public
   return { ...memoryPixelConfig };
 }
 
+const LEGACY_EXTENSION_SHADES = new Set(["نور بليلح غري", "نور بليلج غري"]);
+const FIXED_EXTENSION_SHADE = "أسود بالياج رمادي";
+
+function fixExtensionShadeName(name: string): string {
+  return LEGACY_EXTENSION_SHADES.has(name.trim()) ? FIXED_EXTENSION_SHADE : name;
+}
+
+function normalizeServerCatalogProducts(productsList: Record<string, unknown>[]): Record<string, unknown>[] {
+  return productsList
+    .filter(p => p && typeof p === "object" && typeof p.id === "string")
+    .map(p => {
+      let changed = false;
+      const next: Record<string, unknown> = { ...p };
+      if (Array.isArray(p.colors)) {
+        const nextColors = p.colors.map(c => {
+          if (typeof c !== "string") return c;
+          const fixed = fixExtensionShadeName(c);
+          if (fixed !== c) changed = true;
+          return fixed;
+        });
+        if (changed) next.colors = nextColors;
+      }
+      if (Array.isArray(p.variantImages)) {
+        let viChanged = false;
+        const nextVi = p.variantImages.map(v => {
+          if (!v || typeof v !== "object") return v;
+          const item = v as { name?: unknown; image?: unknown };
+          if (typeof item.name === "string") {
+            const fixed = fixExtensionShadeName(item.name);
+            if (fixed !== item.name) {
+              viChanged = true;
+              return { ...item, name: fixed };
+            }
+          }
+          return v;
+        });
+        if (viChanged) {
+          next.variantImages = nextVi;
+          changed = true;
+        }
+      }
+      if (p.landingConfig && typeof p.landingConfig === "object") {
+        const lc = p.landingConfig as Record<string, unknown>;
+        if (Array.isArray(lc.colorSwatches)) {
+          let swChanged = false;
+          const nextSwatches = lc.colorSwatches.map(sw => {
+            if (!sw || typeof sw !== "object") return sw;
+            const swObj = sw as { name?: unknown; hex?: unknown };
+            if (typeof swObj.name === "string") {
+              const fixed = fixExtensionShadeName(swObj.name);
+              if (fixed !== swObj.name) {
+                swChanged = true;
+                return { ...swObj, name: fixed };
+              }
+            }
+            return sw;
+          });
+          if (swChanged) {
+            next.landingConfig = { ...lc, colorSwatches: nextSwatches };
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : p;
+    });
+}
+
 export function getServerCatalogProducts(): Record<string, unknown>[] {
   return memoryCatalogProducts;
 }
 
 export function setServerCatalogProducts(productsList: Record<string, unknown>[]): void {
   if (!Array.isArray(productsList)) return;
-  memoryCatalogProducts = productsList.filter(p => p && typeof p === "object" && typeof p.id === "string");
+  memoryCatalogProducts = normalizeServerCatalogProducts(productsList);
 }
 
 export function getStaffMembers(): StaffMember[] {
@@ -505,9 +572,7 @@ function mergeStateIntoMemory(
   }
 
   if (Array.isArray(source.catalogProducts) && source.catalogProducts.length > 0) {
-    memoryCatalogProducts = source.catalogProducts.filter(
-      p => p && typeof p === "object" && typeof (p as { id?: unknown }).id === "string"
-    );
+    memoryCatalogProducts = normalizeServerCatalogProducts(source.catalogProducts);
   }
 
   if (source.pixelConfig && typeof source.pixelConfig === "object") {

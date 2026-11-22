@@ -2377,7 +2377,7 @@ function ProductForm({
         { name: "بني عسلي", image: "/manus-storage/ext-m2-v3.jpg" },
         { name: "شاتين روكس", image: "/manus-storage/ext-m2-v4.jpg" },
         { name: "أشقر فاتح", image: "/manus-storage/ext-m2-v5.jpg" },
-        { name: "نور بليلج غري", image: "/manus-storage/ext-m2-v6.jpg" },
+        { name: "أسود بالياج رمادي", image: "/manus-storage/ext-m2-v6.jpg" },
       ]);
       setGalleryList([
         "/manus-storage/ext-m2-s1.jpg",
@@ -3201,7 +3201,7 @@ function getColorsForProduct(product: Product | undefined): string[] {
   if (isDoudoune) return ["أزرق سماوي", "أبيض", "أسود"];
   const isExtensions = product.id === "p-005" || product.slug.includes("extensions") || product.category === "extensions";
   if (isExtensions) {
-    return ["أسود طبيعي", "بني غامق", "بني عسلي", "شاتين روكس", "أشقر فاتح", "نور بليلج غري"];
+    return ["أسود طبيعي", "بني غامق", "بني عسلي", "شاتين روكس", "أشقر فاتح", "أسود بالياج رمادي"];
   }
   return product.colors?.length ? product.colors : ["Emerald", "Noir"];
 }

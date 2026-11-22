@@ -296,6 +296,11 @@
   color: #1a1a1a;
 }
 
+.ext-vrait-root .fm select:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
 .ext-vrait-root .vt {
   font-weight: 900;
   margin: 6px 0 8px;

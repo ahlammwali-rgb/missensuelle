@@ -14,7 +14,7 @@ import {
   saveCheckoutDraft,
   submitCheckoutOrder,
 } from "@/lib/checkout-api";
-import { getCatalogProducts, type Product } from "@/lib/store-data";
+import { getCatalogProducts, normalizeExtensionShadeName, type Product } from "@/lib/store-data";
 import { initializePixels, trackPixelEvent } from "@/lib/tracking";
 import { trpc } from "@/lib/trpc";
 import { shippingFeeFor } from "@shared/shipping";
@@ -59,7 +59,7 @@ const DEFAULT_VARIANTS: VariantDef[] = [
     swatchImg: "/manus-storage/ext-vrait-19.jpg",
   },
   {
-    name: "نور بليلح غري",
+    name: "أسود بالياج رمادي",
     slideImg: "/manus-storage/ext-vrait-7.jpg",
     swatchImg: "/manus-storage/ext-vrait-20.jpg",
   },
@@ -121,7 +121,7 @@ export default function ExtensionsLanding({
     if (isCustomModel) {
       if (passedProduct?.variantImages && passedProduct.variantImages.length > 0) {
         return passedProduct.variantImages.map((v, idx) => ({
-          name: v.name,
+          name: normalizeExtensionShadeName(v.name),
           slideImg: v.image || passedProduct?.image || "",
           swatchImg: v.image || passedProduct?.image || "",
           hex: cfg?.colorSwatches?.[idx]?.hex,
@@ -131,7 +131,7 @@ export default function ExtensionsLanding({
         return cfg.colorSwatches.map((sw, idx) => {
           const img = passedProduct?.gallery?.[idx] || passedProduct?.image || "";
           return {
-            name: sw.name,
+            name: normalizeExtensionShadeName(sw.name),
             slideImg: img,
             swatchImg: img,
             hex: sw.hex,
@@ -141,7 +141,7 @@ export default function ExtensionsLanding({
       if (passedProduct?.colors && passedProduct.colors.length > 0) {
         return passedProduct.colors.map((c, idx) => {
           const img = passedProduct?.gallery?.[idx] || passedProduct?.image || "";
-          return { name: c, slideImg: img, swatchImg: img };
+          return { name: normalizeExtensionShadeName(c), slideImg: img, swatchImg: img };
         });
       }
       return [];
@@ -170,7 +170,6 @@ export default function ExtensionsLanding({
   const [phone, setPhone] = useState("");
   const [wilaya, setWilaya] = useState("");
   const [commune, setCommune] = useState("");
-  const [customCommune, setCustomCommune] = useState("");
   const [delivery, setDelivery] = useState<"home" | "office">("home");
 
   const [colorError, setColorError] = useState(false);
@@ -302,15 +301,17 @@ export default function ExtensionsLanding({
 
   const extraCommunes: string[] = useMemo(() => {
     if (!wilayaCleanName) return [];
-    return (abayaCommunesByWilaya as Record<string, string[]>)[wilayaCleanName] ?? [];
+    const communesMap = abayaCommunesByWilaya as Record<string, string[]>;
+    return (
+      communesMap[wilayaCleanName] ??
+      (wilayaCleanName === "تقرت" ? communesMap["توقرت"] : undefined) ??
+      []
+    );
   }, [wilayaCleanName]);
 
   const resolvedCommune = useMemo(() => {
-    if (commune === "other") {
-      return customCommune.trim() || `${wilayaCleanName} (بلدية أخرى)`;
-    }
     return commune || wilayaCleanName;
-  }, [commune, customCommune, wilayaCleanName]);
+  }, [commune, wilayaCleanName]);
 
   const chosenSummary = useMemo(() => {
     if (variants.length === 0) return cfg?.offer1LabelAr || productTitle;
@@ -561,8 +562,8 @@ export default function ExtensionsLanding({
       setSubmitError("يرجى اختيار الولاية.");
       return;
     }
-    if (!commune || (commune === "other" && !customCommune.trim())) {
-      setSubmitError("يرجى اختيار أو كتابة اسم البلدية.");
+    if (!commune) {
+      setSubmitError("يرجى اختيار البلدية.");
       return;
     }
 
@@ -806,10 +807,8 @@ export default function ExtensionsLanding({
             value={wilaya}
             onChange={e => {
               const nextWilaya = e.target.value;
-              const nextClean = nextWilaya.replace(/^\d+\s*-\s*/, "").trim();
               setWilaya(nextWilaya);
-              setCommune(nextClean || "");
-              setCustomCommune("");
+              setCommune("");
             }}
             required
           >
@@ -828,39 +827,23 @@ export default function ExtensionsLanding({
             id="cm"
             value={commune}
             disabled={!wilaya}
-            onChange={e => {
-              setCommune(e.target.value);
-              if (e.target.value !== "other") {
-                setCustomCommune("");
-              }
-            }}
+            onChange={e => setCommune(e.target.value)}
             required
           >
-            <option value="">البلدية</option>
-            {wilayaCleanName && (
-              <>
-                <option value={wilayaCleanName}>{wilayaCleanName} (مركز الولاية)</option>
-                <option value="other">بلدية أخرى</option>
-                {extraCommunes
-                  .filter(c => c !== wilayaCleanName)
-                  .map(c => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-              </>
-            )}
+            <option value="">
+              {wilaya ? "اختاري البلدية" : "البلدية (اختاري الولاية أولاً)"}
+            </option>
+            {wilayaCleanName &&
+              (extraCommunes.length > 0 ? (
+                extraCommunes.map(c => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))
+              ) : (
+                <option value={wilayaCleanName}>{wilayaCleanName}</option>
+              ))}
           </select>
-
-          {commune === "other" && (
-            <input
-              id="cx"
-              placeholder="اكتبي اسم البلدية"
-              value={customCommune}
-              onChange={e => setCustomCommune(e.target.value)}
-              required
-            />
-          )}
 
           <div className="vt">
             <em>🚚</em> اختاري طريقة التوصيل

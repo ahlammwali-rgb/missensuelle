@@ -220,14 +220,14 @@ export const products: Product[] = [
     badge: "Offre 4 700 DA",
     description: "Extensions cheveux naturel 50%, longueur et volume instantanés, pose facile et tenue longue durée.",
     details: ["Cheveux naturels 60%", "Pose facile et rapide", "Volume et longueur immédiats", "Longue durée de vie"],
-    colors: ["أسود طبيعي", "بني غامق", "بني عسلي", "شاتين روكس", "أشقر فاتح", "نور بليلح غري"],
+    colors: ["أسود طبيعي", "بني غامق", "بني عسلي", "شاتين روكس", "أشقر فاتح", "أسود بالياج رمادي"],
     variantImages: [
       { name: "أسود طبيعي", image: "/manus-storage/ext-vrait-2.jpg" },
       { name: "بني غامق", image: "/manus-storage/ext-vrait-3.jpg" },
       { name: "بني عسلي", image: "/manus-storage/ext-vrait-4.jpg" },
       { name: "شاتين روكس", image: "/manus-storage/ext-vrait-5.jpg" },
       { name: "أشقر فاتح", image: "/manus-storage/ext-vrait-6.jpg" },
-      { name: "نور بليلح غري", image: "/manus-storage/ext-vrait-7.jpg" },
+      { name: "أسود بالياج رمادي", image: "/manus-storage/ext-vrait-7.jpg" },
     ],
     image: "/manus-storage/ext-vrait-1.jpg",
     gallery: ["/manus-storage/ext-vrait-12.jpg", "/manus-storage/ext-vrait-13.jpg"],
@@ -439,6 +439,57 @@ export const getProduct = (slug: string) => {
 
 export const CATALOG_STORAGE_KEY = "miss-sensuelle-catalog";
 
+const LEGACY_EXTENSION_SHADES = new Set(["نور بليلح غري", "نور بليلج غري"]);
+const FIXED_EXTENSION_SHADE = "أسود بالياج رمادي";
+
+export function normalizeExtensionShadeName(name: string): string {
+  return LEGACY_EXTENSION_SHADES.has(name.trim()) ? FIXED_EXTENSION_SHADE : name;
+}
+
+function migrateExtensionShadeInProduct(product: Product): { product: Product; changed: boolean } {
+  let changed = false;
+  let nextColors = product.colors;
+  if (Array.isArray(product.colors)) {
+    const mapped = product.colors.map(c => normalizeExtensionShadeName(c));
+    if (mapped.some((c, idx) => c !== product.colors[idx])) {
+      nextColors = mapped;
+      changed = true;
+    }
+  }
+  let nextVariantImages = product.variantImages;
+  if (Array.isArray(product.variantImages)) {
+    const mapped = product.variantImages.map(v => ({
+      ...v,
+      name: normalizeExtensionShadeName(v.name),
+    }));
+    if (mapped.some((v, idx) => v.name !== product.variantImages?.[idx]?.name)) {
+      nextVariantImages = mapped;
+      changed = true;
+    }
+  }
+  let nextLandingConfig = product.landingConfig;
+  if (product.landingConfig?.colorSwatches) {
+    const mappedSw = product.landingConfig.colorSwatches.map(sw => ({
+      ...sw,
+      name: normalizeExtensionShadeName(sw.name),
+    }));
+    if (mappedSw.some((sw, idx) => sw.name !== product.landingConfig?.colorSwatches?.[idx]?.name)) {
+      nextLandingConfig = { ...product.landingConfig, colorSwatches: mappedSw };
+      changed = true;
+    }
+  }
+  if (!changed) return { product, changed: false };
+  return {
+    product: {
+      ...product,
+      colors: nextColors,
+      ...(nextVariantImages ? { variantImages: nextVariantImages } : {}),
+      ...(nextLandingConfig ? { landingConfig: nextLandingConfig } : {}),
+    },
+    changed: true,
+  };
+}
+
 export function getCatalogProducts(): Product[] {
   if (typeof window === "undefined") return products;
   try {
@@ -448,7 +499,10 @@ export function getCatalogProducts(): Product[] {
     // sont conservés, mais les nouveaux produits intégrés au code sont ajoutés une fois.
     let colorsChanged = false;
     const canonicalExtensions = products.find(p => p.id === "p-005")!;
-    const normalized = saved.map(product => {
+    const normalized = saved.map(rawProduct => {
+      const migrated = migrateExtensionShadeInProduct(rawProduct);
+      if (migrated.changed) colorsChanged = true;
+      const product = migrated.product;
       if (product.id === "p-001" && product.image === firstProductImage) {
         colorsChanged = true;
         return {
@@ -471,6 +525,7 @@ export function getCatalogProducts(): Product[] {
           description: canonicalExtensions.description,
           details: canonicalExtensions.details,
           colors: canonicalExtensions.colors,
+          variantImages: canonicalExtensions.variantImages,
           image: canonicalExtensions.image,
           gallery: canonicalExtensions.gallery,
           arName: canonicalExtensions.arName,
@@ -547,7 +602,7 @@ export function getProductVariantOptions(product: Product | undefined): ProductV
       { name: "بني عسلي", image: "/manus-storage/ext-m2-v3.jpg" },
       { name: "شاتين روكس", image: "/manus-storage/ext-m2-v4.jpg" },
       { name: "أشقر فاتح", image: "/manus-storage/ext-m2-v5.jpg" },
-      { name: "نور بليلج غري", image: "/manus-storage/ext-m2-v6.jpg" },
+      { name: "أسود بالياج رمادي", image: "/manus-storage/ext-m2-v6.jpg" },
     ];
   }
   if (product.colors && product.colors.length > 0) {
@@ -598,8 +653,9 @@ export function syncCatalogFromServer() {
         if (p && p.id) byId.set(p.id, p);
       }
       let changed = false;
-      for (const sp of serverProducts) {
-        if (!sp || !sp.id) continue;
+      for (const rawSp of serverProducts) {
+        if (!rawSp || !rawSp.id) continue;
+        const sp = migrateExtensionShadeInProduct(rawSp).product;
         const existing = byId.get(sp.id);
         if (!existing || JSON.stringify(existing) !== JSON.stringify(sp)) {
           byId.set(sp.id, sp);
