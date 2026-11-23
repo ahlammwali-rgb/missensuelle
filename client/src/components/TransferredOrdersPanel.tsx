@@ -29,12 +29,43 @@ import {
   computeTransferredHistoryAnalytics,
   inspectOrderCarrierHistory,
   matchesTransferredFilter,
+  parseCarrierTimestamp,
   type HistoryStageId,
   type OrderHistoryInspection,
   type TransferredFilterKey,
 } from "@shared/carrierHistory";
 import { formatDZD, type OrderStatus } from "@/lib/store-data";
 import { trpc } from "@/lib/trpc";
+
+function findTrackingData(
+  map: Record<string, TrackingData>,
+  rawTracking?: string | null
+): TrackingData | null {
+  const key = String(rawTracking || "").trim();
+  if (!key) return null;
+  if (map[key]) return map[key];
+  const lower = key.toLowerCase();
+  for (const [k, v] of Object.entries(map)) {
+    if (k.trim().toLowerCase() === lower) return v;
+  }
+  return null;
+}
+
+function formatCarrierStepDate(raw?: string | null): string {
+  const clean = String(raw || "").trim();
+  if (!clean) return "Scan enregistré";
+  const ts = parseCarrierTimestamp(clean);
+  if (ts !== null) {
+    return new Date(ts).toLocaleString("fr-DZ", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  return clean;
+}
 
 interface TransferredOrdersPanelProps {
   orders: CheckoutOrder[];
@@ -81,7 +112,11 @@ export function TransferredOrdersPanel({
     tracking?: TrackingData;
   } | null>(null);
 
-  // E-com & EcoTrack status to get shipments maps
+  // E-com & EcoTrack status & live refresh mutations
+  const utils = trpc.useUtils();
+  const initialEcoForcedRef = useRef(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+
   const syncDeliveriesMutation = trpc.admin.syncDeliveredFromCarriers.useMutation({
     onSuccess: res => {
       if (onRefreshOrders && (res.syncedCount > 0 || (res as { revertedCount?: number }).revertedCount)) {
@@ -91,11 +126,13 @@ export function TransferredOrdersPanel({
   });
   const ecomStatusQuery = trpc.ecom.status.useQuery(undefined, {
     refetchOnWindowFocus: false,
-    staleTime: 30000,
+    refetchOnMount: "always",
+    staleTime: 0,
   });
   const ecotrackStatusQuery = trpc.ecotrack.status.useQuery(undefined, {
     refetchOnWindowFocus: false,
-    staleTime: 30000,
+    refetchOnMount: "always",
+    staleTime: 0,
   });
   const ecomShipments = useMemo(() => ecomStatusQuery.data?.shipments || {}, [ecomStatusQuery.data]);
   const ecoShipments = useMemo(() => ecotrackStatusQuery.data?.shipments || {}, [ecotrackStatusQuery.data]);
@@ -109,17 +146,20 @@ export function TransferredOrdersPanel({
     );
   }, [orders, shipments]);
 
-  // Extract tracking numbers split per carrier
+  // Extract tracking numbers split per carrier (trimmed)
   const { ecomTrackings, ecoTrackings } = useMemo(() => {
     const ecomList: string[] = [];
     const ecoList: string[] = [];
     for (const o of transferredOrders) {
       const ecoSh = ecoShipments[o.id];
       const ecomSh = ecomShipments[o.id];
-      if (ecoSh?.tracking) ecoList.push(ecoSh.tracking);
-      else if (ecomSh?.tracking) ecomList.push(ecomSh.tracking);
+      if (ecoSh?.tracking?.trim()) ecoList.push(ecoSh.tracking.trim());
+      else if (ecomSh?.tracking?.trim()) ecomList.push(ecomSh.tracking.trim());
     }
-    return { ecomTrackings: ecomList, ecoTrackings: ecoList };
+    return {
+      ecomTrackings: Array.from(new Set(ecomList)),
+      ecoTrackings: Array.from(new Set(ecoList)),
+    };
   }, [transferredOrders, ecomShipments, ecoShipments]);
 
   // Batch tracking queries (E-com + EcoTrack)
@@ -127,7 +167,9 @@ export function TransferredOrdersPanel({
     { trackings: ecomTrackings },
     {
       enabled: ecomTrackings.length > 0,
-      refetchInterval: 60000,
+      refetchInterval: 45000,
+      refetchOnMount: "always",
+      staleTime: 0,
       refetchOnWindowFocus: false,
     }
   );
@@ -135,10 +177,65 @@ export function TransferredOrdersPanel({
     { trackings: ecoTrackings },
     {
       enabled: ecoTrackings.length > 0,
-      refetchInterval: 60000,
+      refetchInterval: 45000,
+      refetchOnMount: "always",
+      staleTime: 0,
       refetchOnWindowFocus: false,
     }
   );
+
+  const ecomRefreshMutation = trpc.ecom.refreshBatch.useMutation({
+    onSuccess: data => {
+      if (ecomTrackings.length > 0) {
+        utils.ecom.trackBatch.setData({ trackings: ecomTrackings }, data);
+      }
+    },
+  });
+  const ecotrackRefreshMutation = trpc.ecotrack.refreshBatch.useMutation({
+    onSuccess: data => {
+      if (ecoTrackings.length > 0) {
+        utils.ecotrack.trackBatch.setData({ trackings: ecoTrackings }, data);
+      }
+    },
+  });
+
+  // Trigger a live cache-bypass sync for DHD on first view load
+  useEffect(() => {
+    if (ecoTrackings.length > 0 && !initialEcoForcedRef.current) {
+      initialEcoForcedRef.current = true;
+      void ecotrackRefreshMutation
+        .mutateAsync({ trackings: ecoTrackings })
+        .then(() => {
+          setLastSyncAt(new Date().toLocaleTimeString("fr-DZ", { hour: "2-digit", minute: "2-digit" }));
+          if (onRefreshOrders) onRefreshOrders();
+        })
+        .catch(() => {});
+    }
+  }, [ecoTrackings]);
+
+  const handleForceRefreshAll = async () => {
+    setIsManualRefreshing(true);
+    syncedDeliveredIdsRef.current.clear();
+    try {
+      await Promise.all([ecomStatusQuery.refetch(), ecotrackStatusQuery.refetch()]);
+      await Promise.all([
+        ecoTrackings.length > 0
+          ? ecotrackRefreshMutation.mutateAsync({ trackings: ecoTrackings })
+          : Promise.resolve(null),
+        ecomTrackings.length > 0
+          ? ecomRefreshMutation.mutateAsync({ trackings: ecomTrackings })
+          : Promise.resolve(null),
+      ]);
+      await syncDeliveriesMutation.mutateAsync({ forceRefresh: true }).catch(() => null);
+      if (onRefreshOrders) onRefreshOrders();
+      setLastSyncAt(new Date().toLocaleTimeString("fr-DZ", { hour: "2-digit", minute: "2-digit" }));
+      notify("Statuts & historiques synchronisés en direct ✦");
+    } catch {
+      notify("Impossible de joindre le transporteur pour le moment");
+    } finally {
+      setIsManualRefreshing(false);
+    }
+  };
 
   const trackingMap = useMemo(
     () =>
@@ -148,7 +245,13 @@ export function TransferredOrdersPanel({
       }) as Record<string, TrackingData>,
     [trackingQuery.data, ecotrackTrackingQuery.data]
   );
-  const isTrackingFetching = trackingQuery.isFetching || ecotrackTrackingQuery.isFetching;
+  const isTrackingFetching =
+    isManualRefreshing ||
+    trackingQuery.isFetching ||
+    ecotrackTrackingQuery.isFetching ||
+    ecomRefreshMutation.isPending ||
+    ecotrackRefreshMutation.isPending ||
+    syncDeliveriesMutation.isPending;
 
   const getOrderCarrier = (o: CheckoutOrder): "ecotrack" | "ecom" | "other" => {
     if (ecoShipments[o.id] || o.carrier === "ecotrack") return "ecotrack";
@@ -160,13 +263,14 @@ export function TransferredOrdersPanel({
     if (!onRefreshOrders) return;
     let needsRefresh = false;
     for (const o of transferredOrders) {
-      if (syncedDeliveredIdsRef.current.has(o.id)) continue;
       const sh = ecoShipments[o.id] || ecomShipments[o.id] || shipments[o.id];
-      const trk = sh?.tracking ? trackingMap[sh.tracking] : null;
+      const trk = findTrackingData(trackingMap, sh?.tracking);
       if (!trk) continue;
       const deliveredNow = isCarrierTrackingDelivered(trk);
+      const syncKey = `${o.id}:${deliveredNow}`;
+      if (syncedDeliveredIdsRef.current.has(syncKey)) continue;
       if ((deliveredNow && !o.isDelivered) || (!deliveredNow && Boolean(o.isDelivered))) {
-        syncedDeliveredIdsRef.current.add(o.id);
+        syncedDeliveredIdsRef.current.add(syncKey);
         needsRefresh = true;
       }
     }
@@ -243,7 +347,7 @@ export function TransferredOrdersPanel({
     for (const o of transferredOrders) {
       const isEco = Boolean(ecoShipments[o.id]) || o.carrier === "ecotrack";
       const sh = isEco ? (ecoShipments[o.id] || shipments[o.id]) : (ecomShipments[o.id] || shipments[o.id]);
-      const trk = sh?.tracking ? trackingMap[sh.tracking] : null;
+      const trk = findTrackingData(trackingMap, sh?.tracking);
       map.set(o.id, inspectOrderCarrierHistory(o, trk, sh?.at, nowMs));
     }
     return map;
@@ -296,8 +400,9 @@ export function TransferredOrdersPanel({
     ];
 
     const rows = filteredOrders.map(o => {
-      const sh = shipments[o.id];
-      const trk = sh?.tracking ? trackingMap[sh.tracking] : null;
+      const isEco = Boolean(ecoShipments[o.id]) || o.carrier === "ecotrack";
+      const sh = isEco ? (ecoShipments[o.id] || shipments[o.id]) : (ecomShipments[o.id] || shipments[o.id]);
+      const trk = findTrackingData(trackingMap, sh?.tracking);
       return [
         o.id,
         sh?.tracking || "Non assigné",
@@ -439,20 +544,11 @@ export function TransferredOrdersPanel({
           <button
             type="button"
             className="trans-btn trp-btn-primary"
-            onClick={() => {
-              syncDeliveriesMutation.mutate();
-              void ecomStatusQuery.refetch();
-              void ecotrackStatusQuery.refetch();
-              void trackingQuery.refetch();
-              void ecotrackTrackingQuery.refetch();
-              if (onRefreshOrders) onRefreshOrders();
-              setLastSyncAt(new Date().toLocaleTimeString("fr-DZ", { hour: "2-digit", minute: "2-digit" }));
-              notify("Actualisation des statuts et historiques…");
-            }}
-            disabled={isTrackingFetching || syncDeliveriesMutation.isPending}
+            onClick={() => void handleForceRefreshAll()}
+            disabled={isTrackingFetching}
           >
-            <RefreshCw size={15} className={isTrackingFetching || syncDeliveriesMutation.isPending ? "animate-spin" : ""} />
-            <span>{isTrackingFetching || syncDeliveriesMutation.isPending ? "Actualisation…" : "Actualiser Suivis"}</span>
+            <RefreshCw size={15} className={isTrackingFetching ? "animate-spin" : ""} />
+            <span>{isTrackingFetching ? "Synchronisation…" : "Actualiser Suivis"}</span>
           </button>
 
           <button
@@ -567,8 +663,9 @@ export function TransferredOrdersPanel({
         <div className="trp-pipeline-head">
           <div className="trp-pipeline-title">
             <Package size={16} />
-            <span>Pipeline des Étapes (Historique Transporteur)</span>
+            <span>Étapes du Parcours Colis</span>
           </div>
+          <span className="trp-swipe-hint">Glisser →</span>
           <div className="trp-pipeline-summary">
             Moy. {analytics.avgScansPerTracked} scans/colis · Cliquez sur une étape pour filtrer
           </div>
@@ -749,9 +846,11 @@ export function TransferredOrdersPanel({
         <div className="transferred-cards-grid">
           {filteredOrders.map(order => {
             const isEcoTrack = Boolean(ecoShipments[order.id]) || order.carrier === "ecotrack";
-            const sh = isEcoTrack ? (ecoShipments[order.id] || shipments[order.id]) : shipments[order.id];
-            const tracking = sh?.tracking;
-            const trk = tracking ? trackingMap[tracking] : null;
+            const sh = isEcoTrack
+              ? (ecoShipments[order.id] || shipments[order.id])
+              : (ecomShipments[order.id] || shipments[order.id]);
+            const tracking = sh?.tracking?.trim();
+            const trk = findTrackingData(trackingMap, tracking);
             const badge = getStatusBadge(trk);
 
             return (
@@ -912,7 +1011,7 @@ export function TransferredOrdersPanel({
               <div className="trans-modal-title">
                 <Truck size={20} className="text-purple-400" />
                 <div>
-                  <h3>Historique Transporteur E-com</h3>
+                  <h3>Historique Transporteur</h3>
                   <div className="text-sm opacity-70">
                     Commande {selectedTimelineOrder.order.id} · Suivi {selectedTimelineOrder.tracking?.tracking}
                   </div>
@@ -934,7 +1033,8 @@ export function TransferredOrdersPanel({
                   <div className="trans-timeline-body">
                     <div className="trans-timeline-time">
                       <Calendar size={12} />
-                      {new Date(step.date).toLocaleString("fr-DZ")}
+                      {formatCarrierStepDate(step.date)}
+                      {step.ville ? ` · ${step.ville}` : ""}
                     </div>
                     <div className="trans-timeline-situation">{step.situation}</div>
                     {step.commentaire && (

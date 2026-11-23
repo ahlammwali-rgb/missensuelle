@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CheckoutOrder } from "../shared/checkout";
+import { buildEcoTrackingItem } from "./ecotrackDelivery";
 import {
   classifyOrderHistoryStage,
   computeTransferredHistoryAnalytics,
@@ -181,5 +182,39 @@ describe("carrier history stages & indicators", () => {
     expect(matchesTransferredFilter("delivered_uncollected", inspections.get("MS-2")!)).toBe(true);
     expect(matchesTransferredFilter("delivered_cashed", inspections.get("MS-1")!)).toBe(true);
     expect(matchesTransferredFilter("out_for_delivery", inspections.get("MS-4")!)).toBe(true);
+  });
+
+  it("preserves root EcoTrack activity beside OrderInfo, sorts chronologically, and upgrades stale early status", () => {
+    const built = buildEcoTrackingItem("DHD-9988", {
+      OrderInfo: {
+        tracking: "DHD-9988",
+        status: "vers_wilaya",
+      },
+      // Reverse chronological API order with activity at root (outside OrderInfo)
+      activity: [
+        {
+          date: "23-11-2026",
+          time: "15:10",
+          status: "attempt_delivery",
+          reason: "Client injoignable",
+          station: "Alger Centre",
+          driver: "Karim",
+        },
+        {
+          date: "21-11-2026",
+          time: "09:00",
+          status: "expedie",
+          station: "Hub Blida",
+        },
+      ],
+    });
+
+    expect(built.tracking).toBe("DHD-9988");
+    expect(built.historique).toHaveLength(2);
+    expect(built.historique?.[0]?.ville).toBe("Hub Blida");
+    expect(built.historique?.[1]?.ville).toBe("Alger Centre");
+    expect(built.historique?.[1]?.situation).toContain("injoignable");
+    expect(built.situation).toBe("Ne répond pas");
+    expect(classifyOrderHistoryStage(built)).toBe("no_answer");
   });
 });

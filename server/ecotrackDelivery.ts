@@ -14,6 +14,7 @@ import {
   isCarrierTrackingDelivered,
   normCarrierText,
 } from "../shared/carrierStatus";
+import { parseCarrierTimestamp } from "../shared/carrierHistory";
 import { getCloudToken } from "./persistentStore";
 import type { EcomTrackingInfo } from "./ecomDelivery";
 
@@ -798,6 +799,7 @@ const ECOTRACK_STATUS_LABELS: Record<string, string> = {
   suspendu: "Suspendu",
   livre: "Livrée",
   livree: "Livrée",
+  livred: "Livrée",
   delivered: "Livrée",
   livre_non_encaisse: "Livrée (Non encaissée)",
   livree_non_encaissee: "Livrée (Non encaissée)",
@@ -828,11 +830,37 @@ function formatEcoStatusLabel(raw?: string): string {
   return ECOTRACK_STATUS_LABELS[key] || raw || "En suivi";
 }
 
+type RawEcoEvent = {
+  reason?: string;
+  details?: string;
+  description?: string;
+  comment?: string;
+  commentaire?: string;
+  station?: string;
+  location?: string;
+  wilaya?: string;
+  commune?: string;
+  hub?: string;
+  driver?: string;
+  date?: string;
+  time?: string;
+  heure?: string;
+  date_heure?: string;
+  datetime?: string;
+  created_at?: string;
+  updated_at?: string;
+  status?: string;
+  raw_status?: string;
+  status_label?: string;
+  situation?: string;
+  etat?: string;
+};
+
 type RawEcoTrackingNode = {
   tracking?: string;
   tracking_number?: string;
   code?: string;
-  status?: string;
+  status?: string | boolean;
   global_status?: string;
   status_label?: string;
   situation?: string;
@@ -840,51 +868,130 @@ type RawEcoTrackingNode = {
   raw_status?: string;
   order_id?: string;
   livred_at?: string | null;
+  delivered_at?: string | null;
+  encaisse?: boolean | number;
+  encaisser?: boolean | number;
+  recouvrement?: boolean | number;
+  date_creation?: string;
+  created_at?: string;
   OrderInfo?: RawEcoTrackingNode;
-  activity?: Array<{
-    reason?: string;
-    details?: string;
-    description?: string;
-    comment?: string;
-    station?: string;
-    location?: string;
-    driver?: string;
-    date?: string;
-    time?: string;
-    status?: string;
-    raw_status?: string;
-  }>;
-  history?: RawEcoTrackingNode["activity"];
+  order?: RawEcoTrackingNode;
+  parcel?: RawEcoTrackingNode;
+  activity?: RawEcoEvent[];
+  activities?: RawEcoEvent[];
+  history?: RawEcoEvent[];
+  historique?: RawEcoEvent[];
+  events?: RawEcoEvent[];
 };
 
+function firstNonEmptyStr(...values: unknown[]): string {
+  for (const val of values) {
+    if (typeof val === "string" && val.trim()) {
+      return val.trim();
+    }
+  }
+  return "";
+}
+
+function resolveEcoEventDate(ev: RawEcoEvent): string {
+  return firstNonEmptyStr(
+    ev.date_heure,
+    ev.datetime,
+    [ev.date, ev.time || ev.heure].filter(Boolean).join(" "),
+    ev.created_at,
+    ev.updated_at
+  );
+}
+
+function collectEcoEvents(rawNode: RawEcoTrackingNode, info: RawEcoTrackingNode): RawEcoEvent[] {
+  const candidates = [
+    info.activity,
+    rawNode.activity,
+    info.history,
+    rawNode.history,
+    info.historique,
+    rawNode.historique,
+    info.activities,
+    rawNode.activities,
+    info.events,
+    rawNode.events,
+  ];
+  const rawList = candidates.find(arr => Array.isArray(arr) && arr.length > 0) ?? [];
+  if (rawList.length <= 1) return rawList.filter(Boolean);
+
+  return [...rawList]
+    .filter(Boolean)
+    .map((ev, index) => ({
+      ev,
+      index,
+      ts: parseCarrierTimestamp(resolveEcoEventDate(ev)),
+    }))
+    .sort((a, b) => {
+      if (a.ts !== null && b.ts !== null && a.ts !== b.ts) {
+        return a.ts - b.ts;
+      }
+      return a.index - b.index;
+    })
+    .map(entry => entry.ev);
+}
+
+function inferStatusFromEcoEvent(ev?: RawEcoEvent): string {
+  if (!ev) return "";
+  const evStatus = firstNonEmptyStr(ev.status, ev.raw_status, ev.situation, ev.etat);
+  const evReason = firstNonEmptyStr(ev.reason, ev.details, ev.description, ev.status_label);
+  const evReasonNorm = normCarrierText(evReason);
+  const evStatusNorm = normCarrierText(evStatus).replace(/[\s-]+/g, "_");
+
+  if ((evStatusNorm === "attempt_delivery" || evStatusNorm === "tentative_echouee" || !evStatusNorm) && evReasonNorm) {
+    if (/repond|injoignable|joignable|nrp/.test(evReasonNorm)) {
+      return "ne_repond_pas";
+    }
+    if (/report|reprogramm/.test(evReasonNorm)) {
+      return "reporte";
+    }
+    if (/refus|annul/.test(evReasonNorm)) {
+      return "refuse";
+    }
+    if (/livr|encais/.test(evReasonNorm) && !/non[\s_]+livr/.test(evReasonNorm)) {
+      return "livree";
+    }
+  }
+  return evStatus || evReason;
+}
+
+const TERMINAL_OR_LATE_STATUS_RE =
+  /(?:livr\w*|delivered|encais\w*|recouvr\w*|paye\w*|retour\w*|refus\w*|annul\w*|ne_repond_pas|reporte|en_livraison|sorti_en_livraison|dispatched_to_driver|au_bureau)/;
+const EARLY_STATUS_RE =
+  /(?:^|[\s_-])(?:prete?_a_expedier|en_preparation|order_information|expedie|accepted_by_carrier|vers_hub|en_hub|vers_wilaya|attempt_delivery|suspendu|en_suivi)(?:$|[\s_-])/;
+
 export function buildEcoTrackingItem(trk: string, rawNode: RawEcoTrackingNode): EcomTrackingInfo {
-  const info = rawNode.OrderInfo ?? rawNode;
-  const events = Array.isArray(info.activity)
-    ? info.activity
-    : Array.isArray(info.history)
-      ? info.history
-      : [];
+  const info = rawNode.OrderInfo ?? rawNode.order ?? rawNode.parcel ?? rawNode;
+  const events = collectEcoEvents(rawNode, info);
   const latestEvent = events.length > 0 ? events[events.length - 1] : undefined;
 
-  let rawStatus =
-    info.status || info.global_status || info.raw_status || info.situation || info.etat || info.status_label || "";
+  let rawStatus = firstNonEmptyStr(
+    info.status,
+    info.global_status,
+    info.raw_status,
+    info.situation,
+    info.etat,
+    info.status_label,
+    rawNode.status,
+    rawNode.global_status,
+    rawNode.raw_status,
+    rawNode.situation,
+    rawNode.etat,
+    rawNode.status_label
+  );
 
-  if (!rawStatus && latestEvent) {
-    const evStatus = String(latestEvent.status || latestEvent.raw_status || "").trim();
-    const evReason = String(latestEvent.reason || latestEvent.details || "").trim();
-    const evReasonNorm = normCarrierText(evReason);
-    if (evStatus === "attempt_delivery" && evReasonNorm) {
-      if (/repond|injoignable|joignable/.test(evReasonNorm)) {
-        rawStatus = "ne_repond_pas";
-      } else if (/report|reprogramm/.test(evReasonNorm)) {
-        rawStatus = "reporte";
-      } else if (/refus|annul/.test(evReasonNorm)) {
-        rawStatus = "refuse";
-      } else {
-        rawStatus = evStatus;
-      }
-    } else {
-      rawStatus = evStatus || evReason;
+  const eventDerivedStatus = inferStatusFromEcoEvent(latestEvent);
+  if (!rawStatus && eventDerivedStatus) {
+    rawStatus = eventDerivedStatus;
+  } else if (rawStatus && eventDerivedStatus) {
+    const rawNormSlug = normCarrierText(rawStatus).replace(/[\s-]+/g, "_");
+    const evNormSlug = normCarrierText(eventDerivedStatus).replace(/[\s-]+/g, "_");
+    if (EARLY_STATUS_RE.test(rawNormSlug) && TERMINAL_OR_LATE_STATUS_RE.test(evNormSlug)) {
+      rawStatus = eventDerivedStatus;
     }
   }
 
@@ -898,7 +1005,7 @@ export function buildEcoTrackingItem(trk: string, rawNode: RawEcoTrackingNode): 
 
   const isDelivered =
     !isReturned &&
-    (Boolean(info.livred_at) ||
+    (Boolean(info.livred_at || info.delivered_at || rawNode.livred_at || rawNode.delivered_at) ||
       isCarrierStatusTextDelivered(rawStatus) ||
       isCarrierStatusTextDelivered(sit));
 
@@ -906,31 +1013,60 @@ export function buildEcoTrackingItem(trk: string, rawNode: RawEcoTrackingNode): 
   const isCashCollected =
     isDelivered &&
     !isExplicitNonEncaisse &&
-    (rawNorm.includes("encaisse") ||
+    (Boolean(info.encaisse || info.encaisser || rawNode.encaisse || rawNode.encaisser) ||
+      rawNorm.includes("encaisse") ||
       rawNorm.includes("paye") ||
       rawNorm.includes("recouvr") ||
       rawStatus === "delivered" ||
       rawStatus === "livre" ||
-      rawStatus === "livree");
+      rawStatus === "livree" ||
+      rawStatus === "livred");
 
   return {
     tracking: trk,
+    date_creation: firstNonEmptyStr(info.date_creation, info.created_at, rawNode.date_creation, rawNode.created_at) || undefined,
     situation: sit,
     etat_logistique: rawStatus || sit,
     encaisser: isCashCollected,
     recouvert:
       isCashCollected &&
       !rawNorm.includes("non_paye") &&
-      (rawNorm.includes("encaisse_paye") ||
+      (Boolean(info.recouvrement || rawNode.recouvrement) ||
+        rawNorm.includes("encaisse_paye") ||
         rawNorm.includes("paye_et_archive") ||
         rawStatus === "paye"),
-    historique: events.map(a => ({
-      date: [a.date, a.time].filter(Boolean).join(" "),
-      ville: a.station || a.location || "",
-      situation: a.reason || a.raw_status || (a.status ? formatEcoStatusLabel(a.status) : sit),
-      commentaire: a.details || a.description || a.comment || (a.driver ? `Livreur : ${a.driver}` : undefined),
-    })),
+    historique: events.map(a => {
+      const evLabel = a.status ? formatEcoStatusLabel(a.status) : "";
+      const evStatusNorm = normCarrierText(a.status).replace(/[\s-]+/g, "_");
+      const reasonText = firstNonEmptyStr(a.reason);
+      const sitText =
+        evStatusNorm === "attempt_delivery" && reasonText
+          ? `Tentative — ${reasonText}`
+          : firstNonEmptyStr(a.status_label, reasonText, a.raw_status, evLabel, a.situation, a.etat) || sit;
+      return {
+        date: resolveEcoEventDate(a),
+        ville: firstNonEmptyStr(a.station, a.location, a.wilaya, a.commune, a.hub),
+        situation: sitText,
+        commentaire:
+          firstNonEmptyStr(
+            a.details,
+            a.description,
+            a.comment,
+            a.commentaire,
+            evStatusNorm !== "attempt_delivery" ? reasonText : ""
+          ) || (a.driver ? `Livreur : ${a.driver}` : undefined),
+      };
+    }),
   };
+}
+
+function isPureEcoEventArray(rows: unknown[]): boolean {
+  if (rows.length === 0) return false;
+  const first = rows[0];
+  if (!first || typeof first !== "object") return false;
+  const obj = first as Record<string, unknown>;
+  if (obj.tracking || obj.tracking_number || obj.code) return false;
+  return Boolean(obj.date || obj.created_at || obj.status || obj.reason || obj.station || obj.location);
 }
 
 function extractEcoEntries(
@@ -940,48 +1076,90 @@ function extractEcoEntries(
   const entries: Array<[string, RawEcoTrackingNode]> = [];
   if (!resp || typeof resp !== "object") return entries;
   const root = resp as Record<string, unknown>;
+  const rootData = root.data && typeof root.data === "object" && !Array.isArray(root.data)
+    ? (root.data as Record<string, unknown>)
+    : null;
   const inner =
-    root.data && typeof root.data === "object" && !Array.isArray(root.data) && Array.isArray((root.data as Record<string, unknown>).data)
-      ? (root.data as Record<string, unknown>).data
-      : root.data !== undefined
-        ? root.data
-        : resp;
+    rootData && Array.isArray(rootData.data)
+      ? rootData.data
+      : rootData && Array.isArray(rootData.orders)
+        ? rootData.orders
+        : Array.isArray(root.orders)
+          ? root.orders
+          : root.data !== undefined
+            ? root.data
+            : resp;
 
   if (Array.isArray(inner)) {
+    if (expectedTrackings.length === 1 && isPureEcoEventArray(inner)) {
+      entries.push([
+        expectedTrackings[0],
+        {
+          tracking: expectedTrackings[0],
+          activity: inner as RawEcoEvent[],
+        },
+      ]);
+      return entries;
+    }
     for (const row of inner) {
       if (!row || typeof row !== "object") continue;
       const node = row as RawEcoTrackingNode;
-      const trk = String(node.tracking || node.tracking_number || node.code || "").trim();
+      const trk = firstNonEmptyStr(
+        node.tracking,
+        node.tracking_number,
+        node.code,
+        node.OrderInfo?.tracking,
+        node.order?.tracking
+      );
       if (trk) entries.push([trk, node]);
     }
     return entries;
   }
 
   if (inner && typeof inner === "object") {
-    const obj = inner as Record<string, unknown>;
-    const directTrk = String(
-      (obj as RawEcoTrackingNode).tracking ||
-        (obj as RawEcoTrackingNode).tracking_number ||
-        ((obj as RawEcoTrackingNode).OrderInfo?.tracking ?? "")
-    ).trim();
-    if (directTrk && ((obj as RawEcoTrackingNode).status || (obj as RawEcoTrackingNode).OrderInfo)) {
-      entries.push([directTrk, obj as RawEcoTrackingNode]);
+    const obj = inner as RawEcoTrackingNode & Record<string, unknown>;
+    const directTrk = firstNonEmptyStr(
+      obj.tracking,
+      obj.tracking_number,
+      obj.code,
+      obj.OrderInfo?.tracking,
+      obj.OrderInfo?.tracking_number,
+      obj.order?.tracking,
+      obj.parcel?.tracking
+    );
+    const hasTrackingPayload = Boolean(
+      typeof obj.status === "string" ||
+        obj.situation ||
+        obj.etat ||
+        obj.OrderInfo ||
+        obj.order ||
+        obj.parcel ||
+        obj.activity ||
+        obj.activities ||
+        obj.history ||
+        obj.historique ||
+        obj.events
+    );
+    if (directTrk && hasTrackingPayload) {
+      entries.push([directTrk, obj]);
       return entries;
     }
-    if (
-      expectedTrackings.length === 1 &&
-      ((obj as RawEcoTrackingNode).status ||
-        (obj as RawEcoTrackingNode).activity ||
-        (obj as RawEcoTrackingNode).history)
-    ) {
-      entries.push([expectedTrackings[0], obj as RawEcoTrackingNode]);
+    if (expectedTrackings.length === 1 && hasTrackingPayload) {
+      entries.push([expectedTrackings[0], obj]);
       return entries;
     }
     for (const [key, val] of Object.entries(obj)) {
-      if (!val || typeof val !== "object" || key === "success" || key === "message") continue;
+      if (!val || typeof val !== "object" || Array.isArray(val) || key === "success" || key === "message") {
+        continue;
+      }
       const node = val as RawEcoTrackingNode;
-      const trk = String(node.tracking || node.OrderInfo?.tracking || key).trim();
-      if (trk && !/^\d+$/.test(trk)) {
+      const trk = firstNonEmptyStr(
+        node.tracking,
+        node.tracking_number,
+        node.OrderInfo?.tracking,
+        !/^\d+$/.test(key) ? key : ""
+      );
+      if (trk) {
         entries.push([trk, node]);
       }
     }
@@ -989,19 +1167,69 @@ function extractEcoEntries(
   return entries;
 }
 
+function mergeEcoTrackingItems(
+  base: EcomTrackingInfo | undefined,
+  detail: EcomTrackingInfo
+): EcomTrackingInfo {
+  if (!base) return detail;
+  const baseHist = Array.isArray(base.historique) ? base.historique : [];
+  const detailHist = Array.isArray(detail.historique) ? detail.historique : [];
+  const pickedHist = detailHist.length >= baseHist.length ? detailHist : baseHist;
+
+  const baseSit = base.situation || "";
+  const detailSit = detail.situation || "";
+  const detailHasConcreteSit = Boolean(detailSit && detailSit !== "En suivi" && detailSit !== "1");
+  const baseHasConcreteSit = Boolean(baseSit && baseSit !== "En suivi" && baseSit !== "1");
+
+  const useDetailSit =
+    detailHasConcreteSit &&
+    (!baseHasConcreteSit ||
+      isCarrierTrackingDelivered(detail) ||
+      isCarrierStatusTextReturned(detail.situation) ||
+      normCarrierText(detail.etat_logistique) !== normCarrierText(base.etat_logistique));
+
+  const encaisser = Boolean(detail.encaisser || base.encaisser);
+  const recouvert = Boolean(detail.recouvert || base.recouvert);
+
+  return {
+    ...base,
+    ...detail,
+    tracking: base.tracking || detail.tracking,
+    date_creation: detail.date_creation || base.date_creation,
+    situation: useDetailSit ? detail.situation : base.situation || detail.situation,
+    etat_logistique: useDetailSit
+      ? detail.etat_logistique
+      : base.etat_logistique || detail.etat_logistique,
+    encaisser,
+    recouvert,
+    historique: pickedHist,
+  };
+}
+
 export async function getEcoTrackTrackingBatch(
-  trackings: string[]
+  trackings: string[],
+  options?: { forceRefresh?: boolean }
 ): Promise<Record<string, EcomTrackingInfo>> {
   const result: Record<string, EcomTrackingInfo> = {};
   const now = Date.now();
+  const forceRefresh = Boolean(options?.forceRefresh);
   const unique = Array.from(new Set(trackings.map(t => t.trim()).filter(Boolean)));
   if (!unique.length) return result;
   const creds = await credentials();
   if (!creds) return result;
 
+  if (forceRefresh) {
+    ecoStatusCache = null;
+  }
+
+  const canonicalByLower = new Map<string, string>();
+  for (const t of unique) {
+    canonicalByLower.set(t.toLowerCase(), t);
+  }
+
   const toFetch: string[] = [];
   for (const trk of unique) {
-    const cached = ecoTrackingCache.get(trk);
+    const cached = forceRefresh ? undefined : ecoTrackingCache.get(trk.toLowerCase());
     if (cached && now - cached.at < ECO_TRACKING_TTL) {
       result[trk] = cached.data;
     } else {
@@ -1010,22 +1238,27 @@ export async function getEcoTrackTrackingBatch(
   }
   if (!toFetch.length) return result;
 
-  const requestedSet = new Set(unique);
-  const storeEntries = (pairs: Array<[string, RawEcoTrackingNode]>) => {
-    for (const [trk, node] of pairs) {
-      const item = buildEcoTrackingItem(trk, node);
-      ecoTrackingCache.set(trk, { at: Date.now(), data: item });
-      if (requestedSet.has(trk)) {
-        result[trk] = item;
+  const storeEntries = (pairs: Array<[string, RawEcoTrackingNode]>, mergeExisting: boolean) => {
+    for (const [rawTrk, node] of pairs) {
+      const lower = rawTrk.trim().toLowerCase();
+      const targetKey = canonicalByLower.get(lower) || rawTrk.trim();
+      if (!targetKey) continue;
+      const incoming = buildEcoTrackingItem(targetKey, node);
+      const existing = result[targetKey] ?? ecoTrackingCache.get(lower)?.data;
+      const item = mergeExisting ? mergeEcoTrackingItems(existing, incoming) : incoming;
+      ecoTrackingCache.set(lower, { at: Date.now(), data: item });
+      if (canonicalByLower.has(lower)) {
+        result[targetKey] = item;
       }
     }
   };
 
-  // 1) Primary fast paginated fetch: /api/v1/get/orders?page=N returns ALL EcoTrack/DHD parcels
-  // with authoritative root `status` (livré_non_encaissé, encaissé_non_payé, en_livraison, retour_*, etc.)
-  const maxPages = 15;
-  for (let page = 1; page <= maxPages; page++) {
-    if (toFetch.every(t => Boolean(result[t]))) break;
+  // 1) Primary fast paginated fetch: /api/v1/get/orders?page=N
+  let lastPageDetected = 0;
+  const visitedPages = new Set<number>();
+  const fetchOrdersPage = async (page: number) => {
+    if (visitedPages.has(page)) return false;
+    visitedPages.add(page);
     try {
       const resp = await ecoRequest<{
         data?: unknown;
@@ -1039,21 +1272,44 @@ export async function getEcoTrackTrackingBatch(
         },
       });
       const pairs = extractEcoEntries(resp, []);
-      if (pairs.length === 0) break;
-      storeEntries(pairs);
-      const lastPage = Number(resp?.last_page || 0);
-      if ((lastPage > 0 && page >= lastPage) || resp?.next_page_url === null) {
-        break;
+      if (pairs.length === 0) return false;
+      storeEntries(pairs, false);
+      const lp = Number(resp?.last_page || 0);
+      if (lp > lastPageDetected) lastPageDetected = lp;
+      if ((lp > 0 && page >= lp) || resp?.next_page_url === null) {
+        return false;
       }
+      return true;
     } catch {
-      break;
+      return false;
+    }
+  };
+
+  for (let page = 1; page <= 8; page++) {
+    if (toFetch.every(t => Boolean(result[t]))) break;
+    const hasMore = await fetchOrdersPage(page);
+    if (!hasMore) break;
+  }
+
+  // If the account has > 8 pages and some requested trackings are still missing,
+  // scan the newest tail pages (some EcoTrack panels sort page 1 oldest-first).
+  if (lastPageDetected > 8 && toFetch.some(t => !result[t])) {
+    const tailStop = Math.max(9, lastPageDetected - 6);
+    for (let page = lastPageDetected; page >= tailStop; page--) {
+      if (toFetch.every(t => Boolean(result[t]))) break;
+      await fetchOrdersPage(page);
     }
   }
 
-  // 2) Fallback per tracking for any tracking still missing (without the old 15-item cap)
-  const stillMissing = toFetch.filter(t => !result[t]);
-  for (let i = 0; i < stillMissing.length; i += 6) {
-    const chunk = stillMissing.slice(i, i + 6);
+  // 2) Enrich missing trackings OR active/recent parcels with empty historique via /api/v1/get/tracking/info
+  const missingFromOrders = toFetch.filter(t => !result[t]);
+  const emptyHistoryPriority = toFetch
+    .filter(t => result[t] && (!result[t].historique || result[t].historique!.length === 0))
+    .slice(0, 60);
+  const toEnrich = Array.from(new Set([...missingFromOrders, ...emptyHistoryPriority]));
+
+  for (let i = 0; i < toEnrich.length; i += 6) {
+    const chunk = toEnrich.slice(i, i + 6);
     await Promise.all(
       chunk.map(async trk => {
         try {
@@ -1064,7 +1320,7 @@ export async function getEcoTrackTrackingBatch(
               tracking: trk,
             },
           });
-          storeEntries(extractEcoEntries(resp, [trk]));
+          storeEntries(extractEcoEntries(resp, [trk]), true);
         } catch {
           // Ignore individual lookup failure
         }

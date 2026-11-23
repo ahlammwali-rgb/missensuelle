@@ -104,9 +104,11 @@ export async function reconcileCarrierBatchOrders(params: {
 export async function syncAllCarrierDeliveries(options?: {
   includeEcom?: boolean;
   includeEcoTrack?: boolean;
+  forceRefresh?: boolean;
 }): Promise<{ syncedCount: number; revertedCount: number }> {
   const includeEcom = options?.includeEcom ?? true;
   const includeEcoTrack = options?.includeEcoTrack ?? true;
+  const forceRefresh = Boolean(options?.forceRefresh);
 
   let syncedCount = 0;
   let revertedCount = 0;
@@ -130,7 +132,7 @@ export async function syncAllCarrierDeliveries(options?: {
     if (ecomTrackings.length > 0) {
       const batch: Record<string, CarrierTrackingSummary> = {};
       for (let i = 0; i < ecomTrackings.length; i += 80) {
-        const chunk = await getEcomTrackingBatch(ecomTrackings.slice(i, i + 80)).catch(
+        const chunk = await getEcomTrackingBatch(ecomTrackings.slice(i, i + 80), { forceRefresh }).catch(
           () => ({} as Record<string, CarrierTrackingSummary>)
         );
         Object.assign(batch, chunk);
@@ -159,7 +161,7 @@ export async function syncAllCarrierDeliveries(options?: {
     if (ecoTrackings.length > 0) {
       const batch: Record<string, CarrierTrackingSummary> = {};
       for (let i = 0; i < ecoTrackings.length; i += 80) {
-        const chunk = await getEcoTrackTrackingBatch(ecoTrackings.slice(i, i + 80)).catch(
+        const chunk = await getEcoTrackTrackingBatch(ecoTrackings.slice(i, i + 80), { forceRefresh }).catch(
           () => ({} as Record<string, CarrierTrackingSummary>)
         );
         Object.assign(batch, chunk);

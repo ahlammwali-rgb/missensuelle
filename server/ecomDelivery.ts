@@ -425,14 +425,18 @@ export async function getEcomTracking(tracking: string): Promise<EcomTrackingInf
   }
 }
 
-export async function getEcomTrackingBatch(trackings: string[]): Promise<Record<string, EcomTrackingInfo>> {
+export async function getEcomTrackingBatch(
+  trackings: string[],
+  options?: { forceRefresh?: boolean }
+): Promise<Record<string, EcomTrackingInfo>> {
   const result: Record<string, EcomTrackingInfo> = {};
   const now = Date.now();
-  const unique = Array.from(new Set(trackings.filter(Boolean)));
+  const forceRefresh = Boolean(options?.forceRefresh);
+  const unique = Array.from(new Set(trackings.map(t => t.trim()).filter(Boolean)));
   const toFetch: string[] = [];
 
   for (const trk of unique) {
-    const cached = trackingCache.get(trk);
+    const cached = forceRefresh ? undefined : trackingCache.get(trk);
     if (cached && now - cached.at < TRACKING_TTL) {
       result[trk] = cached.data;
     } else {

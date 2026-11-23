@@ -251,13 +251,19 @@ export const appRouter = router({
         const actor = resolveActor(ctx.user);
         return markOrderDelivered(input.id, input.isDelivered, actor);
       }),
-    syncDeliveredFromCarriers: adminProcedure.mutation(async () => {
-      try {
-        return await syncAllCarrierDeliveries({ includeEcom: true, includeEcoTrack: true });
-      } catch {
-        return { syncedCount: 0, revertedCount: 0 };
-      }
-    }),
+    syncDeliveredFromCarriers: adminProcedure
+      .input(z.object({ forceRefresh: z.boolean().optional() }).optional())
+      .mutation(async ({ input }) => {
+        try {
+          return await syncAllCarrierDeliveries({
+            includeEcom: true,
+            includeEcoTrack: true,
+            forceRefresh: input?.forceRefresh ?? true,
+          });
+        } catch {
+          return { syncedCount: 0, revertedCount: 0 };
+        }
+      }),
     setOrderCarrier: adminProcedure
       .input(z.object({ id: z.number().int().positive(), carrier: orderCarrierSchema }))
       .mutation(({ ctx, input }) => {
@@ -568,10 +574,30 @@ export const appRouter = router({
         .input(z.object({ tracking: z.string().min(1) }))
         .query(({ input }) => ecomGuard(() => getEcomTracking(input.tracking))),
       trackBatch: adminProcedure
-        .input(z.object({ trackings: z.array(z.string()).max(500) }))
+        .input(z.object({ trackings: z.array(z.string()).max(500), forceRefresh: z.boolean().optional() }))
         .query(({ input }) =>
           ecomGuard(async () => {
-            const batch = await getEcomTrackingBatch(input.trackings);
+            const batch = await getEcomTrackingBatch(input.trackings, { forceRefresh: input.forceRefresh });
+            try {
+              const ecomStatus = await getEcomStatus();
+              const orders = await listCheckoutOrders();
+              await reconcileCarrierBatchOrders({
+                carrier: "ecom",
+                orders,
+                shipments: ecomStatus.shipments || {},
+                trackingMap: batch,
+              });
+            } catch {
+              // Ignore auto-delivery sync error
+            }
+            return batch;
+          })
+        ),
+      refreshBatch: adminProcedure
+        .input(z.object({ trackings: z.array(z.string()).max(500) }))
+        .mutation(({ input }) =>
+          ecomGuard(async () => {
+            const batch = await getEcomTrackingBatch(input.trackings, { forceRefresh: true });
             try {
               const ecomStatus = await getEcomStatus();
               const orders = await listCheckoutOrders();
@@ -646,10 +672,30 @@ export const appRouter = router({
       .input(z.object({ tracking: z.string().min(1).max(100) }))
       .mutation(({ input }) => ecomGuard(() => validateEcoTrackOrder(input.tracking))),
     trackBatch: adminProcedure
-      .input(z.object({ trackings: z.array(z.string()).max(500) }))
+      .input(z.object({ trackings: z.array(z.string()).max(500), forceRefresh: z.boolean().optional() }))
       .query(({ input }) =>
         ecomGuard(async () => {
-          const batch = await getEcoTrackTrackingBatch(input.trackings);
+          const batch = await getEcoTrackTrackingBatch(input.trackings, { forceRefresh: input.forceRefresh });
+          try {
+            const ecoStatus = await getEcoTrackStatus();
+            const orders = await listCheckoutOrders();
+            await reconcileCarrierBatchOrders({
+              carrier: "ecotrack",
+              orders,
+              shipments: ecoStatus.shipments || {},
+              trackingMap: batch,
+            });
+          } catch {
+            // Ignore auto-delivery sync error
+          }
+          return batch;
+        })
+      ),
+    refreshBatch: adminProcedure
+      .input(z.object({ trackings: z.array(z.string()).max(500) }))
+      .mutation(({ input }) =>
+        ecomGuard(async () => {
+          const batch = await getEcoTrackTrackingBatch(input.trackings, { forceRefresh: true });
           try {
             const ecoStatus = await getEcoTrackStatus();
             const orders = await listCheckoutOrders();
