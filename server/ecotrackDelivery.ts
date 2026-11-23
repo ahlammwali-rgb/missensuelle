@@ -8,6 +8,12 @@ import {
   wilayaIdFromName,
   type ShippingRate,
 } from "../shared/shipping";
+import {
+  isCarrierStatusTextDelivered,
+  isCarrierStatusTextReturned,
+  isCarrierTrackingDelivered,
+  normCarrierText,
+} from "../shared/carrierStatus";
 import { getCloudToken } from "./persistentStore";
 import type { EcomTrackingInfo } from "./ecomDelivery";
 
@@ -775,19 +781,24 @@ const ECOTRACK_STATUS_LABELS: Record<string, string> = {
   prete_a_expedier: "Prêt à expédier",
   pret_a_expedier: "Prêt à expédier",
   en_preparation: "En préparation",
+  order_information_received_by_carrier: "En préparation",
   expedie: "Expédié",
+  accepted_by_carrier: "Pris en charge (Hub)",
   vers_hub: "En transit vers Hub",
   en_hub: "Au Hub",
   au_bureau: "Au Bureau (Stop Desk)",
   vers_wilaya: "En transit vers Wilaya",
   en_livraison: "En cours de livraison",
   sorti_en_livraison: "En cours de livraison",
+  dispatched_to_driver: "En cours de livraison",
   tentative_echouee: "Tentative échouée",
+  attempt_delivery: "Tentative de livraison",
   ne_repond_pas: "Ne répond pas",
   reporte: "Reporté",
   suspendu: "Suspendu",
   livre: "Livrée",
   livree: "Livrée",
+  delivered: "Livrée",
   livre_non_encaisse: "Livrée (Non encaissée)",
   livree_non_encaissee: "Livrée (Non encaissée)",
   livre_encaisse: "Livrée & Encaissée",
@@ -799,6 +810,9 @@ const ECOTRACK_STATUS_LABELS: Record<string, string> = {
   paye: "Payé",
   paye_et_archive: "Livrée & Payée",
   retour_en_cours: "Retour en cours",
+  retour_en_traitement: "Retour en traitement",
+  retour_chez_livreur: "Retour chez livreur",
+  retour_recu: "Retour reçu",
   retourne: "Retourné",
   retour_client: "Retourné",
   retour_hub: "Retour au Hub",
@@ -810,12 +824,7 @@ const ECOTRACK_STATUS_LABELS: Record<string, string> = {
 };
 
 function formatEcoStatusLabel(raw?: string): string {
-  const key = (raw || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[\s-]+/g, "_");
+  const key = normCarrierText(raw).replace(/[\s-]+/g, "_");
   return ECOTRACK_STATUS_LABELS[key] || raw || "En suivi";
 }
 
@@ -824,11 +833,13 @@ type RawEcoTrackingNode = {
   tracking_number?: string;
   code?: string;
   status?: string;
+  global_status?: string;
   status_label?: string;
   situation?: string;
   etat?: string;
   raw_status?: string;
   order_id?: string;
+  livred_at?: string | null;
   OrderInfo?: RawEcoTrackingNode;
   activity?: Array<{
     reason?: string;
@@ -846,30 +857,73 @@ type RawEcoTrackingNode = {
   history?: RawEcoTrackingNode["activity"];
 };
 
-function buildEcoTrackingItem(trk: string, rawNode: RawEcoTrackingNode): EcomTrackingInfo {
+export function buildEcoTrackingItem(trk: string, rawNode: RawEcoTrackingNode): EcomTrackingInfo {
   const info = rawNode.OrderInfo ?? rawNode;
-  const rawStatus =
-    info.status_label || info.raw_status || info.situation || info.etat || info.status || "";
-  const sit = formatEcoStatusLabel(info.status || rawStatus);
-  const low = `${info.status || ""} ${rawStatus} ${sit}`
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
   const events = Array.isArray(info.activity)
     ? info.activity
     : Array.isArray(info.history)
       ? info.history
       : [];
+  const latestEvent = events.length > 0 ? events[events.length - 1] : undefined;
+
+  let rawStatus =
+    info.status || info.global_status || info.raw_status || info.situation || info.etat || info.status_label || "";
+
+  if (!rawStatus && latestEvent) {
+    const evStatus = String(latestEvent.status || latestEvent.raw_status || "").trim();
+    const evReason = String(latestEvent.reason || latestEvent.details || "").trim();
+    const evReasonNorm = normCarrierText(evReason);
+    if (evStatus === "attempt_delivery" && evReasonNorm) {
+      if (/repond|injoignable|joignable/.test(evReasonNorm)) {
+        rawStatus = "ne_repond_pas";
+      } else if (/report|reprogramm/.test(evReasonNorm)) {
+        rawStatus = "reporte";
+      } else if (/refus|annul/.test(evReasonNorm)) {
+        rawStatus = "refuse";
+      } else {
+        rawStatus = evStatus;
+      }
+    } else {
+      rawStatus = evStatus || evReason;
+    }
+  }
+
+  const sit = formatEcoStatusLabel(rawStatus);
+  const rawNorm = normCarrierText(rawStatus);
+  const sitNorm = normCarrierText(sit);
+
+  const isReturned =
+    isCarrierStatusTextReturned(rawStatus) ||
+    isCarrierStatusTextReturned(sit);
+
+  const isDelivered =
+    !isReturned &&
+    (Boolean(info.livred_at) ||
+      isCarrierStatusTextDelivered(rawStatus) ||
+      isCarrierStatusTextDelivered(sit));
+
+  const isExplicitNonEncaisse = rawNorm.includes("non_encaisse") || sitNorm.includes("non encaisse");
+  const isCashCollected =
+    isDelivered &&
+    !isExplicitNonEncaisse &&
+    (rawNorm.includes("encaisse") ||
+      rawNorm.includes("paye") ||
+      rawNorm.includes("recouvr") ||
+      rawStatus === "delivered" ||
+      rawStatus === "livre" ||
+      rawStatus === "livree");
+
   return {
     tracking: trk,
     situation: sit,
-    etat_logistique: info.status || rawStatus || sit,
-    encaisser:
-      low.includes("livr") ||
-      low.includes("encaiss") ||
-      low.includes("paye") ||
-      low.includes("recouvr"),
-    recouvert: low.includes("encaiss") || low.includes("paye") || low.includes("recouvr"),
+    etat_logistique: rawStatus || sit,
+    encaisser: isCashCollected,
+    recouvert:
+      isCashCollected &&
+      !rawNorm.includes("non_paye") &&
+      (rawNorm.includes("encaisse_paye") ||
+        rawNorm.includes("paye_et_archive") ||
+        rawStatus === "paye"),
     historique: events.map(a => ({
       date: [a.date, a.time].filter(Boolean).join(" "),
       ville: a.station || a.location || "",
@@ -914,7 +968,12 @@ function extractEcoEntries(
       entries.push([directTrk, obj as RawEcoTrackingNode]);
       return entries;
     }
-    if (expectedTrackings.length === 1 && ((obj as RawEcoTrackingNode).status || (obj as RawEcoTrackingNode).activity || (obj as RawEcoTrackingNode).history)) {
+    if (
+      expectedTrackings.length === 1 &&
+      ((obj as RawEcoTrackingNode).status ||
+        (obj as RawEcoTrackingNode).activity ||
+        (obj as RawEcoTrackingNode).history)
+    ) {
       entries.push([expectedTrackings[0], obj as RawEcoTrackingNode]);
       return entries;
     }
@@ -935,7 +994,7 @@ export async function getEcoTrackTrackingBatch(
 ): Promise<Record<string, EcomTrackingInfo>> {
   const result: Record<string, EcomTrackingInfo> = {};
   const now = Date.now();
-  const unique = Array.from(new Set(trackings.filter(Boolean)));
+  const unique = Array.from(new Set(trackings.map(t => t.trim()).filter(Boolean)));
   if (!unique.length) return result;
   const creds = await credentials();
   if (!creds) return result;
@@ -951,64 +1010,66 @@ export async function getEcoTrackTrackingBatch(
   }
   if (!toFetch.length) return result;
 
+  const requestedSet = new Set(unique);
   const storeEntries = (pairs: Array<[string, RawEcoTrackingNode]>) => {
     for (const [trk, node] of pairs) {
       const item = buildEcoTrackingItem(trk, node);
       ecoTrackingCache.set(trk, { at: Date.now(), data: item });
-      result[trk] = item;
+      if (requestedSet.has(trk)) {
+        result[trk] = item;
+      }
     }
   };
 
-  // 1) Primary batch query via /api/v1/get/orders/status
-  for (let i = 0; i < toFetch.length; i += 40) {
-    const chunk = toFetch.slice(i, i + 40);
+  // 1) Primary fast paginated fetch: /api/v1/get/orders?page=N returns ALL EcoTrack/DHD parcels
+  // with authoritative root `status` (livré_non_encaissé, encaissé_non_payé, en_livraison, retour_*, etc.)
+  const maxPages = 15;
+  for (let page = 1; page <= maxPages; page++) {
+    if (toFetch.every(t => Boolean(result[t]))) break;
     try {
-      const resp = await ecoRequest<unknown>("/api/v1/get/orders/status", {
+      const resp = await ecoRequest<{
+        data?: unknown;
+        last_page?: number;
+        next_page_url?: string | null;
+      }>("/api/v1/get/orders", {
         creds,
         query: {
           api_token: creds.token,
-          trackings: chunk.join(","),
+          page,
         },
       });
-      storeEntries(extractEcoEntries(resp, chunk));
+      const pairs = extractEcoEntries(resp, []);
+      if (pairs.length === 0) break;
+      storeEntries(pairs);
+      const lastPage = Number(resp?.last_page || 0);
+      if ((lastPage > 0 && page >= lastPage) || resp?.next_page_url === null) {
+        break;
+      }
     } catch {
-      // Fall back to /api/v1/get/orders below
+      break;
     }
   }
 
-  // 2) Fallback for trackings still missing: /api/v1/get/orders
-  const missingAfterStatus = toFetch.filter(t => !result[t]);
-  for (let i = 0; i < missingAfterStatus.length; i += 40) {
-    const chunk = missingAfterStatus.slice(i, i + 40);
-    try {
-      const resp = await ecoRequest<unknown>("/api/v1/get/orders", {
-        creds,
-        query: {
-          api_token: creds.token,
-          tracking: chunk.join(","),
-        },
-      });
-      storeEntries(extractEcoEntries(resp, chunk));
-    } catch {
-      // Continue to per-tracking lookup
-    }
-  }
-
-  // 3) Final fallback per tracking (up to 15): /api/v1/get/tracking/info
-  const stillMissing = toFetch.filter(t => !result[t]).slice(0, 15);
-  for (const trk of stillMissing) {
-    try {
-      const resp = await ecoRequest<unknown>("/api/v1/get/tracking/info", {
-        creds,
-        query: {
-          api_token: creds.token,
-          tracking: trk,
-        },
-      });
-      storeEntries(extractEcoEntries(resp, [trk]));
-    } catch {
-      // Ignore individual lookup failure
-    }
+  // 2) Fallback per tracking for any tracking still missing (without the old 15-item cap)
+  const stillMissing = toFetch.filter(t => !result[t]);
+  for (let i = 0; i < stillMissing.length; i += 6) {
+    const chunk = stillMissing.slice(i, i + 6);
+    await Promise.all(
+      chunk.map(async trk => {
+        try {
+          const resp = await ecoRequest<unknown>("/api/v1/get/tracking/info", {
+            creds,
+            query: {
+              api_token: creds.token,
+              tracking: trk,
+            },
+          });
+          storeEntries(extractEcoEntries(resp, [trk]));
+        } catch {
+          // Ignore individual lookup failure
+        }
+      })
+    );
   }
 
   return result;
@@ -1058,15 +1119,7 @@ export async function recordEcoTrackWebhookStatus(payload: Record<string, unknow
   const matchedEntry = Object.entries(state.shipments).find(
     ([, sh]) => sh.tracking.trim().toLowerCase() === tracking.toLowerCase()
   );
-  const low = `${rawStatus} ${item.situation}`
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-  const isDelivered =
-    low.includes("livr") ||
-    low.includes("encaiss") ||
-    low.includes("paye") ||
-    low.includes("recouvr");
+  const isDelivered = isCarrierTrackingDelivered(item);
 
   return {
     ok: true,

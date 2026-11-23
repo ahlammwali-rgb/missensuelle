@@ -20,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import type { CheckoutOrder } from "@shared/checkout";
+import { classifyCarrierTracking, isCarrierTrackingDelivered } from "@shared/carrierStatus";
 import { formatDZD, type OrderStatus } from "@/lib/store-data";
 import { trpc } from "@/lib/trpc";
 
@@ -66,6 +67,13 @@ export function TransferredOrdersPanel({
   } | null>(null);
 
   // E-com & EcoTrack status to get shipments maps
+  const syncDeliveriesMutation = trpc.admin.syncDeliveredFromCarriers.useMutation({
+    onSuccess: res => {
+      if (onRefreshOrders && (res.syncedCount > 0 || (res as { revertedCount?: number }).revertedCount)) {
+        onRefreshOrders();
+      }
+    },
+  });
   const ecomStatusQuery = trpc.ecom.status.useQuery(undefined, {
     refetchOnWindowFocus: false,
     staleTime: 30000,
@@ -137,19 +145,12 @@ export function TransferredOrdersPanel({
     if (!onRefreshOrders) return;
     let needsRefresh = false;
     for (const o of transferredOrders) {
-      if (o.isDelivered || syncedDeliveredIdsRef.current.has(o.id)) continue;
+      if (syncedDeliveredIdsRef.current.has(o.id)) continue;
       const sh = ecoShipments[o.id] || ecomShipments[o.id] || shipments[o.id];
       const trk = sh?.tracking ? trackingMap[sh.tracking] : null;
       if (!trk) continue;
-      const sit = `${trk.situation || ""} ${trk.etat_logistique || ""}`.toLowerCase();
-      if (
-        sit.includes("livr") ||
-        sit.includes("encaiss") ||
-        sit.includes("recouvr") ||
-        sit.includes("paye") ||
-        Boolean(trk.encaisser) ||
-        Boolean(trk.recouvert)
-      ) {
+      const deliveredNow = isCarrierTrackingDelivered(trk);
+      if ((deliveredNow && !o.isDelivered) || (!deliveredNow && Boolean(o.isDelivered))) {
         syncedDeliveredIdsRef.current.add(o.id);
         needsRefresh = true;
       }
@@ -229,14 +230,14 @@ export function TransferredOrdersPanel({
 
       const sh = ecoShipments[o.id] || ecomShipments[o.id] || shipments[o.id];
       const trk = sh?.tracking ? trackingMap[sh.tracking] : null;
-      const sit = (trk?.situation || "EnCours").toLowerCase();
+      const cat = classifyCarrierTracking(trk);
 
       if (filterSituation !== "all") {
-        if (filterSituation === "livre" && !sit.includes("livr")) return false;
-        if (filterSituation === "encours" && !sit.includes("cours")) return false;
-        if (filterSituation === "ne_repond_pas" && !sit.includes("repond")) return false;
-        if (filterSituation === "reporte" && !sit.includes("report")) return false;
-        if (filterSituation === "retour" && (!sit.includes("retour") && !sit.includes("annul") && !sit.includes("refus"))) return false;
+        if (filterSituation === "livre" && cat !== "delivered") return false;
+        if (filterSituation === "encours" && cat !== "in_transit" && cat !== "postponed") return false;
+        if (filterSituation === "ne_repond_pas" && cat !== "no_answer") return false;
+        if (filterSituation === "reporte" && cat !== "postponed") return false;
+        if (filterSituation === "retour" && cat !== "returned") return false;
       }
 
       if (!search.trim()) return true;
@@ -257,18 +258,18 @@ export function TransferredOrdersPanel({
     let returned = 0;
 
     for (const o of transferredOrders) {
-      const sh = shipments[o.id];
+      const sh = ecoShipments[o.id] || ecomShipments[o.id] || shipments[o.id];
       const trk = sh?.tracking ? trackingMap[sh.tracking] : null;
-      const sit = (trk?.situation || "").toLowerCase();
+      const cat = classifyCarrierTracking(trk);
 
-      if (sit.includes("livr")) delivered++;
-      else if (sit.includes("repond")) noAnswer++;
-      else if (sit.includes("retour") || sit.includes("annul") || sit.includes("refus")) returned++;
+      if (cat === "delivered") delivered++;
+      else if (cat === "no_answer") noAnswer++;
+      else if (cat === "returned") returned++;
       else inTransit++;
     }
 
     return { total: transferredOrders.length, delivered, inTransit, noAnswer, returned };
-  }, [transferredOrders, shipments, trackingMap]);
+  }, [transferredOrders, ecoShipments, ecomShipments, shipments, trackingMap]);
 
   const exportCSV = () => {
     const header = [
@@ -323,45 +324,47 @@ export function TransferredOrdersPanel({
     notify("Export CSV des commandes transférées téléchargé ✦");
   };
 
-  const getStatusBadge = (situation?: string, etatLogistique?: string) => {
-    const sit = (situation || "").toLowerCase();
-    if (sit.includes("livr")) {
+  const getStatusBadge = (trk?: TrackingData | null) => {
+    const cat = classifyCarrierTracking(trk);
+    const situation = trk?.situation;
+    const etatLogistique = trk?.etat_logistique;
+    if (cat === "delivered") {
       return {
         label: "Livré",
         cls: "trans-badge-livre",
         icon: "🟢",
-        sub: etatLogistique || "Colis remis au client",
+        sub: etatLogistique || situation || "Colis remis au client",
       };
     }
-    if (sit.includes("repond")) {
+    if (cat === "no_answer") {
       return {
         label: "Ne Répond Pas (Livreur)",
         cls: "trans-badge-norepond",
         icon: "📞",
-        sub: etatLogistique || "Tentative d'appel livreur",
+        sub: etatLogistique || situation || "Tentative d'appel livreur",
       };
     }
-    if (sit.includes("report")) {
+    if (cat === "postponed") {
       return {
         label: "Reporté",
         cls: "trans-badge-reporte",
         icon: "📅",
-        sub: etatLogistique || "Reprogrammé avec le client",
+        sub: etatLogistique || situation || "Reprogrammé avec le client",
       };
     }
-    if (sit.includes("retour") || sit.includes("annul") || sit.includes("refus")) {
+    if (cat === "returned") {
       return {
         label: "Retour / Refusé",
         cls: "trans-badge-retour",
         icon: "↩️",
-        sub: etatLogistique || "En cours de retour",
+        sub: etatLogistique || situation || "En cours de retour",
       };
     }
     return {
       label: "En Transit / Livraison",
       cls: "trans-badge-encours",
       icon: "🚚",
-      sub: etatLogistique || "En Préparation / Expédié",
+      sub: etatLogistique || situation || "En Préparation / Expédié",
     };
   };
 
@@ -389,6 +392,7 @@ export function TransferredOrdersPanel({
             type="button"
             className="trans-btn trans-btn-refresh"
             onClick={() => {
+              syncDeliveriesMutation.mutate();
               void ecomStatusQuery.refetch();
               void ecotrackStatusQuery.refetch();
               void trackingQuery.refetch();
@@ -396,10 +400,10 @@ export function TransferredOrdersPanel({
               if (onRefreshOrders) onRefreshOrders();
               notify("Actualisation des statuts de livraison…");
             }}
-            disabled={isTrackingFetching}
+            disabled={isTrackingFetching || syncDeliveriesMutation.isPending}
           >
-            <RefreshCw size={15} className={isTrackingFetching ? "animate-spin" : ""} />
-            <span>{isTrackingFetching ? "Actualisation…" : "Actualiser Suivis"}</span>
+            <RefreshCw size={15} className={isTrackingFetching || syncDeliveriesMutation.isPending ? "animate-spin" : ""} />
+            <span>{isTrackingFetching || syncDeliveriesMutation.isPending ? "Actualisation…" : "Actualiser Suivis"}</span>
           </button>
 
           <button
@@ -502,18 +506,8 @@ export function TransferredOrdersPanel({
               <button
                 key={opt.id}
                 type="button"
+                className={`trans-carrier-pill-btn${active ? " is-active" : ""}`}
                 onClick={() => setFilterCarrier(opt.id)}
-                style={{
-                  height: 36,
-                  padding: "0 12px",
-                  borderRadius: 10,
-                  border: active ? "1.5px solid #2563eb" : "1px solid rgba(148, 163, 184, 0.35)",
-                  background: active ? "rgba(37, 99, 235, 0.12)" : "var(--surface, #fff)",
-                  color: active ? "#1d4ed8" : "inherit",
-                  fontSize: 12.5,
-                  fontWeight: active ? 800 : 600,
-                  cursor: "pointer",
-                }}
               >
                 {opt.label}
               </button>
@@ -540,7 +534,7 @@ export function TransferredOrdersPanel({
             const sh = isEcoTrack ? (ecoShipments[order.id] || shipments[order.id]) : shipments[order.id];
             const tracking = sh?.tracking;
             const trk = tracking ? trackingMap[tracking] : null;
-            const badge = getStatusBadge(trk?.situation, trk?.etat_logistique);
+            const badge = getStatusBadge(trk);
 
             return (
               <div key={order.id} className="trans-order-card">
@@ -548,18 +542,7 @@ export function TransferredOrdersPanel({
                 <div className="trans-card-header">
                   <div className="trans-card-ids">
                     <span className="trans-order-id">{order.id}</span>
-                    <span
-                      className="trans-carrier-pill"
-                      style={
-                        isEcoTrack
-                          ? {
-                              background: "rgba(37, 99, 235, 0.1)",
-                              color: "#1d4ed8",
-                              borderColor: "rgba(37, 99, 235, 0.25)",
-                            }
-                          : undefined
-                      }
-                    >
+                    <span className={`trans-carrier-pill${isEcoTrack ? " is-ecotrack" : ""}`}>
                       <Truck size={12} />
                       {isEcoTrack ? ecoCarrierName : "E-com Delivery"}
                     </span>
@@ -601,6 +584,10 @@ export function TransferredOrdersPanel({
                       {trk?.encaisser ? (
                         <span className="trans-paid-pill">
                           <ShieldCheck size={11} /> Encaissé
+                        </span>
+                      ) : isCarrierTrackingDelivered(trk) ? (
+                        <span className="trans-paid-pill">
+                          <ShieldCheck size={11} /> Livré · Non encaissé
                         </span>
                       ) : (
                         <span className="trans-unpaid-pill">

@@ -502,11 +502,11 @@ export function MobileAppCard({
 
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
           {isPushSubscribed ? (
-            <span className="mobile-status-badge installed" style={{ background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" }}>
+            <span className="mobile-status-badge installed mobile-push-badge-ok">
               <Radio size={14} /> Push Arrière-Plan Actif ✅
             </span>
           ) : (
-            <span className="mobile-status-badge ready" style={{ background: "#fffbeb", color: "#d97706", border: "1px solid #fde68a" }}>
+            <span className="mobile-status-badge ready mobile-push-badge-warn">
               <Bell size={14} /> Push à synchroniser
             </span>
           )}
@@ -561,23 +561,9 @@ export function MobileAppCard({
                   : "Activer les notifications push (Même écran verrouillé)"}
               </button>
             ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  background: "#f0fdf4",
-                  padding: "10px 14px",
-                  borderRadius: "8px",
-                  border: "1px solid #bbf7d0",
-                  color: "#15803d",
-                  fontSize: "0.88rem",
-                  fontWeight: 600,
-                  marginBottom: "8px",
-                }}
-              >
-                <ShieldCheck size={18} />
-                Téléphone connecté aux alertes serveur en arrière-plan ✓
+              <div className="mobile-push-connected">
+                <ShieldCheck size={18} style={{ flexShrink: 0 }} />
+                <span>Téléphone connecté aux alertes serveur en arrière-plan ✓</span>
               </div>
             )}
 
@@ -590,8 +576,8 @@ export function MobileAppCard({
               style={{
                 width: "100%",
                 justifyContent: "center",
-                background: testCountdown ? "#e2e8f0" : "#6366f1",
-                color: testCountdown ? "#475569" : "#ffffff",
+                background: testCountdown ? "rgba(148, 163, 184, 0.35)" : "#6366f1",
+                color: testCountdown ? "var(--app-text, #475569)" : "#ffffff",
               }}
             >
               <Clock size={16} />
@@ -599,7 +585,7 @@ export function MobileAppCard({
                 ? `⏳ Verrouillez votre écran ! Arrivée dans ${testCountdown}s...`
                 : "📲 Tester la notification en arrière-plan (Délai 5s)"}
             </button>
-            <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "6px 0 0 2px" }}>
+            <p className="mobile-muted-sub" style={{ margin: "6px 0 0 2px" }}>
               Appuyez, puis verrouillez immédiatement votre écran pour voir le téléphone sonner en veille !
             </p>
           </div>
@@ -619,39 +605,19 @@ export function MobileAppCard({
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "8px",
-              }}
-            >
+            <div className="mobile-sound-grid">
               <button
                 type="button"
                 onClick={() => handleSelectCashSound("shopify")}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                  gap: "4px",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border:
-                    cashSoundType === "shopify"
-                      ? "2px solid #10b981"
-                      : "1px solid #cbd5e1",
-                  background: cashSoundType === "shopify" ? "#f0fdf4" : "#ffffff",
-                  cursor: "pointer",
-                  textAlign: "left",
-                }}
+                className={`mobile-sound-card${cashSoundType === "shopify" ? " is-selected" : ""}`}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-                  <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#0f172a" }}>
+                  <span style={{ fontWeight: 700, fontSize: "0.85rem" }}>
                     💰 Shopify Cha-Ching
                   </span>
-                  {cashSoundType === "shopify" && <Check size={16} style={{ color: "#10b981" }} />}
+                  {cashSoundType === "shopify" && <Check size={16} style={{ color: "#10b981", flexShrink: 0 }} />}
                 </div>
-                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>
+                <span className="mobile-muted-micro">
                   Clochette nette et rapide identique à Shopify
                 </span>
               </button>
@@ -659,29 +625,15 @@ export function MobileAppCard({
               <button
                 type="button"
                 onClick={() => handleSelectCashSound("vintage")}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                  gap: "4px",
-                  padding: "10px 12px",
-                  borderRadius: "8px",
-                  border:
-                    cashSoundType === "vintage"
-                      ? "2px solid #10b981"
-                      : "1px solid #cbd5e1",
-                  background: cashSoundType === "vintage" ? "#f0fdf4" : "#ffffff",
-                  cursor: "pointer",
-                  textAlign: "left",
-                }}
+                className={`mobile-sound-card${cashSoundType === "vintage" ? " is-selected" : ""}`}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-                  <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#0f172a" }}>
+                  <span style={{ fontWeight: 700, fontSize: "0.85rem" }}>
                     🛎️ Caisse Vintage
                   </span>
-                  {cashSoundType === "vintage" && <Check size={16} style={{ color: "#10b981" }} />}
+                  {cashSoundType === "vintage" && <Check size={16} style={{ color: "#10b981", flexShrink: 0 }} />}
                 </div>
-                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>
+                <span className="mobile-muted-micro">
                   Tiroir métallique coulissant + ding lourd
                 </span>
               </button>
@@ -734,16 +686,7 @@ export function MobileAppCard({
       </div>
 
       {/* NEW: Dedicated Problem Notification Controls (Ne répond pas, Annulé, Reporté) */}
-      <div
-        style={{
-          marginTop: "16px",
-          background: anyProblemEnabled ? "#fff7ed" : "#f8fafc",
-          border: anyProblemEnabled ? "1.5px solid #fdba74" : "1.5px solid #e2e8f0",
-          borderRadius: "12px",
-          padding: "14px 16px",
-          transition: "all 0.2s ease",
-        }}
-      >
+      <div className={`mobile-problems-box${anyProblemEnabled ? " is-active" : ""}`}>
         <div
           style={{
             display: "flex",
@@ -754,26 +697,26 @@ export function MobileAppCard({
             marginBottom: "12px",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: "1 1 220px" }}>
             {anyProblemEnabled ? (
-              <AlertTriangle size={20} style={{ color: "#ea580c" }} />
+              <AlertTriangle size={20} style={{ color: "#ea580c", flexShrink: 0 }} />
             ) : (
-              <BellOff size={20} style={{ color: "#64748b" }} />
+              <BellOff size={20} style={{ color: "#64748b", flexShrink: 0 }} />
             )}
-            <div>
-              <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}>
-                Gestion des Alertes de Problèmes (Ne répond pas, Annulé, Reporté)
+            <div style={{ minWidth: 0 }}>
+              <div className="mobile-problems-title">
+                <span>Gestion des Alertes de Problèmes (Ne répond pas, Annulé, Reporté)</span>
                 {anyProblemEnabled ? (
-                  <span style={{ fontSize: "0.72rem", padding: "2px 8px", background: "#fed7aa", color: "#9a3412", borderRadius: "999px", fontWeight: 700 }}>
+                  <span className="mobile-problems-status is-on">
                     🔔 Alertes Actives
                   </span>
                 ) : (
-                  <span style={{ fontSize: "0.72rem", padding: "2px 8px", background: "#e2e8f0", color: "#475569", borderRadius: "999px", fontWeight: 700 }}>
+                  <span className="mobile-problems-status is-off">
                     🔕 Toutes Désactivées
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: "0.78rem", color: "#64748b" }}>
+              <div className="mobile-muted-sub">
                 Activez ou désactivez les notifications individuellement ou d'un seul clic :
               </div>
             </div>
@@ -797,6 +740,7 @@ export function MobileAppCard({
               color: "#ffffff",
               boxShadow: anyProblemEnabled ? "0 2px 8px rgba(234, 88, 12, 0.3)" : "0 2px 8px rgba(16, 185, 129, 0.3)",
               transition: "transform 0.1s ease",
+              maxWidth: "100%",
             }}
           >
             {anyProblemEnabled ? (
@@ -814,51 +758,21 @@ export function MobileAppCard({
         </div>
 
         {/* 3 Individual Buttons */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "10px",
-          }}
-        >
+        <div className="mobile-problems-grid">
           {/* Button 1: Ne Répond Pas */}
           <button
             type="button"
             onClick={() => handleToggleNrp(!notifNrp)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "10px 14px",
-              borderRadius: "8px",
-              border: notifNrp ? "1.5px solid #f97316" : "1.5px solid #cbd5e1",
-              background: notifNrp ? "#ffffff" : "#f1f5f9",
-              color: notifNrp ? "#0f172a" : "#64748b",
-              cursor: "pointer",
-              textAlign: "left",
-              transition: "all 0.15s ease",
-            }}
+            className={`mobile-problem-btn is-nrp${notifNrp ? " is-enabled" : ""}`}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <PhoneOff size={18} style={{ color: notifNrp ? "#ea580c" : "#94a3b8" }} />
-              <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+              <PhoneOff size={18} style={{ color: notifNrp ? "#ea580c" : "#94a3b8", flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>Client Ne Répond Pas</div>
-                <div style={{ fontSize: "0.74rem", color: "#64748b" }}>Rappel livreur / client</div>
+                <div className="mobile-muted-micro">Rappel livreur / client</div>
               </div>
             </div>
-            <span
-              style={{
-                fontSize: "0.75rem",
-                fontWeight: 800,
-                padding: "3px 8px",
-                borderRadius: "6px",
-                background: notifNrp ? "#ffedd5" : "#e2e8f0",
-                color: notifNrp ? "#c2410c" : "#64748b",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
-            >
+            <span className={`mobile-problem-badge is-nrp${notifNrp ? " is-enabled" : ""}`}>
               {notifNrp ? (
                 <>
                   <Check size={12} /> Actif
@@ -875,40 +789,16 @@ export function MobileAppCard({
           <button
             type="button"
             onClick={() => handleToggleCancel(!notifCancel)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "10px 14px",
-              borderRadius: "8px",
-              border: notifCancel ? "1.5px solid #ef4444" : "1.5px solid #cbd5e1",
-              background: notifCancel ? "#ffffff" : "#f1f5f9",
-              color: notifCancel ? "#0f172a" : "#64748b",
-              cursor: "pointer",
-              textAlign: "left",
-              transition: "all 0.15s ease",
-            }}
+            className={`mobile-problem-btn is-cancel${notifCancel ? " is-enabled" : ""}`}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <XCircle size={18} style={{ color: notifCancel ? "#dc2626" : "#94a3b8" }} />
-              <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+              <XCircle size={18} style={{ color: notifCancel ? "#dc2626" : "#94a3b8", flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>Commande Annulée / Refusée</div>
-                <div style={{ fontSize: "0.74rem", color: "#64748b" }}>Échec ou retour colis</div>
+                <div className="mobile-muted-micro">Échec ou retour colis</div>
               </div>
             </div>
-            <span
-              style={{
-                fontSize: "0.75rem",
-                fontWeight: 800,
-                padding: "3px 8px",
-                borderRadius: "6px",
-                background: notifCancel ? "#fee2e2" : "#e2e8f0",
-                color: notifCancel ? "#b91c1c" : "#64748b",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
-            >
+            <span className={`mobile-problem-badge is-cancel${notifCancel ? " is-enabled" : ""}`}>
               {notifCancel ? (
                 <>
                   <Check size={12} /> Actif
@@ -925,40 +815,16 @@ export function MobileAppCard({
           <button
             type="button"
             onClick={() => handleToggleDelay(!notifDelay)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "10px 14px",
-              borderRadius: "8px",
-              border: notifDelay ? "1.5px solid #eab308" : "1.5px solid #cbd5e1",
-              background: notifDelay ? "#ffffff" : "#f1f5f9",
-              color: notifDelay ? "#0f172a" : "#64748b",
-              cursor: "pointer",
-              textAlign: "left",
-              transition: "all 0.15s ease",
-            }}
+            className={`mobile-problem-btn is-delay${notifDelay ? " is-enabled" : ""}`}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <CalendarClock size={18} style={{ color: notifDelay ? "#ca8a04" : "#94a3b8" }} />
-              <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+              <CalendarClock size={18} style={{ color: notifDelay ? "#ca8a04" : "#94a3b8", flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>Livraison Reportée</div>
-                <div style={{ fontSize: "0.74rem", color: "#64748b" }}>Report demandé par le client</div>
+                <div className="mobile-muted-micro">Report demandé par le client</div>
               </div>
             </div>
-            <span
-              style={{
-                fontSize: "0.75rem",
-                fontWeight: 800,
-                padding: "3px 8px",
-                borderRadius: "6px",
-                background: notifDelay ? "#fef9c3" : "#e2e8f0",
-                color: notifDelay ? "#a16207" : "#64748b",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
-            >
+            <span className={`mobile-problem-badge is-delay${notifDelay ? " is-enabled" : ""}`}>
               {notifDelay ? (
                 <>
                   <Check size={12} /> Actif
@@ -974,18 +840,7 @@ export function MobileAppCard({
       </div>
 
       {/* Panel 3: Installation & Preferences Bar */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "12px",
-          marginTop: "16px",
-          paddingTop: "14px",
-          borderTop: "1px solid #e2e8f0",
-        }}
-      >
+      <div className="mobile-prefs-footer">
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <button
             type="button"

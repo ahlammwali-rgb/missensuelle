@@ -175,51 +175,18 @@ export function EcomDeliveryPanel({
   return (
     <section className="ecom-delivery-panel">
       {/* Switcher Transporteurs : E-com Delivery | EcoTrack API */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: 8,
-          padding: 6,
-          borderRadius: 16,
-          background: "var(--app-surface-alt, rgba(148,163,184,0.14))",
-          border: "1px solid var(--app-border, rgba(148,163,184,0.25))",
-          marginBottom: 14,
-        }}
-      >
+      <div className="ecom-carrier-switcher">
         <button
           type="button"
+          className={`ecom-carrier-switch-btn${carrierTab === "ecom" ? " is-active" : ""}`}
           onClick={() => setCarrierTab("ecom")}
-          style={{
-            border: 0,
-            borderRadius: 12,
-            padding: "10px 12px",
-            font: "inherit",
-            fontWeight: 900,
-            fontSize: 13,
-            cursor: "pointer",
-            background: carrierTab === "ecom" ? "linear-gradient(135deg, #2563eb, #1d4ed8)" : "transparent",
-            color: carrierTab === "ecom" ? "#ffffff" : "inherit",
-            boxShadow: carrierTab === "ecom" ? "0 4px 12px rgba(37, 99, 235, 0.28)" : "none",
-          }}
         >
           🚚 E-com Delivery ({linkedEcom.length})
         </button>
         <button
           type="button"
+          className={`ecom-carrier-switch-btn${carrierTab === "ecotrack" ? " is-active is-ecotrack" : ""}`}
           onClick={() => setCarrierTab("ecotrack")}
-          style={{
-            border: 0,
-            borderRadius: 12,
-            padding: "10px 12px",
-            font: "inherit",
-            fontWeight: 900,
-            fontSize: 13,
-            cursor: "pointer",
-            background: carrierTab === "ecotrack" ? "linear-gradient(135deg, #8b5cf6, #7c3aed)" : "transparent",
-            color: carrierTab === "ecotrack" ? "#ffffff" : "inherit",
-            boxShadow: carrierTab === "ecotrack" ? "0 4px 12px rgba(139, 92, 246, 0.28)" : "none",
-          }}
         >
           📦 DHD / EcoTrack API ({linkedEcoTrackCount})
         </button>
@@ -292,7 +259,7 @@ export function EcomDeliveryPanel({
                 placeholder="Votre Token"
               />
             </label>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
                 className="button button-gradient"
                 disabled={!apiKey.trim() || !apiToken.trim() || saveCredentials.isPending}
@@ -409,19 +376,8 @@ export function EcomDeliveryPanel({
                 className="ecom-shipped-row"
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}
               >
-                <span>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      padding: "2px 8px",
-                      borderRadius: "999px",
-                      background: "rgba(245, 158, 11, 0.15)",
-                      color: "#b45309",
-                      fontSize: "11px",
-                      fontWeight: 800,
-                      marginRight: 8,
-                    }}
-                  >
+                <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
+                  <span className="ecom-prep-badge">
                     📦 En préparation
                   </span>
                   <b>{order.customer}</b> · {order.phone} · {order.wilaya} / {order.commune}
@@ -466,19 +422,8 @@ export function EcomDeliveryPanel({
           const isReady = Boolean(shipments[order.id]?.readyToShip);
           return (
             <div key={order.id} className="ecom-shipped-row">
-              <span>
-                <span
-                  style={{
-                    display: "inline-block",
-                    padding: "2px 8px",
-                    borderRadius: "999px",
-                    background: isReady ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                    color: isReady ? "#047857" : "#b45309",
-                    fontSize: "11px",
-                    fontWeight: 800,
-                    marginRight: 8,
-                  }}
-                >
+              <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
+                <span className={isReady ? "ecom-ready-badge" : "ecom-prep-badge"}>
                   {isReady ? "✅ Prêt à expédier" : "📦 En préparation"}
                 </span>
                 <b>{order.customer}</b> · {order.phone} · {order.wilaya} / {order.commune}
@@ -561,7 +506,7 @@ function ShipRow({
           }
           style={{ marginTop: 4 }}
         />
-        <span style={{ flex: 1 }}>
+        <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
           <b className="ecom-row-customer">{order.customer}</b> ·{" "}
           <span dir="ltr" className="ecom-row-phone">{order.phone}</span> ·{" "}
           <span className="ecom-row-product">{order.product}</span>

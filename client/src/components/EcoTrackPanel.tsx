@@ -257,12 +257,12 @@ export function EcoTrackPanel({
             </div>
           </div>
         ) : (
-          <div className="ecom-connected-bar" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-              <span>
+          <div className="ecom-connected-bar">
+            <div className="ecom-connected-bar-top">
+              <span className="ecom-connected-meta">
                 Plateforme : <b dir="ltr">{status.baseUrl}</b> · Token : <b dir="ltr">{status.tokenPreview}</b>
               </span>
-              <div>
+              <div className="ecom-connected-actions">
                 <button
                   className="button button-outline"
                   onClick={() => {
@@ -288,21 +288,8 @@ export function EcoTrackPanel({
                 </button>
               </div>
             </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: 8,
-                padding: "8px 12px",
-                borderRadius: 10,
-                background: "rgba(37, 99, 235, 0.08)",
-                border: "1px dashed rgba(37, 99, 235, 0.35)",
-                fontSize: 12,
-              }}
-            >
-              <span>
+            <div className="ecom-webhook-box">
+              <span style={{ minWidth: 0, flex: "1 1 220px" }}>
                 🔄 <strong>Sync auto DHD active (toutes les 5 min)</strong> · URL Webhook temps réel :{" "}
                 <code dir="ltr">{`${window.location.origin}/api/ecotrack/webhook`}</code>
               </span>
@@ -340,7 +327,7 @@ export function EcoTrackPanel({
               {showAllConfirmed ? "Voir seulement liées EcoTrack" : `Voir toutes (${otherConfirmed.length} autres)`}
             </button>
           )}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginLeft: "auto" }}>
+          <div className="ecom-card-head-actions">
             <button
               className="button button-outline"
               disabled={!connected || !selectedOrders.length || ship.isPending}
@@ -435,19 +422,8 @@ export function EcoTrackPanel({
             : null;
           return (
             <div key={order.id} className="ecom-shipped-row">
-              <span>
-                <span
-                  style={{
-                    display: "inline-block",
-                    padding: "2px 8px",
-                    borderRadius: "999px",
-                    background: sh.readyToShip ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                    color: sh.readyToShip ? "#047857" : "#b45309",
-                    fontSize: 11,
-                    fontWeight: 800,
-                    marginRight: 8,
-                  }}
-                >
+              <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
+                <span className={sh.readyToShip ? "ecom-ready-badge" : "ecom-prep-badge"}>
                   {sh.readyToShip ? "✅ Expédiée" : "📦 En préparation"}
                 </span>
                 <b>{order.customer}</b> · {order.phone} · {order.wilaya} / {order.commune}
@@ -548,22 +524,12 @@ function EcoTrackShipRow({
           }
           style={{ marginTop: 4 }}
         />
-        <span style={{ flex: 1 }}>
+        <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
           <b className="ecom-row-customer">{order.customer}</b> ·{" "}
           <span dir="ltr" className="ecom-row-phone">{order.phone}</span> ·{" "}
           <span className="ecom-row-product">{order.product}</span>
           {order.carrier === "ecotrack" && (
-            <span
-              style={{
-                marginLeft: 8,
-                padding: "2px 7px",
-                borderRadius: 999,
-                fontSize: 10.5,
-                fontWeight: 800,
-                background: "rgba(139, 92, 246, 0.14)",
-                color: "#7c3aed",
-              }}
-            >
+            <span className="ecom-linked-pill">
               📦 Liée à EcoTrack
             </span>
           )}

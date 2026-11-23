@@ -175,7 +175,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
   });
   const syncDeliveriesMutation = trpc.admin.syncDeliveredFromCarriers.useMutation({
     onSuccess: async res => {
-      if (res.syncedCount > 0) {
+      if (res.syncedCount > 0 || (res as { revertedCount?: number }).revertedCount) {
         await utils.admin.orders.invalidate();
         await utils.admin.staffData.invalidate();
       }
@@ -1369,7 +1369,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                               Aucune commande livrée sur cette période ({formatDateFr(st.effectiveStart)} ➔ {formatDateFr(st.effectiveEnd)}).
                             </div>
                           ) : (
-                            shownOrdersList.slice(0, 35).map(item => (
+                            shownOrdersList.map(item => (
                               <div
                                 key={item.order.id}
                                 onClick={() => onOpenOrderHistory(item.order)}
@@ -1626,15 +1626,9 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                         {log.orderId && (
                           <button
                             type="button"
+                            className="sp-journal-order-btn"
                             onClick={() => targetOrder && onOpenOrderHistory(targetOrder)}
                             style={{
-                              padding: "3px 9px",
-                              borderRadius: "8px",
-                              background: "rgba(15, 23, 42, 0.06)",
-                              border: "none",
-                              color: "#0f172a",
-                              fontWeight: 800,
-                              fontSize: "12px",
                               cursor: targetOrder ? "pointer" : "default",
                               textDecoration: targetOrder ? "underline" : "none",
                             }}
@@ -1643,12 +1637,12 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                           </button>
                         )}
 
-                        <strong style={{ fontSize: "13px", color: "var(--text, #1e293b)" }}>
+                        <strong style={{ fontSize: "13px", color: "var(--app-text, #1e293b)" }}>
                           {log.summary}
                         </strong>
                       </div>
 
-                      <span style={{ fontSize: "11.5px", color: "#64748b", fontWeight: 600 }}>
+                      <span style={{ fontSize: "11.5px", color: "var(--app-muted, #64748b)", fontWeight: 600 }}>
                         🕒 {formatTime(log.at)}
                       </span>
                     </div>
@@ -1669,18 +1663,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                     )}
 
                     {Array.isArray(log.changes) && log.changes.length > 0 && (
-                      <div
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: "8px",
-                          background: "rgba(248, 250, 252, 0.9)",
-                          border: "1px solid #e2e8f0",
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: "10px",
-                          fontSize: "11.5px",
-                        }}
-                      >
+                      <div className="sp-journal-changes">
                         {log.changes.map((c, i) => (
                           <span key={i}>
                             <strong>{c.label}:</strong>{" "}
@@ -1863,7 +1846,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
             </div>
 
             <form onSubmit={handleSaveStaff} style={{ display: "grid", gap: "14px", marginTop: "14px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div className="sp-form-grid-2">
                 <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
                   Nom / Prénom *
                   <input
@@ -1894,20 +1877,11 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
               </label>
 
               {/* Section Dates de début et de fin du mois du salarié */}
-              <div
-                style={{
-                  padding: "12px 14px",
-                  borderRadius: "12px",
-                  background: "rgba(236, 72, 153, 0.06)",
-                  border: "1px solid rgba(236, 72, 153, 0.25)",
-                  display: "grid",
-                  gap: "10px",
-                }}
-              >
-                <div style={{ fontSize: "13px", fontWeight: 800, color: "#be185d" }}>
+              <div className="sp-period-banner">
+                <div className="sp-period-banner-title">
                   📅 Période du mois du salarié (Début & Fin du comptage)
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                <div className="sp-form-grid-2">
                   <label style={{ display: "grid", gap: "4px", fontSize: "12px", fontWeight: 700 }}>
                     Date où le mois commence *
                     <input
@@ -1933,13 +1907,13 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                     />
                   </label>
                 </div>
-                <small style={{ fontSize: "11px", color: "#64748b" }}>
+                <small style={{ fontSize: "11px", color: "var(--app-muted, #64748b)" }}>
                   Le comptage des appels, confirmations, livraisons et commissions de ce salarié sera calculé entre ces deux dates.
                 </small>
               </div>
 
               {/* Salaire de base + Commission par défaut */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div className="sp-form-grid-2">
                 <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
                   💵 Salaire de base fixe (DA)
                   <input
@@ -1963,38 +1937,18 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
               </div>
 
               {/* Section Commission par produit */}
-              <div
-                style={{
-                  padding: "14px",
-                  borderRadius: "14px",
-                  background: "#f8fafc",
-                  border: "1px solid #cbd5e1",
-                  display: "grid",
-                  gap: "10px",
-                }}
-              >
+              <div className="sp-comm-box">
                 <div>
-                  <strong style={{ fontSize: "13.5px", color: "#0f172a", display: "block" }}>
+                  <strong className="sp-comm-box-title">
                     🛍️ Commission par Produit (Chaque produit a sa propre commission)
                   </strong>
-                  <small style={{ fontSize: "11.5px", color: "#64748b" }}>
+                  <small style={{ fontSize: "11.5px", color: "var(--app-muted, #64748b)" }}>
                     Sélectionnez un produit dans la liste ou modifiez directement la commission (en DA) de chaque produit ci-dessous :
                   </small>
                 </div>
 
                 {/* Sélecteur rapide Produit + Commission */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1.4fr 0.8fr auto",
-                    gap: "8px",
-                    alignItems: "end",
-                    padding: "10px",
-                    borderRadius: "10px",
-                    background: "#fff",
-                    border: "1px solid #e2e8f0",
-                  }}
-                >
+                <div className="sp-product-comm-picker">
                   <label style={{ display: "grid", gap: "4px", fontSize: "11.5px", fontWeight: 700 }}>
                     Sélectionner un produit
                     <select
@@ -2064,22 +2018,10 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                         ? productCommissions[prod.id]
                         : commissionPerDelivered;
                     return (
-                      <div
-                        key={prod.id}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 130px",
-                          alignItems: "center",
-                          gap: "10px",
-                          padding: "6px 10px",
-                          borderRadius: "8px",
-                          background: "#fff",
-                          border: "1px solid #e2e8f0",
-                        }}
-                      >
-                        <div style={{ fontSize: "12.5px", fontWeight: 700, color: "#1e293b" }}>
+                      <div key={prod.id} className="sp-product-comm-row">
+                        <div style={{ fontSize: "12.5px", fontWeight: 700 }}>
                           {prod.name}{" "}
-                          <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 500 }}>
+                          <span style={{ fontSize: "11px", color: "var(--app-muted, #64748b)", fontWeight: 500 }}>
                             ({formatDZD(prod.price)})
                           </span>
                         </div>
@@ -2099,14 +2041,14 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                               width: "90px",
                               height: "32px",
                               borderRadius: "6px",
-                              border: "1px solid #cbd5e1",
+                              border: "1px solid var(--app-border, #cbd5e1)",
                               padding: "0 8px",
                               fontWeight: 800,
                               fontSize: "12.5px",
-                              color: "#059669",
+                              color: "#10b981",
                             }}
                           />
-                          <span style={{ fontSize: "11px", fontWeight: 700, color: "#475569" }}>DA</span>
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--app-muted, #475569)" }}>DA</span>
                         </div>
                       </div>
                     );
@@ -2114,7 +2056,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div className="sp-form-grid-2">
                 <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
                   🔥 Bonus Pack Duo / Cross-Sell Livré (DA)
                   <input
@@ -2137,7 +2079,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                 <span style={{ fontSize: "12px", fontWeight: 700, display: "block", marginBottom: "6px" }}>
                   Couleur du badge :
                 </span>
-                <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   {AVATAR_COLORS.map(c => (
                     <button
                       key={c}
@@ -2148,7 +2090,7 @@ export function StaffPanel({ orders, notify, onOpenOrderHistory }: Props) {
                         height: "30px",
                         borderRadius: "50%",
                         background: c,
-                        border: avatarColor === c ? "3px solid #0f172a" : "2px solid transparent",
+                        border: avatarColor === c ? "3px solid var(--app-text, #0f172a)" : "2px solid transparent",
                         cursor: "pointer",
                       }}
                     />

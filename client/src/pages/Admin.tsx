@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { AdminAuthGate } from "@/components/AdminAuthGate";
 import { trpc } from "@/lib/trpc";
 import type { CheckoutOrder } from "@shared/checkout";
+import { classifyCarrierTracking, type CarrierTrackingSummary } from "@shared/carrierStatus";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
 import { isFreeShippingProduct, type ShippingRate, WILAYA_FRENCH_NAMES, wilayaIdFromName } from "@shared/shipping";
 import { categories, getCatalogProducts, getProductVariantOptions, saveCatalogProducts, formatDZD, wilayas, type LandingTemplateId, type Order, type OrderStatus, type Product, type ProductVariantImage } from "@/lib/store-data";
@@ -249,7 +250,7 @@ function AdminPageContent() {
   const staffDataQuery = trpc.admin.staffData.useQuery(undefined, { enabled: isProfileModalOpen, retry: false, refetchOnWindowFocus: false });
   const syncProfileDeliveries = trpc.admin.syncDeliveredFromCarriers.useMutation({
     onSuccess: res => {
-      if (res.syncedCount > 0) {
+      if (res.syncedCount > 0 || (res as { revertedCount?: number }).revertedCount) {
         void utils.admin.orders.invalidate();
         void utils.admin.staffData.invalidate();
       }
@@ -554,7 +555,7 @@ function AdminPageContent() {
       ({
         ...(trackingBatchQuery.data || {}),
         ...(ecotrackBatchQuery.data || {}),
-      }) as Record<string, { situation?: string }>,
+      }) as Record<string, CarrierTrackingSummary>,
     [trackingBatchQuery.data, ecotrackBatchQuery.data]
   );
   const knownSituationsRef = useRef<Map<string, string>>(new Map());
@@ -566,8 +567,8 @@ function AdminPageContent() {
     if (!initialSituationsLoadedRef.current) {
       initialSituationsLoadedRef.current = true;
       for (const [tracking, data] of Object.entries(trackingMap)) {
-        if (data?.situation) {
-          knownSituationsRef.current.set(tracking, data.situation.toLowerCase());
+        if (data?.situation || data?.etat_logistique) {
+          knownSituationsRef.current.set(tracking, classifyCarrierTracking(data));
         }
       }
       return;
@@ -586,12 +587,12 @@ function AdminPageContent() {
     }
 
     for (const [tracking, data] of Object.entries(trackingMap)) {
-      if (!data?.situation) continue;
-      const currentSit = data.situation.toLowerCase();
-      const prevSit = knownSituationsRef.current.get(tracking);
+      if (!data?.situation && !data?.etat_logistique) continue;
+      const currentCat = classifyCarrierTracking(data);
+      const prevCat = knownSituationsRef.current.get(tracking);
 
-      if (prevSit && prevSit !== currentSit) {
-        knownSituationsRef.current.set(tracking, currentSit);
+      if (prevCat && prevCat !== currentCat) {
+        knownSituationsRef.current.set(tracking, currentCat);
         const orderId = orderIdByTracking.get(tracking);
         const order = orderId ? orderById.get(orderId) : null;
         const customerName = order?.customer || "Cliente";
@@ -600,7 +601,7 @@ function AdminPageContent() {
         const total = order?.total || 0;
 
         // 1. Colis LIVRÉ -> GREEN VICTORY
-        if (currentSit.includes("livr") && !prevSit.includes("livr")) {
+        if (currentCat === "delivered") {
           if (soundVictoryEnabled) playVictoryDeliveredSound();
           if (pushEnabled) {
             showPushNotification(
@@ -613,7 +614,7 @@ function AdminPageContent() {
           notify(`🎉 VICTOIRE : Colis ${orderId || tracking} livré à ${customerName} (+${formatDZD(total)}) !`, "victory");
         }
         // 2. Client NE RÉPOND PAS -> RED ALERT
-        else if (currentSit.includes("repond") && !prevSit.includes("repond") && notifNrpEnabled) {
+        else if (currentCat === "no_answer" && notifNrpEnabled) {
           if (soundUrgentEnabled) playUrgentAlertSound();
           if (pushEnabled) {
             showPushNotification(
@@ -626,7 +627,7 @@ function AdminPageContent() {
           notify(`🚨 INTERVENTION : ${customerName} (${phone}) ne répond pas au livreur !`, "urgent");
         }
         // 3. Colis REPORTÉ -> RED / ORANGE ALERT
-        else if (currentSit.includes("report") && !prevSit.includes("report") && notifDelayEnabled) {
+        else if (currentCat === "postponed" && notifDelayEnabled) {
           if (soundUrgentEnabled) playUrgentAlertSound();
           if (pushEnabled) {
             showPushNotification(
@@ -639,8 +640,7 @@ function AdminPageContent() {
           notify(`⚠️ LIVRAISON REPORTÉE : ${customerName} (${wilaya})`, "urgent");
         }
         // 4. Colis ANNULÉ / RETOUR / REFUSÉ -> RED ALERT
-        else if ((currentSit.includes("retour") || currentSit.includes("annul") || currentSit.includes("refus")) &&
-                 (!prevSit.includes("retour") && !prevSit.includes("annul") && !prevSit.includes("refus")) && notifCancelEnabled) {
+        else if (currentCat === "returned" && notifCancelEnabled) {
           if (soundUrgentEnabled) playUrgentAlertSound();
           if (pushEnabled) {
             showPushNotification(
@@ -652,11 +652,11 @@ function AdminPageContent() {
           }
           notify(`🚨 ALERTE RETOUR : Colis ${orderId || tracking} en retour (${customerName}) !`, "urgent");
         }
-      } else if (!prevSit) {
-        knownSituationsRef.current.set(tracking, currentSit);
+      } else if (!prevCat) {
+        knownSituationsRef.current.set(tracking, currentCat);
       }
     }
-  }, [trackingBatchQuery.data, shipments, orderById]);
+  }, [trackingBatchQuery.data, ecotrackBatchQuery.data, trackingMap, shipments, orderById]);
 
   useEffect(() => {
     if (ordersQuery.isLoading || ordersQuery.error) return;
@@ -706,19 +706,37 @@ function AdminPageContent() {
     return () => window.clearTimeout(timer);
   }, [ordersQuery.isLoading, ordersQuery.error, serverOrders]);
   const orders = useMemo(() => serverOrders.map(toDashboardOrder), [serverOrders]);
-  const periodOrders = useMemo(() => orders.filter(order => order.status !== "transferee" && orderMatchesPeriod(order, period)), [orders, period]);
-  const filtered = useMemo(() => periodOrders.filter(order => order.status !== "transferee" && (activeStatus === "all" || order.status === activeStatus) && `${order.id} ${order.phone} ${order.customer}`.toLowerCase().includes(query.toLowerCase())), [periodOrders, activeStatus, query]);
+  const isTransferredOrShipped = (order: { id: string; status: OrderStatus }) =>
+    order.status === "transferee" || Boolean(shipments[order.id]);
+  const periodOrders = useMemo(
+    () => orders.filter(order => !isTransferredOrShipped(order) && orderMatchesPeriod(order, period)),
+    [orders, shipments, period]
+  );
+  const filtered = useMemo(
+    () =>
+      periodOrders.filter(
+        order =>
+          !isTransferredOrShipped(order) &&
+          (activeStatus === "all" || order.status === activeStatus) &&
+          `${order.id} ${order.phone} ${order.customer}`.toLowerCase().includes(query.toLowerCase())
+      ),
+    [periodOrders, shipments, activeStatus, query]
+  );
   const { activeNewCount, confirmedCount, transferredCount } = useMemo(() => {
     let activeNew = 0;
     let confirmed = 0;
     let transferred = 0;
     for (const order of serverOrders) {
-      if (order.status === "nouvelle") activeNew++;
-      else if (order.status === "confirmee") confirmed++;
-      else if (order.status === "transferee") transferred++;
+      if (order.status === "transferee" || Boolean(shipments[order.id])) {
+        transferred++;
+      } else if (order.status === "nouvelle") {
+        activeNew++;
+      } else if (order.status === "confirmee") {
+        confirmed++;
+      }
     }
     return { activeNewCount: activeNew, confirmedCount: confirmed, transferredCount: transferred };
-  }, [serverOrders]);
+  }, [serverOrders, shipments]);
   const catalogCount = useMemo(() => getCatalogProducts().length, [section]);
   const searchResults = useMemo(() => {
     if (!searchPopupQuery.trim()) return [];
@@ -981,33 +999,33 @@ function AdminPageContent() {
   </button>
   <button
     type="button"
-    className="neo-darkmode-btn"
+    className="neo-darkmode-btn topbar-pill-studio"
     onClick={() => go("catalogue")}
     title="Créer un produit ou lancer le Studio IA"
-    style={{ background: "rgba(124, 58, 237, 0.10)", border: "1px solid rgba(124, 58, 237, 0.28)", cursor: "pointer" }}
+    style={{ cursor: "pointer" }}
   >
-    <Sparkles size={14} style={{ color: "#7c3aed" }} />
-    <span className="neo-btn-label" style={{ color: "#6d28d9", fontWeight: 800 }}>Studio IA</span>
+    <Sparkles size={14} className="topbar-pill-icon" />
+    <span className="neo-btn-label" style={{ fontWeight: 800 }}>Studio IA</span>
   </button>
   <button
     type="button"
-    className="neo-darkmode-btn"
+    className="neo-darkmode-btn topbar-pill-staff"
     onClick={() => go("staff")}
     title="Gérer les confirmateurs, salaires, commissions et appels"
-    style={{ background: "rgba(16, 185, 129, 0.12)", border: "1px solid rgba(16, 185, 129, 0.30)", cursor: "pointer" }}
+    style={{ cursor: "pointer" }}
   >
-    <Users size={14} style={{ color: "#059669" }} />
-    <span className="neo-btn-label" style={{ color: "#047857", fontWeight: 700 }}>Confirmateurs</span>
+    <Users size={14} className="topbar-pill-icon" />
+    <span className="neo-btn-label" style={{ fontWeight: 700 }}>Confirmateurs</span>
   </button>
   <button
     type="button"
-    className="neo-darkmode-btn"
+    className="neo-darkmode-btn topbar-pill-mobile"
     onClick={() => go("settings")}
     title="Installer l'application mobile & alertes sonores"
-    style={{ background: "rgba(245, 158, 11, 0.12)", border: "1px solid rgba(245, 158, 11, 0.32)", cursor: "pointer" }}
+    style={{ cursor: "pointer" }}
   >
-    <Smartphone size={14} style={{ color: "#d97706" }} />
-    <span className="neo-btn-label" style={{ color: "#b45309", fontWeight: 700 }}>App Mobile</span>
+    <Smartphone size={14} className="topbar-pill-icon" />
+    <span className="neo-btn-label" style={{ fontWeight: 700 }}>App Mobile</span>
   </button>
   <button className="icon-button gcome-notif-bell" aria-label="Notifications"><Bell size={19} />{activeNewCount > 0 && <span className="gcome-bell-badge">{activeNewCount}</span>}</button><button type="button" className="admin-profile" onClick={() => setIsProfileModalOpen(true)} title="Voir mon profil, salaire & commissions" style={{ background: "transparent", border: 0, cursor: "pointer" }}><div className="admin-avatar small gcome-avatar-badge">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></button></div></header><div className="admin-content"><Suspense fallback={<section className="admin-data-state" role="status"><span className="eyebrow">Administration</span><h2>Chargement du module…</h2></section>}>{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onSetCarrier={handleSetCarrier} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} stockPanel={<>{gcomeHeroBanner}<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} /></>} />}</Suspense></div></main><GcomeBottomWaveBar /><nav className="admin-mobile-nav gcome-bottom-dock" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={18} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={18} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge gcome-red-badge">{transferredCount}</span>}</button><button type="button" className={section === "catalogue" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => { go("catalogue"); setIsMoreMenuOpen(false); }}><Package size={18} /><span>Produits</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={18} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><Menu size={18} /><span>Menu</span></button></nav>{isSearchOpen && (
   <div className="admin-search-modal-overlay" onClick={() => setIsSearchOpen(false)}>
@@ -1666,7 +1684,7 @@ function AdminPageContent() {
             </div>
           ) : (
             <div style={{ display: "grid", gap: 6, maxHeight: 210, overflowY: "auto" }}>
-              {shownDelivered.slice(0, 50).map(order => (
+              {shownDelivered.map(order => (
                 <div
                   key={order.id}
                   onClick={() => {
@@ -4044,24 +4062,15 @@ function OrderModal({
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "#065f46" }}>Ajout rapide 1-clic :</span>
+                <span className="modal-cross-hint">Ajout rapide 1-clic :</span>
                 {catalog
                   .filter(p => ["p-005", "p-008", "p-007", "p-003", "p-004"].includes(p.id))
                   .map(item => (
                     <button
                       key={item.id}
                       type="button"
+                      className="modal-cross-chip"
                       onClick={() => activateSecondProduct(item.id)}
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: "999px",
-                        border: "1px solid rgba(16, 185, 129, 0.35)",
-                        background: "#fff",
-                        color: "#065f46",
-                        fontSize: "11px",
-                        fontWeight: 800,
-                        cursor: "pointer",
-                      }}
                     >
                       + {item.name} ({formatDZD(item.price)})
                     </button>
@@ -4093,7 +4102,7 @@ function OrderModal({
                   >
                     PRODUIT #2 (CROSS-SELL)
                   </span>
-                  <strong style={{ fontSize: "13px", color: "#064e3b" }}>
+                  <strong className="modal-cross-price">
                     +{formatDZD(secondGoods)}
                   </strong>
                 </div>
@@ -4238,7 +4247,7 @@ function OrderModal({
 
               {/* Offres commerciales rapides Cross-Sell */}
               <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", paddingTop: "4px", borderTop: "1px dashed rgba(16, 185, 129, 0.3)" }}>
-                <span style={{ fontSize: "11px", fontWeight: 800, color: "#065f46" }}>🎁 Geste commercial Cross-Sell :</span>
+                <span className="modal-cross-hint">🎁 Geste commercial Cross-Sell :</span>
                 {[
                   { label: "Tarif normal", discount: 0, freeShip: false },
                   { label: "-300 DA (Remise Duo)", discount: 300, freeShip: false },
@@ -4250,17 +4259,8 @@ function OrderModal({
                     <button
                       key={offer.label}
                       type="button"
+                      className={`modal-cross-chip${isSelected ? " is-selected" : ""}`}
                       onClick={() => applyCrossSellDiscount(offer.discount, offer.freeShip)}
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: "999px",
-                        border: isSelected ? "1.5px solid #059669" : "1px solid rgba(16, 185, 129, 0.3)",
-                        background: isSelected ? "#059669" : "#fff",
-                        color: isSelected ? "#fff" : "#065f46",
-                        fontSize: "11px",
-                        fontWeight: 800,
-                        cursor: "pointer",
-                      }}
                     >
                       {offer.label}
                     </button>
@@ -4270,7 +4270,7 @@ function OrderModal({
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: "12px" }}>
             <label style={{ display: "grid", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
               Wilaya
               <select
@@ -4472,53 +4472,22 @@ function OrderModal({
         </form>
 
         {order.status === "confirmee" && onSetCarrier && (
-          <div
-            style={{
-              marginTop: "12px",
-              padding: "10px 12px",
-              borderRadius: "12px",
-              background: "rgba(15, 23, 42, 0.04)",
-              border: "1px dashed rgba(100, 116, 139, 0.28)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "8px",
-              flexWrap: "wrap",
-            }}
-          >
-            <span style={{ fontSize: "12px", fontWeight: 700, color: "#475569" }}>
+          <div className="modal-carrier-link-box">
+            <span className="modal-carrier-link-label">
               🚚 Société de livraison liée :
             </span>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               <button
                 type="button"
+                className={`modal-carrier-btn${!order.carrier || order.carrier === "ecom" ? " is-ecom" : ""}`}
                 onClick={() => onSetCarrier("ecom")}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: "9px",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  background: !order.carrier || order.carrier === "ecom" ? "#0f766e" : "#fff",
-                  color: !order.carrier || order.carrier === "ecom" ? "#fff" : "#334155",
-                  border: !order.carrier || order.carrier === "ecom" ? "1px solid #0f766e" : "1px solid rgba(148,163,184,0.35)",
-                }}
               >
                 🚚 E-com Delivery
               </button>
               <button
                 type="button"
+                className={`modal-carrier-btn${order.carrier === "ecotrack" ? " is-ecotrack" : ""}`}
                 onClick={() => onSetCarrier("ecotrack")}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: "9px",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                  background: order.carrier === "ecotrack" ? "#2563eb" : "#fff",
-                  color: order.carrier === "ecotrack" ? "#fff" : "#334155",
-                  border: order.carrier === "ecotrack" ? "1px solid #2563eb" : "1px solid rgba(148,163,184,0.35)",
-                }}
               >
                 📦 DHD (EcoTrack)
               </button>

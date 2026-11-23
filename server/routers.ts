@@ -94,40 +94,8 @@ import {
   getAiKeyStatus,
   saveRuntimeGeminiKey,
 } from "./aiLanding";
+import { reconcileCarrierBatchOrders, syncAllCarrierDeliveries } from "./carrierSync";
 import { z } from "zod";
-
-function normTrackingText(value?: string | null): string {
-  return String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-function isCarrierTrackingDelivered(trkData: any): boolean {
-  if (!trkData || typeof trkData !== "object") return false;
-  if (Boolean(trkData.encaisser) || Boolean(trkData.recouvert)) return true;
-  const sit = normTrackingText(`${trkData.situation || ""} ${trkData.etat_logistique || ""}`);
-  if (
-    sit.includes("livr") ||
-    sit.includes("encaiss") ||
-    sit.includes("recouvr") ||
-    sit.includes("paye")
-  ) {
-    return true;
-  }
-  if (Array.isArray(trkData.historique)) {
-    return trkData.historique.some((h: any) => {
-      const hs = normTrackingText(`${h?.situation || ""} ${h?.commentaire || ""}`);
-      return (
-        hs.includes("livr") ||
-        hs.includes("encaiss") ||
-        hs.includes("recouvr") ||
-        hs.includes("paye")
-      );
-    });
-  }
-  return false;
-}
 
 function isOwnerUser(user: { openId?: string | null; loginMethod?: string | null } | null | undefined): boolean {
   if (!user) return false;
@@ -283,84 +251,11 @@ export const appRouter = router({
         return markOrderDelivered(input.id, input.isDelivered, actor);
       }),
     syncDeliveredFromCarriers: adminProcedure.mutation(async () => {
-      let syncedCount = 0;
       try {
-        const orders = await listCheckoutOrders();
-        const [ecomStatus, ecoStatus] = await Promise.all([
-          getEcomStatus().catch(() => null),
-          getEcoTrackStatus().catch(() => null),
-        ]);
-        const ecomShipments = ecomStatus?.shipments || {};
-        const ecoShipments = ecoStatus?.shipments || {};
-
-        const pendingOrders = orders.filter(
-          o =>
-            !o.isDelivered &&
-            !o.returnReceived &&
-            (o.status === "transferee" ||
-              o.status === "confirmee" ||
-              Boolean(ecomShipments[o.id]?.tracking) ||
-              Boolean(ecoShipments[o.id]?.tracking))
-        );
-        if (pendingOrders.length === 0) return { syncedCount: 0 };
-
-        if (ecomStatus?.configured) {
-          const ecomTrackings = Array.from(
-            new Set(
-              pendingOrders
-                .map(o => ecomShipments[o.id]?.tracking)
-                .filter((t): t is string => Boolean(t))
-            )
-          );
-          const batch: Record<string, any> = {};
-          for (let i = 0; i < ecomTrackings.length; i += 80) {
-            const chunk = await getEcomTrackingBatch(ecomTrackings.slice(i, i + 80)).catch(() => ({} as Record<string, any>));
-            Object.assign(batch, chunk);
-          }
-          for (const order of pendingOrders) {
-            const trkNum = ecomShipments[order.id]?.tracking;
-            const trkData = trkNum ? batch[trkNum] : undefined;
-            if (!isCarrierTrackingDelivered(trkData)) continue;
-            await markOrderDelivered(order.dbId, true, {
-              actorId: "system",
-              actorName: "E-com Delivery (Auto)",
-            });
-            order.isDelivered = true;
-            syncedCount++;
-          }
-        }
-
-        if (ecoStatus?.configured) {
-          const ecoTrackings = Array.from(
-            new Set(
-              pendingOrders
-                .filter(o => !o.isDelivered)
-                .map(o => ecoShipments[o.id]?.tracking)
-                .filter((t): t is string => Boolean(t))
-            )
-          );
-          const batch: Record<string, any> = {};
-          for (let i = 0; i < ecoTrackings.length; i += 80) {
-            const chunk = await getEcoTrackTrackingBatch(ecoTrackings.slice(i, i + 80)).catch(() => ({} as Record<string, any>));
-            Object.assign(batch, chunk);
-          }
-          for (const order of pendingOrders) {
-            if (order.isDelivered) continue;
-            const trkNum = ecoShipments[order.id]?.tracking;
-            const trkData = trkNum ? batch[trkNum] : undefined;
-            if (!isCarrierTrackingDelivered(trkData)) continue;
-            await markOrderDelivered(order.dbId, true, {
-              actorId: "system",
-              actorName: "EcoTrack (Auto)",
-            });
-            order.isDelivered = true;
-            syncedCount++;
-          }
-        }
+        return await syncAllCarrierDeliveries({ includeEcom: true, includeEcoTrack: true });
       } catch {
-        // Ignore sync error
+        return { syncedCount: 0, revertedCount: 0 };
       }
-      return { syncedCount };
     }),
     setOrderCarrier: adminProcedure
       .input(z.object({ id: z.number().int().positive(), carrier: orderCarrierSchema }))
@@ -677,19 +572,13 @@ export const appRouter = router({
             const batch = await getEcomTrackingBatch(input.trackings);
             try {
               const ecomStatus = await getEcomStatus();
-              const shipments = ecomStatus.shipments || {};
               const orders = await listCheckoutOrders();
-              for (const order of orders) {
-                if (order.isDelivered) continue;
-                const sh = shipments[order.id];
-                if (!sh?.tracking) continue;
-                const trkData = batch[sh.tracking];
-                if (!isCarrierTrackingDelivered(trkData)) continue;
-                await markOrderDelivered(order.dbId, true, {
-                  actorId: "system",
-                  actorName: "E-com Delivery (Auto)",
-                });
-              }
+              await reconcileCarrierBatchOrders({
+                carrier: "ecom",
+                orders,
+                shipments: ecomStatus.shipments || {},
+                trackingMap: batch,
+              });
             } catch {
               // Ignore auto-delivery sync error
             }
@@ -761,19 +650,13 @@ export const appRouter = router({
           const batch = await getEcoTrackTrackingBatch(input.trackings);
           try {
             const ecoStatus = await getEcoTrackStatus();
-            const shipments = ecoStatus.shipments || {};
             const orders = await listCheckoutOrders();
-            for (const order of orders) {
-              if (order.isDelivered) continue;
-              const sh = shipments[order.id];
-              if (!sh?.tracking) continue;
-              const trkData = batch[sh.tracking];
-              if (!isCarrierTrackingDelivered(trkData)) continue;
-              await markOrderDelivered(order.dbId, true, {
-                actorId: "system",
-                actorName: "EcoTrack (Auto)",
-              });
-            }
+            await reconcileCarrierBatchOrders({
+              carrier: "ecotrack",
+              orders,
+              shipments: ecoStatus.shipments || {},
+              trackingMap: batch,
+            });
           } catch {
             // Ignore auto-delivery sync error
           }

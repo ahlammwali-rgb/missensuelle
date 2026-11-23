@@ -524,7 +524,34 @@ export async function markOrderDelivered(
     }
   } else if (!isDelivered) {
     found.deliveredAt = undefined;
+    if (wasDelivered && actor) {
+      appendOrderHistory(found, {
+        type: "delivered",
+        actorId: actor.actorId || "system",
+        actorName: actor.actorName || "Sync Transporteur",
+        summary: "↩️ Statut Livré corrigé automatiquement (statut transporteur non livré)",
+      });
+    }
   }
+  saveStore();
+  return found;
+}
+
+export async function restoreTransferredStatusFromCarrier(
+  id: number,
+  actor: { actorId: string; actorName: string }
+) {
+  await loadStore();
+  const found = memoryOrders.find(order => order.dbId === id);
+  if (!found || found.status === "transferee") return found ?? null;
+  const prevLabel = STATUS_HUMAN_LABELS[found.status] || found.status;
+  found.status = "transferee";
+  appendOrderHistory(found, {
+    type: "status_change",
+    actorId: actor.actorId || "system",
+    actorName: actor.actorName || "Sync Transporteur",
+    summary: `Statut : ${prevLabel} ➔ Transférée E-com (Colis expédié/confirmé chez le transporteur)`,
+  });
   saveStore();
   return found;
 }

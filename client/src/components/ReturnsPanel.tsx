@@ -20,6 +20,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import type { CheckoutOrder } from "@shared/checkout";
+import { isCarrierTrackingReturned } from "@shared/carrierStatus";
 import { adjustProductStock, formatDZD } from "@/lib/store-data";
 import { playScanSound } from "@/lib/sound";
 import { trpc } from "@/lib/trpc";
@@ -41,51 +42,73 @@ export function ReturnsPanel({ orders, notify, onRefreshOrders }: ReturnsPanelPr
 
   const utils = trpc.useUtils();
   const ecomStatusQuery = trpc.ecom.status.useQuery(undefined, { refetchOnWindowFocus: false });
-  const shipments = ecomStatusQuery.data?.shipments || {};
+  const ecotrackStatusQuery = trpc.ecotrack.status.useQuery(undefined, { refetchOnWindowFocus: false });
+  const ecomShipments = useMemo(() => ecomStatusQuery.data?.shipments || {}, [ecomStatusQuery.data]);
+  const ecoShipments = useMemo(() => ecotrackStatusQuery.data?.shipments || {}, [ecotrackStatusQuery.data]);
+  const ecoCarrierName = ecotrackStatusQuery.data?.label || "DHD (EcoTrack)";
+  const shipments = useMemo(() => ({ ...ecomShipments, ...ecoShipments }), [ecomShipments, ecoShipments]);
 
   // Find all orders that have a tracking number or are transferred
   const shippedOrders = useMemo(() => {
     return orders.filter(o => o.status === "transferee" || Boolean(shipments[o.id]));
   }, [orders, shipments]);
 
-  const allTrackings = useMemo(() => {
-    return Array.from(new Set(shippedOrders.map(o => shipments[o.id]?.tracking).filter(Boolean)));
-  }, [shippedOrders, shipments]);
+  const { ecomTrackings, ecoTrackings } = useMemo(() => {
+    const ecomList: string[] = [];
+    const ecoList: string[] = [];
+    for (const o of shippedOrders) {
+      const ecoSh = ecoShipments[o.id];
+      const ecomSh = ecomShipments[o.id];
+      if (ecoSh?.tracking) ecoList.push(ecoSh.tracking);
+      else if (ecomSh?.tracking) ecomList.push(ecomSh.tracking);
+    }
+    return { ecomTrackings: Array.from(new Set(ecomList)), ecoTrackings: Array.from(new Set(ecoList)) };
+  }, [shippedOrders, ecomShipments, ecoShipments]);
 
   const trackingBatchQuery = trpc.ecom.trackBatch.useQuery(
-    { trackings: allTrackings },
+    { trackings: ecomTrackings },
     {
-      enabled: allTrackings.length > 0,
+      enabled: ecomTrackings.length > 0,
+      refetchInterval: 60000,
+      staleTime: 30000,
+      refetchOnWindowFocus: false,
+    }
+  );
+  const ecotrackTrackingQuery = trpc.ecotrack.trackBatch.useQuery(
+    { trackings: ecoTrackings },
+    {
+      enabled: ecoTrackings.length > 0,
       refetchInterval: 60000,
       staleTime: 30000,
       refetchOnWindowFocus: false,
     }
   );
 
-  const trackingMap = trackingBatchQuery.data || {};
+  const trackingMap = useMemo(
+    () => ({ ...(trackingBatchQuery.data || {}), ...(ecotrackTrackingQuery.data || {}) }),
+    [trackingBatchQuery.data, ecotrackTrackingQuery.data]
+  );
+  const isTrackingFetching = trackingBatchQuery.isFetching || ecotrackTrackingQuery.isFetching;
   const markReturnMutation = trpc.admin.markReturnReceived.useMutation();
 
-  // Classify returns according to E-com tracking status and local receipt state
+  // Classify returns according to E-com / DHD tracking status and local receipt state
   const returnsList = useMemo(() => {
     return shippedOrders
       .map(order => {
-        const tracking = shipments[order.id]?.tracking;
+        const isEco = Boolean(ecoShipments[order.id]) || order.carrier === "ecotrack";
+        const tracking = (isEco ? ecoShipments[order.id]?.tracking : ecomShipments[order.id]?.tracking) || shipments[order.id]?.tracking;
         const info = tracking ? trackingMap[tracking] : undefined;
         const situation = info?.situation || "";
         const etat = info?.etat_logistique || "";
 
-        const isDeclaredReturn =
-          situation.toLowerCase().includes("retour") ||
-          situation.toLowerCase().includes("refus") ||
-          situation.toLowerCase().includes("annul") ||
-          etat.toLowerCase().includes("retour");
-
+        const isDeclaredReturn = isCarrierTrackingReturned(info);
         const isReceived = Boolean(order.returnReceived);
 
         if (!isDeclaredReturn && !isReceived) return null;
 
         return {
           order,
+          carrierLabel: isEco ? ecoCarrierName : "E-com",
           tracking: tracking || "Sans tracking",
           trackingInfo: info,
           isDeclaredReturn,
@@ -95,7 +118,7 @@ export function ReturnsPanel({ orders, notify, onRefreshOrders }: ReturnsPanelPr
         };
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
-  }, [shippedOrders, shipments, trackingMap]);
+  }, [shippedOrders, ecoShipments, ecomShipments, shipments, trackingMap, ecoCarrierName]);
 
   // Stats
   const totalCount = returnsList.length;
@@ -240,7 +263,7 @@ export function ReturnsPanel({ orders, notify, onRefreshOrders }: ReturnsPanelPr
             Gestion des Retours & Stocks <span className="count-bubble">{totalCount}</span>
           </h2>
           <p>
-            Contrôlez les colis retournés par E-com Delivery, réintégrez le stock au scan et identifiez les colis manquants.
+            Contrôlez les colis retournés par E-com Delivery &amp; DHD (EcoTrack), réintégrez le stock au scan et identifiez les colis manquants.
           </p>
         </div>
         <div className="returns-actions-group">
@@ -254,10 +277,15 @@ export function ReturnsPanel({ orders, notify, onRefreshOrders }: ReturnsPanelPr
           <button
             type="button"
             className="button button-light"
-            onClick={() => void trackingBatchQuery.refetch()}
-            disabled={trackingBatchQuery.isFetching}
+            onClick={() => {
+              void ecomStatusQuery.refetch();
+              void ecotrackStatusQuery.refetch();
+              void trackingBatchQuery.refetch();
+              void ecotrackTrackingQuery.refetch();
+            }}
+            disabled={isTrackingFetching}
           >
-            <RefreshCw size={15} className={trackingBatchQuery.isFetching ? "spin" : ""} />
+            <RefreshCw size={15} className={isTrackingFetching ? "spin" : ""} />
             <span>Actualiser</span>
           </button>
         </div>
@@ -367,7 +395,7 @@ export function ReturnsPanel({ orders, notify, onRefreshOrders }: ReturnsPanelPr
             <RotateCcw size={40} className="empty-icon" />
             <h3>Aucun colis retour trouvé dans cet onglet</h3>
             <p>
-              Dès qu'E-com Delivery signale un colis en situation « Retour » ou « Refusé », il apparaîtra automatiquement ici pour réconciliation.
+              Dès qu'E-com Delivery ou DHD (EcoTrack) signale un colis en situation « Retour » ou « Refusé », il apparaîtra automatiquement ici pour réconciliation.
             </p>
           </div>
         ) : (
@@ -388,7 +416,7 @@ export function ReturnsPanel({ orders, notify, onRefreshOrders }: ReturnsPanelPr
                       <Clock size={13} /> En attente de scan
                     </span>
                   )}
-                  <span className="return-ecom-tag">E-com: {item.situation}</span>
+                  <span className="return-ecom-tag">{item.carrierLabel}: {item.situation}</span>
                 </div>
 
                 {/* Customer Info */}

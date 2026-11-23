@@ -501,14 +501,103 @@ html.dark .sp-btn-close-month {
   }
 }
 
+/* Responsive staff grids & modal forms */
+.sp-form-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sp-product-comm-picker {
+  display: grid;
+  grid-template-columns: 1.4fr 0.8fr auto;
+  gap: 8px;
+  align-items: end;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--app-surface, #ffffff);
+  border: 1px solid var(--app-border, #e2e8f0);
+}
+
+.sp-product-comm-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--app-surface, #ffffff);
+  border: 1px solid var(--app-border, #e2e8f0);
+}
+
+.sp-comm-box {
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--app-surface-sub, #f8fafc);
+  border: 1px solid var(--app-border, #cbd5e1);
+  display: grid;
+  gap: 10px;
+}
+
+.sp-comm-box-title {
+  font-size: 13.5px;
+  color: var(--app-text, #0f172a);
+  display: block;
+}
+
+.sp-journal-order-btn {
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.06);
+  border: none;
+  color: var(--app-text, #0f172a);
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.sp-journal-changes {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11.5px;
+}
+
+.sp-period-banner {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(236, 72, 153, 0.06);
+  border: 1px solid rgba(236, 72, 153, 0.25);
+  display: grid;
+  gap: 10px;
+}
+
+.sp-period-banner-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #be185d;
+}
+
+@media (max-width: 600px) {
+  .sp-form-grid-2,
+  .sp-product-comm-picker,
+  .sp-product-comm-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Neon Flashy Dark Mode for Staff & Commissions */
 html.dark .sp-card,
 .dark .sp-card,
-html.dark .sp-kpi,
-.dark .sp-kpi {
+html.dark .sp-kpi-card,
+.dark .sp-kpi-card {
   background: linear-gradient(160deg, rgba(16, 21, 46, 0.96) 0%, rgba(10, 13, 30, 0.98) 100%);
   border-color: rgba(168, 85, 247, 0.42);
   box-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.75), 0 0 18px -4px rgba(168, 85, 247, 0.24);
+  color: #f8fafc;
 }
 html.dark .sp-card:hover,
 .dark .sp-card:hover {
@@ -535,4 +624,62 @@ html.dark .sp-btn-close-month,
   background: rgba(16, 185, 129, 0.16);
   color: #6ee7b7;
   box-shadow: 0 0 12px rgba(52, 211, 153, 0.24);
+}
+html.dark .sp-evolution-box,
+.dark .sp-evolution-box,
+html.dark .sp-counter-item,
+.dark .sp-counter-item,
+html.dark .sp-accordion,
+.dark .sp-accordion,
+html.dark .sp-period-select,
+.dark .sp-period-select {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(148, 163, 184, 0.24);
+  color: #f1f5f9;
+}
+html.dark .sp-period-select option,
+.dark .sp-period-select option {
+  background: #0f172a;
+  color: #f8fafc;
+}
+html.dark .sp-comm-box,
+.dark .sp-comm-box {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(148, 163, 184, 0.25);
+}
+html.dark .sp-comm-box-title,
+.dark .sp-comm-box-title {
+  color: #f8fafc;
+}
+html.dark .sp-product-comm-picker,
+.dark .sp-product-comm-picker,
+html.dark .sp-product-comm-row,
+.dark .sp-product-comm-row {
+  background: rgba(2, 6, 23, 0.7);
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #f1f5f9;
+}
+html.dark .sp-product-comm-row div,
+.dark .sp-product-comm-row div {
+  color: #f1f5f9 !important;
+}
+html.dark .sp-journal-order-btn,
+.dark .sp-journal-order-btn {
+  background: rgba(148, 163, 184, 0.16);
+  color: #f8fafc;
+}
+html.dark .sp-journal-changes,
+.dark .sp-journal-changes {
+  background: rgba(15, 23, 42, 0.75);
+  border-color: rgba(148, 163, 184, 0.22);
+  color: #e2e8f0;
+}
+html.dark .sp-period-banner,
+.dark .sp-period-banner {
+  background: rgba(236, 72, 153, 0.12);
+  border-color: rgba(244, 114, 182, 0.35);
+}
+html.dark .sp-period-banner-title,
+.dark .sp-period-banner-title {
+  color: #f9a8d4;
 }

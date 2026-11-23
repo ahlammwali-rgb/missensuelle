@@ -67,7 +67,11 @@ export function ParcelScannerModal({
 
   const utils = trpc.useUtils();
   const ecomStatusQuery = trpc.ecom.status.useQuery(undefined, { refetchOnWindowFocus: false });
-  const shipments = ecomStatusQuery.data?.shipments || {};
+  const ecotrackStatusQuery = trpc.ecotrack.status.useQuery(undefined, { refetchOnWindowFocus: false });
+  const shipments = {
+    ...(ecomStatusQuery.data?.shipments || {}),
+    ...(ecotrackStatusQuery.data?.shipments || {}),
+  };
 
   const shipMutation = trpc.ecom.ship.useMutation();
   const markReturnMutation = trpc.admin.markReturnReceived.useMutation();

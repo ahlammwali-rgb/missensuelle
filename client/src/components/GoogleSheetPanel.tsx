@@ -262,7 +262,7 @@ export function GoogleSheetPanel({
             />
           </label>
 
-          <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
+          <div style={{ display: "flex", gap: "10px", marginTop: "4px", flexWrap: "wrap" }}>
             <button
               type="submit"
               className="aoc-btn aoc-btn-confirm"
@@ -300,7 +300,7 @@ export function GoogleSheetPanel({
           </h3>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: "16px" }}>
           <div
             style={{
               padding: "16px",

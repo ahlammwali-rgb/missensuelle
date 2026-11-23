@@ -5,9 +5,17 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { publicPlatformScript } from "./publicConfig";
 import { appRouter } from "../routers";
-import { ensureCheckoutStoreReady, listCheckoutOrders, markOrderDelivered, registerCheckoutHttpRoutes, startGoogleSheetAutoSync } from "../checkout";
+import {
+  ensureCheckoutStoreReady,
+  listCheckoutOrders,
+  markOrderDelivered,
+  registerCheckoutHttpRoutes,
+  restoreTransferredStatusFromCarrier,
+  startGoogleSheetAutoSync,
+} from "../checkout";
 import { getServerPixelConfig } from "../persistentStore";
-import { getEcoTrackStatus, getEcoTrackTrackingBatch, recordEcoTrackWebhookStatus } from "../ecotrackDelivery";
+import { syncAllCarrierDeliveries } from "../carrierSync";
+import { recordEcoTrackWebhookStatus } from "../ecotrackDelivery";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { publicTrackingScript } from "./siteTracking";
@@ -42,11 +50,19 @@ async function startServer() {
         const target = result.orderId
           ? orders.find(o => o.id === result.orderId)
           : undefined;
-        if (target && !target.isDelivered && !target.returnReceived) {
-          await markOrderDelivered(target.dbId, true, {
-            actorId: "webhook",
-            actorName: "DHD / EcoTrack Webhook",
-          });
+        if (target && !target.returnReceived) {
+          if (target.status !== "transferee") {
+            await restoreTransferredStatusFromCarrier(target.dbId, {
+              actorId: "webhook",
+              actorName: "DHD / EcoTrack Webhook",
+            });
+          }
+          if (!target.isDelivered) {
+            await markOrderDelivered(target.dbId, true, {
+              actorId: "webhook",
+              actorName: "DHD / EcoTrack Webhook",
+            });
+          }
         }
       }
       return res.json(result);
@@ -75,47 +91,15 @@ async function startServer() {
   server.listen(port, "0.0.0.0", () => {
     console.log(`Server listening on port ${port}`);
     startGoogleSheetAutoSync();
-    const runEcoTrackAutoSync = async () => {
+    const runCarrierAutoSync = async () => {
       try {
-        const ecoStatus = await getEcoTrackStatus();
-        if (!ecoStatus.configured) return;
-        const orders = await listCheckoutOrders();
-        const pending = orders.filter(
-          o => !o.isDelivered && !o.returnReceived && (o.status === "transferee" || o.status === "confirmee")
-        );
-        const trackings = pending
-          .map(o => ecoStatus.shipments[o.id]?.tracking)
-          .filter((t): t is string => Boolean(t));
-        if (trackings.length === 0) return;
-        const batch = await getEcoTrackTrackingBatch(trackings.slice(0, 100));
-        for (const order of pending) {
-          const trkNum = ecoStatus.shipments[order.id]?.tracking;
-          const trkData = trkNum ? batch[trkNum] : undefined;
-          if (!trkData) continue;
-          const sit = `${trkData.situation || ""} ${trkData.etat_logistique || ""}`
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "");
-          if (
-            sit.includes("livr") ||
-            sit.includes("encaiss") ||
-            sit.includes("paye") ||
-            sit.includes("recouvr") ||
-            Boolean(trkData.encaisser) ||
-            Boolean(trkData.recouvert)
-          ) {
-            await markOrderDelivered(order.dbId, true, {
-              actorId: "system",
-              actorName: "DHD / EcoTrack (Auto)",
-            });
-          }
-        }
+        await syncAllCarrierDeliveries({ includeEcom: true, includeEcoTrack: true });
       } catch {
         // Ignore background sync failure
       }
     };
-    setTimeout(() => void runEcoTrackAutoSync(), 25_000).unref();
-    setInterval(() => void runEcoTrackAutoSync(), 5 * 60 * 1000).unref();
+    setTimeout(() => void runCarrierAutoSync(), 12_000).unref();
+    setInterval(() => void runCarrierAutoSync(), 5 * 60 * 1000).unref();
     if (process.env.NODE_ENV === "production") {
       const publicUrl = (process.env.RENDER_EXTERNAL_URL || "https://missensuelle.onrender.com").replace(/\/$/, "");
       setInterval(() => {
