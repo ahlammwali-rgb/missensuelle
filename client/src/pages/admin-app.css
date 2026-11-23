@@ -7743,7 +7743,7 @@ html.dark .pixel-diagnostics,
 }
 
 /* =====================================================================
-   GCOME WAW SITE & PRODUCT VISITS ANALYTICS HERO + ANIMATIONS
+   GCOME FULL-WIDTH MOBILE-APP VISITS CHART + SLIDE CONTROLS + ANIMATIONS
    ===================================================================== */
 
 @keyframes gcomeSweepReveal {
@@ -7758,10 +7758,10 @@ html.dark .pixel-diagnostics,
 }
 
 @keyframes gcomeScanSlide {
-  0% { left: 4%; opacity: 0; }
-  12% { opacity: 0.95; }
-  88% { opacity: 0.85; }
-  100% { left: 98%; opacity: 0; }
+  0% { left: 2%; opacity: 0; }
+  10% { opacity: 0.95; }
+  90% { opacity: 0.85; }
+  100% { left: 99%; opacity: 0; }
 }
 
 @keyframes gcomeBarRise {
@@ -7769,113 +7769,84 @@ html.dark .pixel-diagnostics,
   100% { transform: scaleY(1); opacity: 1; }
 }
 
-@keyframes gcomeFillExpand {
-  0% { transform: scaleX(0); opacity: 0.4; }
-  100% { transform: scaleX(1); opacity: 1; }
-}
-
-@keyframes gcomeCardStagger {
-  0% { opacity: 0; transform: translateY(10px) scale(0.98); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-
 @keyframes gcomeLiveRing {
-  0% { transform: scale(0.8); opacity: 0.85; }
-  70% { transform: scale(2.15); opacity: 0; }
-  100% { transform: scale(2.15); opacity: 0; }
+  0% { transform: scale(0.8); opacity: 0.9; }
+  70% { transform: scale(2.2); opacity: 0; }
+  100% { transform: scale(2.2); opacity: 0; }
 }
 
 @keyframes gcomeSvgRing {
   0% { r: 4.5px; stroke-opacity: 0.95; }
-  100% { r: 14px; stroke-opacity: 0; }
+  100% { r: 15px; stroke-opacity: 0; }
 }
 
-.gcome-visits-hub {
+.gcome-mchart-shell {
   position: relative;
-  border-radius: 24px;
-  padding: 20px;
-  margin-bottom: 18px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: 26px;
+  padding: 16px 16px 14px;
+  margin-bottom: 16px;
   background:
-    radial-gradient(circle at 8% 0%, rgba(139, 92, 246, 0.14), transparent 45%),
-    radial-gradient(circle at 96% 10%, rgba(236, 72, 153, 0.12), transparent 42%),
-    radial-gradient(circle at 60% 100%, rgba(6, 182, 212, 0.08), transparent 50%),
-    linear-gradient(155deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 246, 255, 0.96) 100%);
-  border: 1.5px solid rgba(139, 92, 246, 0.22);
+    radial-gradient(circle at 12% 0%, rgba(139, 92, 246, 0.14), transparent 46%),
+    radial-gradient(circle at 92% 14%, rgba(236, 72, 153, 0.11), transparent 44%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.99) 0%, rgba(247, 244, 255, 0.97) 100%);
+  border: 1.5px solid rgba(139, 92, 246, 0.24);
   box-shadow:
     0 18px 40px -14px rgba(76, 29, 149, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
   overflow: hidden;
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
 }
 
-html.dark .gcome-visits-hub,
-.dark .gcome-visits-hub {
+html.dark .gcome-mchart-shell,
+.dark .gcome-mchart-shell {
   background:
-    radial-gradient(circle at 10% 0%, rgba(168, 85, 247, 0.28), transparent 44%),
-    radial-gradient(circle at 92% 8%, rgba(236, 72, 153, 0.22), transparent 40%),
-    radial-gradient(circle at 50% 100%, rgba(34, 211, 238, 0.16), transparent 55%),
-    linear-gradient(160deg, rgba(13, 18, 42, 0.97) 0%, rgba(8, 11, 26, 0.99) 100%);
-  border-color: rgba(168, 85, 247, 0.52);
+    radial-gradient(circle at 14% 0%, rgba(168, 85, 247, 0.30), transparent 45%),
+    radial-gradient(circle at 90% 8%, rgba(236, 72, 153, 0.22), transparent 42%),
+    radial-gradient(circle at 50% 100%, rgba(34, 211, 238, 0.14), transparent 55%),
+    linear-gradient(165deg, rgba(13, 17, 40, 0.98) 0%, rgba(7, 10, 24, 0.99) 100%);
+  border-color: rgba(168, 85, 247, 0.56);
   box-shadow:
-    0 20px 44px -12px rgba(0, 0, 0, 0.78),
-    0 0 28px -6px rgba(168, 85, 247, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    0 22px 44px -12px rgba(0, 0, 0, 0.8),
+    0 0 28px -6px rgba(168, 85, 247, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.gcome-visits-ambient {
-  position: absolute;
-  inset: -40% -20% auto auto;
-  width: 280px;
-  height: 280px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.18), transparent 70%);
-  filter: blur(22px);
-  pointer-events: none;
-}
-
-.gcome-visits-head {
-  position: relative;
-  z-index: 2;
+/* Header App Mobile */
+.gcome-mchart-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
-.gcome-visits-title-wrap {
+  gap: 10px;
+  margin-bottom: 12px;
   min-width: 0;
-  flex: 1 1 240px;
 }
 
-.gcome-visits-live-badge {
+.gcome-mchart-stat {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.gcome-mchart-eyebrow {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 4px 11px;
-  border-radius: 999px;
-  background: rgba(124, 58, 237, 0.11);
-  border: 1px solid rgba(124, 58, 237, 0.25);
+  gap: 7px;
   font-size: 10.5px;
   font-weight: 900;
   letter-spacing: 0.06em;
-  color: #5b21b6;
-  margin-bottom: 7px;
+  color: #6d28d9;
+  margin-bottom: 2px;
 }
 
-html.dark .gcome-visits-live-badge,
-.dark .gcome-visits-live-badge {
-  background: rgba(168, 85, 247, 0.22);
-  border-color: rgba(192, 132, 252, 0.48);
+html.dark .gcome-mchart-eyebrow,
+.dark .gcome-mchart-eyebrow {
   color: #e9d5ff;
-  box-shadow: 0 0 14px rgba(168, 85, 247, 0.35);
 }
 
-.gcome-live-dot {
+.gcome-mchart-live-dot {
   position: relative;
   width: 8px;
   height: 8px;
@@ -7885,7 +7856,7 @@ html.dark .gcome-visits-live-badge,
   flex-shrink: 0;
 }
 
-.gcome-live-dot::after {
+.gcome-mchart-live-dot::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -7894,481 +7865,395 @@ html.dark .gcome-visits-live-badge,
   animation: gcomeLiveRing 1.9s cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
 
-.gcome-range-chip {
+.gcome-mchart-range-pill {
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(124, 58, 237, 0.14);
-  color: #6d28d9;
+  background: rgba(124, 58, 237, 0.12);
+  color: #5b21b6;
   font-size: 10px;
   font-weight: 800;
 }
 
-html.dark .gcome-range-chip,
-.dark .gcome-range-chip {
-  background: rgba(34, 211, 238, 0.2);
+html.dark .gcome-mchart-range-pill,
+.dark .gcome-mchart-range-pill {
+  background: rgba(34, 211, 238, 0.18);
   color: #67e8f9;
 }
 
-.gcome-visits-heading {
-  margin: 0;
-  font-size: clamp(18px, 2.6vw, 22px);
-  font-weight: 900;
-  letter-spacing: -0.02em;
-  color: var(--app-text, #0f172a);
-}
-
-.gcome-visits-sub {
-  margin: 3px 0 0;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--app-text-muted, #64748b);
-}
-
-html.dark .gcome-visits-sub,
-.dark .gcome-visits-sub {
-  color: #cbd5e1;
-}
-
-.gcome-visits-hero-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(126px, 1fr));
-  gap: 10px;
-  flex: 1 1 400px;
-  min-width: 0;
-}
-
-.gcome-vm-card {
-  border-radius: 16px;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.86);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  box-shadow: 0 8px 18px -8px rgba(76, 29, 149, 0.14);
+.gcome-mchart-num-row {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.gcome-vm-card.is-primary {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(243, 232, 255, 0.72));
-  border-color: rgba(168, 85, 247, 0.34);
-}
-.gcome-vm-card.is-cyan {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(224, 242, 254, 0.72));
-  border-color: rgba(14, 165, 233, 0.3);
-}
-.gcome-vm-card.is-mint {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(209, 250, 229, 0.72));
-  border-color: rgba(16, 185, 129, 0.3);
-}
-
-html.dark .gcome-vm-card,
-.dark .gcome-vm-card {
-  background: rgba(15, 23, 42, 0.78);
-  border-color: rgba(168, 85, 247, 0.38);
-  box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.55);
-}
-html.dark .gcome-vm-card.is-primary,
-.dark .gcome-vm-card.is-primary {
-  background: linear-gradient(145deg, rgba(88, 28, 135, 0.32), rgba(15, 23, 42, 0.85));
-  border-color: rgba(192, 132, 252, 0.65);
-}
-html.dark .gcome-vm-card.is-cyan,
-.dark .gcome-vm-card.is-cyan {
-  background: linear-gradient(145deg, rgba(8, 145, 178, 0.25), rgba(15, 23, 42, 0.85));
-  border-color: rgba(56, 189, 248, 0.6);
-}
-html.dark .gcome-vm-card.is-mint,
-.dark .gcome-vm-card.is-mint {
-  background: linear-gradient(145deg, rgba(5, 150, 105, 0.25), rgba(15, 23, 42, 0.85));
-  border-color: rgba(52, 211, 153, 0.6);
-}
-
-.gcome-vm-top {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--app-text-muted, #475569);
+  align-items: baseline;
   flex-wrap: wrap;
+  gap: 8px;
 }
 
-html.dark .gcome-vm-top,
-.dark .gcome-vm-top {
-  color: #cbd5e1;
-}
-
-.gcome-vm-num {
-  font-size: clamp(19px, 3.6vw, 25px);
+.gcome-mchart-big-num {
+  font-size: clamp(28px, 6vw, 40px);
   font-weight: 900;
-  letter-spacing: -0.03em;
-  line-height: 1.08;
-  color: var(--app-text, #0f172a);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  color: #080b18;
 }
 
-html.dark .gcome-vm-num,
-.dark .gcome-vm-num {
+html.dark .gcome-mchart-big-num,
+.dark .gcome-mchart-big-num {
   color: #ffffff;
-  text-shadow: 0 0 14px rgba(192, 132, 252, 0.45);
+  text-shadow: 0 0 18px rgba(192, 132, 252, 0.45);
 }
 
-.gcome-vm-hint {
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--app-text-muted, #64748b);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-html.dark .gcome-vm-hint,
-.dark .gcome-vm-hint {
-  color: #94a3b8;
-}
-
-.gcome-vm-delta {
-  margin-left: auto;
+.gcome-mchart-delta {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 2px 6px;
+  padding: 3px 8px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 900;
 }
 
-.gcome-vm-delta.is-up {
+.gcome-mchart-delta.is-up {
   background: rgba(16, 185, 129, 0.16);
   color: #047857;
 }
-.gcome-vm-delta.is-down {
+.gcome-mchart-delta.is-down {
   background: rgba(239, 68, 68, 0.14);
   color: #b91c1c;
 }
-html.dark .gcome-vm-delta.is-up,
-.dark .gcome-vm-delta.is-up {
-  background: rgba(16, 185, 129, 0.25);
+html.dark .gcome-mchart-delta.is-up,
+.dark .gcome-mchart-delta.is-up {
+  background: rgba(16, 185, 129, 0.24);
   color: #6ee7b7;
 }
-html.dark .gcome-vm-delta.is-down,
-.dark .gcome-vm-delta.is-down {
-  background: rgba(239, 68, 68, 0.25);
+html.dark .gcome-mchart-delta.is-down,
+.dark .gcome-mchart-delta.is-down {
+  background: rgba(239, 68, 68, 0.24);
   color: #fca5a5;
 }
 
-/* Filter Bar */
-.gcome-visits-controls {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.gcome-visits-filter-group {
+/* Indicateurs compacts */
+.gcome-mchart-indicators {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.gcome-filter-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  color: var(--app-text-muted, #64748b);
-}
-
-.gcome-date-pills {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 5px;
-  padding: 4px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.12);
-  border: 1px solid rgba(139, 92, 246, 0.16);
-  max-width: 100%;
-}
-
-html.dark .gcome-date-pills,
-.dark .gcome-date-pills {
-  background: rgba(15, 23, 42, 0.72);
-  border-color: rgba(168, 85, 247, 0.28);
-}
-
-.gcome-date-pill {
-  border: 0;
-  background: transparent;
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--app-text-muted, #475569);
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-
-.gcome-date-pill:hover {
-  color: var(--app-text, #0f172a);
-}
-
-.gcome-date-pill.is-active {
-  background: linear-gradient(135deg, #6d28d9, #a855f7);
-  color: #ffffff;
-  box-shadow: 0 5px 14px rgba(109, 40, 217, 0.35);
-}
-
-html.dark .gcome-date-pill,
-.dark .gcome-date-pill {
-  color: #cbd5e1;
-}
-
-html.dark .gcome-date-pill.is-active,
-.dark .gcome-date-pill.is-active {
-  background: linear-gradient(135deg, #7c3aed, #ec4899);
-  box-shadow: 0 0 16px rgba(168, 85, 247, 0.55);
-}
-
-.gcome-custom-dates {
-  display: inline-flex;
-  align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  margin-top: 6px;
 }
 
-.gcome-custom-dates input {
-  height: 32px;
-  padding: 0 8px;
-  border-radius: 10px;
-  border: 1px solid rgba(139, 92, 246, 0.28);
-  background: var(--app-surface, #ffffff);
-  color: var(--app-text, #0f172a);
-  font-size: 12px;
+.gcome-mind-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
   font-weight: 700;
+  background: rgba(148, 163, 184, 0.12);
+  color: #334155;
+  max-width: 100%;
 }
 
-html.dark .gcome-custom-dates input,
-.dark .gcome-custom-dates input {
+.gcome-mind-chip i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.gcome-mind-chip.is-purple {
+  background: rgba(139, 92, 246, 0.13);
+  color: #5b21b6;
+}
+.gcome-mind-chip.is-purple i {
+  background: linear-gradient(135deg, #7c3aed, #ec4899);
+  box-shadow: 0 0 8px rgba(236, 72, 153, 0.65);
+}
+
+.gcome-mind-chip.is-cyan {
+  background: rgba(6, 182, 212, 0.13);
+  color: #0e7490;
+}
+.gcome-mind-chip.is-cyan i {
+  background: #22d3ee;
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.65);
+}
+
+.gcome-mind-chip.is-mint {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+
+html.dark .gcome-mind-chip,
+.dark .gcome-mind-chip {
+  background: rgba(148, 163, 184, 0.16);
+  color: #e2e8f0;
+}
+html.dark .gcome-mind-chip.is-purple,
+.dark .gcome-mind-chip.is-purple {
+  background: rgba(168, 85, 247, 0.24);
+  color: #f3e8ff;
+}
+html.dark .gcome-mind-chip.is-cyan,
+.dark .gcome-mind-chip.is-cyan {
+  background: rgba(34, 211, 238, 0.2);
+  color: #cffafe;
+}
+html.dark .gcome-mind-chip.is-mint,
+.dark .gcome-mind-chip.is-mint {
+  background: rgba(16, 185, 129, 0.22);
+  color: #6ee7b7;
+}
+
+.gcome-mswap-btn {
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  background: var(--app-surface, #fff);
+  color: #6d28d9;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+html.dark .gcome-mswap-btn,
+.dark .gcome-mswap-btn {
   background: rgba(15, 23, 42, 0.85);
-  color: #f8fafc;
+  color: #d8b4fe;
   border-color: rgba(168, 85, 247, 0.45);
 }
 
-.gcome-select-pill {
-  display: inline-flex;
+/* Header Action Slide Controls */
+.gcome-mchart-actions {
+  display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 11px;
-  height: 34px;
-  border-radius: 999px;
-  background: var(--app-surface, #ffffff);
-  border: 1px solid rgba(124, 58, 237, 0.22);
-  color: var(--app-text, #1e293b);
-  font-size: 12px;
-  font-weight: 700;
-  box-shadow: 0 4px 12px rgba(76, 29, 149, 0.06);
-  max-width: 100%;
-  min-width: 0;
+  flex-shrink: 0;
 }
 
-.gcome-select-pill select {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-weight: 700;
-  outline: none;
-  cursor: pointer;
-  max-width: 190px;
-  min-width: 0;
-}
-
-.gcome-select-pill.is-compare {
-  border-color: rgba(6, 182, 212, 0.35);
-}
-
-.gcome-select-pill.is-compare-target {
-  border-color: rgba(6, 182, 212, 0.55);
-  background: rgba(6, 182, 212, 0.08);
-}
-
-html.dark .gcome-select-pill,
-.dark .gcome-select-pill {
-  background: rgba(15, 23, 42, 0.84);
-  border-color: rgba(168, 85, 247, 0.36);
-  color: #f1f5f9;
-}
-
-html.dark .gcome-select-pill select option,
-.dark .gcome-select-pill select option {
-  background: #0f172a;
-  color: #f8fafc;
-}
-
-.gcome-view-switch {
-  display: inline-flex;
+.gcome-mslide-mode-switch {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  width: 64px;
+  height: 32px;
   padding: 3px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.14);
-  border: 1px solid rgba(139, 92, 246, 0.18);
-  gap: 3px;
-}
-
-html.dark .gcome-view-switch,
-.dark .gcome-view-switch {
-  background: rgba(15, 23, 42, 0.72);
-  border-color: rgba(168, 85, 247, 0.3);
-}
-
-.gcome-view-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 0;
-  background: transparent;
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 800;
-  color: var(--app-text-muted, #475569);
+  border: 1px solid rgba(124, 58, 237, 0.24);
+  background: rgba(148, 163, 184, 0.15);
   cursor: pointer;
 }
 
-.gcome-view-btn.is-active {
-  background: var(--app-surface, #ffffff);
-  color: #6d28d9;
-  box-shadow: 0 3px 10px rgba(76, 29, 149, 0.14);
+html.dark .gcome-mslide-mode-switch,
+.dark .gcome-mslide-mode-switch {
+  background: rgba(15, 23, 42, 0.82);
+  border-color: rgba(168, 85, 247, 0.42);
 }
 
-html.dark .gcome-view-btn,
-.dark .gcome-view-btn {
-  color: #cbd5e1;
+.gcome-mslide-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 28px;
+  height: 24px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6d28d9, #a855f7);
+  box-shadow: 0 3px 10px rgba(109, 40, 217, 0.38);
+  transition: transform 0.26s cubic-bezier(0.34, 1.5, 0.64, 1);
 }
 
-html.dark .gcome-view-btn.is-active,
-.dark .gcome-view-btn.is-active {
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(56, 189, 248, 0.3));
+.gcome-mslide-thumb.is-right {
+  transform: translateX(28px);
+}
+
+.gcome-mslide-opt {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+  transition: color 0.2s ease;
+}
+
+.gcome-mslide-opt.is-on {
   color: #ffffff;
 }
 
-.gcome-icon-chip {
-  width: 34px;
-  height: 34px;
+.gcome-mchart-icon-btn {
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  border: 1px solid rgba(124, 58, 237, 0.24);
+  border: 1px solid rgba(124, 58, 237, 0.22);
   background: var(--app-surface, #ffffff);
   color: #6d28d9;
   display: inline-grid;
   place-items: center;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.18s ease;
 }
 
-.gcome-icon-chip:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(109, 40, 217, 0.2);
+.gcome-mchart-icon-btn:active {
+  transform: scale(0.92);
 }
 
-html.dark .gcome-icon-chip,
-.dark .gcome-icon-chip {
+html.dark .gcome-mchart-icon-btn,
+.dark .gcome-mchart-icon-btn {
   background: rgba(15, 23, 42, 0.82);
   border-color: rgba(168, 85, 247, 0.42);
   color: #d8b4fe;
 }
 
-/* SVG Chart Container & Animations */
-.gcome-visits-canvas-shell {
+/* Segmented Slide Date Track */
+.gcome-mslider-row {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-bottom: 8px;
+}
+.gcome-mslider-row::-webkit-scrollbar {
+  display: none;
+}
+
+.gcome-mdate-track {
   position: relative;
-  z-index: 2;
-  border-radius: 18px;
-  padding: 12px 12px 8px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(139, 92, 246, 0.15);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  display: grid;
+  grid-template-columns: repeat(7, minmax(60px, 1fr));
+  align-items: center;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  min-width: 100%;
+  box-sizing: border-box;
 }
 
-html.dark .gcome-visits-canvas-shell,
-.dark .gcome-visits-canvas-shell {
-  background: rgba(2, 6, 23, 0.56);
-  border-color: rgba(168, 85, 247, 0.32);
-  box-shadow: inset 0 0 28px rgba(139, 92, 246, 0.12);
+html.dark .gcome-mdate-track,
+.dark .gcome-mdate-track {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(168, 85, 247, 0.34);
 }
 
-.gcome-chart-legend {
+.gcome-mdate-slider-bg {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  height: calc(100% - 8px);
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6d28d9 0%, #a855f7 60%, #ec4899 100%);
+  box-shadow: 0 5px 14px rgba(109, 40, 217, 0.36);
+  transition: transform 0.3s cubic-bezier(0.34, 1.35, 0.64, 1);
+  pointer-events: none;
+}
+
+.gcome-mdate-btn {
+  position: relative;
+  z-index: 1;
+  border: 0;
+  background: transparent;
+  padding: 6px 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.gcome-mdate-btn.is-active {
+  color: #ffffff;
+}
+
+html.dark .gcome-mdate-btn,
+.dark .gcome-mdate-btn {
+  color: #cbd5e1;
+}
+html.dark .gcome-mdate-btn.is-active,
+.dark .gcome-mdate-btn.is-active {
+  color: #ffffff;
+}
+
+.gcome-mcustom-dates {
   display: flex;
   align-items: center;
+  justify-content: center;
+  gap: 8px;
   flex-wrap: wrap;
-  gap: 14px;
-  margin-bottom: 6px;
-  padding: 0 6px;
+  margin-bottom: 8px;
+}
+
+.gcome-mcustom-dates input {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  background: var(--app-surface, #ffffff);
+  color: var(--app-text, #0f172a);
   font-size: 12px;
   font-weight: 700;
 }
 
-.gcome-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--app-text, #1e293b);
+html.dark .gcome-mcustom-dates input,
+.dark .gcome-mcustom-dates input {
+  background: rgba(15, 23, 42, 0.85);
+  color: #f8fafc;
+  border-color: rgba(168, 85, 247, 0.45);
 }
 
-.gcome-legend-item i {
-  width: 18px;
-  height: 4px;
-  border-radius: 999px;
-  display: inline-block;
-}
-
-.gcome-legend-item.is-primary i {
-  background: linear-gradient(90deg, #7c3aed, #ec4899);
-  box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
-}
-
-.gcome-legend-item.is-compare i {
-  background: #22d3ee;
-  box-shadow: 0 0 8px rgba(34, 211, 238, 0.6);
-}
-
-.gcome-visits-svg-wrap {
+/* Full-Bleed Edge-to-Edge Canvas Taking Full Stage */
+.gcome-mchart-canvas-wrap {
   position: relative;
-  width: 100%;
-  height: 228px;
+  margin: 4px -16px 0;
+  height: 244px;
   overflow: hidden;
   touch-action: pan-y;
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.03) 0%, rgba(139, 92, 246, 0.08) 100%);
+  border-top: 1px solid rgba(139, 92, 246, 0.12);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.12);
 }
 
-.gcome-visits-svg {
+html.dark .gcome-mchart-canvas-wrap,
+.dark .gcome-mchart-canvas-wrap {
+  background: linear-gradient(180deg, rgba(2, 6, 23, 0.35) 0%, rgba(15, 23, 42, 0.72) 100%);
+  border-color: rgba(168, 85, 247, 0.25);
+}
+
+.gcome-mchart-svg {
   width: 100%;
   height: 100%;
   display: block;
 }
 
 .gcome-grid-line {
-  stroke: rgba(148, 163, 184, 0.22);
-  stroke-dasharray: 3 4;
+  stroke: rgba(148, 163, 184, 0.18);
+  stroke-dasharray: 3 5;
   stroke-width: 1;
 }
 
 html.dark .gcome-grid-line,
 .dark .gcome-grid-line {
-  stroke: rgba(148, 163, 184, 0.16);
+  stroke: rgba(148, 163, 184, 0.14);
+}
+
+.gcome-mchart-ylabel {
+  fill: rgba(100, 116, 139, 0.78);
+  font-size: 9.5px;
+  font-weight: 800;
+  font-family: inherit;
+}
+
+html.dark .gcome-mchart-ylabel,
+.dark .gcome-mchart-ylabel {
+  fill: rgba(148, 163, 184, 0.72);
 }
 
 .gcome-axis-label {
   fill: #64748b;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 700;
   font-family: inherit;
 }
@@ -8379,17 +8264,17 @@ html.dark .gcome-axis-label,
 }
 
 .gcome-svg-sweep-rect {
-  animation: gcomeSweepReveal 1.05s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: gcomeSweepReveal 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .gcome-area-fade {
-  animation: gcomeAreaFade 1.15s ease-out forwards;
+  animation: gcomeAreaFade 1.1s ease-out forwards;
 }
 
 .gcome-bar-rise {
   transform-box: fill-box;
   transform-origin: bottom;
-  animation: gcomeBarRise 0.72s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: gcomeBarRise 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .gcome-live-dot-core {
@@ -8412,32 +8297,32 @@ html.dark .gcome-axis-label,
 }
 
 .gcome-crosshair-line {
-  stroke: rgba(168, 85, 247, 0.55);
-  stroke-width: 1.5;
+  stroke: rgba(168, 85, 247, 0.65);
+  stroke-width: 1.6;
   stroke-dasharray: 4 3;
 }
 
 .gcome-scan-beam {
   position: absolute;
-  top: 12px;
-  bottom: 28px;
+  top: 6px;
+  bottom: 24px;
   width: 2px;
   background: linear-gradient(180deg, transparent, #22d3ee, #ec4899, transparent);
-  box-shadow: 0 0 18px 4px rgba(168, 85, 247, 0.55);
+  box-shadow: 0 0 18px 4px rgba(168, 85, 247, 0.58);
   pointer-events: none;
-  animation: gcomeScanSlide 1.05s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: gcomeScanSlide 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .gcome-visits-tooltip {
   position: absolute;
-  top: 10px;
+  top: 8px;
   transform: translateX(-50%);
   z-index: 5;
-  min-width: 158px;
-  padding: 9px 11px;
+  min-width: 148px;
+  padding: 8px 10px;
   border-radius: 13px;
   background: rgba(15, 23, 42, 0.92);
-  border: 1px solid rgba(192, 132, 252, 0.5);
+  border: 1px solid rgba(192, 132, 252, 0.55);
   box-shadow: 0 12px 26px rgba(15, 23, 42, 0.45), 0 0 18px rgba(168, 85, 247, 0.35);
   color: #f8fafc;
   pointer-events: none;
@@ -8445,363 +8330,266 @@ html.dark .gcome-axis-label,
 }
 
 .gcome-tt-date {
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 800;
   color: #c4b5fd;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   border-bottom: 1px dashed rgba(148, 163, 184, 0.25);
-  padding-bottom: 4px;
+  padding-bottom: 3px;
 }
 
 .gcome-tt-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  font-size: 11.5px;
-  margin-top: 3px;
+  gap: 10px;
+  font-size: 11px;
+  margin-top: 2px;
 }
 
 .gcome-tt-row.is-primary strong { color: #f472b6; }
 .gcome-tt-row.is-compare strong { color: #67e8f9; }
 .gcome-tt-row.is-orders strong { color: #6ee7b7; }
 
-.gcome-visits-empty-banner {
-  margin-top: 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
-  border-radius: 12px;
-  background: rgba(124, 58, 237, 0.08);
+.gcome-mchart-zero-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.1);
   border: 1px dashed rgba(124, 58, 237, 0.28);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--app-text-muted, #475569);
+  font-size: 11px;
+  font-weight: 700;
+  color: #6d28d9;
+  white-space: nowrap;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }
 
-html.dark .gcome-visits-empty-banner,
-.dark .gcome-visits-empty-banner {
-  background: rgba(139, 92, 246, 0.14);
-  border-color: rgba(192, 132, 252, 0.4);
-  color: #cbd5e1;
+html.dark .gcome-mchart-zero-hint,
+.dark .gcome-mchart-zero-hint {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(192, 132, 252, 0.42);
+  color: #e9d5ff;
 }
 
-/* Product Comparison Cards Strip */
-.gcome-products-compare-wrap {
-  position: relative;
-  z-index: 2;
-  margin-top: 14px;
+/* Footer: iOS Slide Compare Switch + Horizontal Product Slide Carousel */
+.gcome-mchart-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 11px;
+  min-width: 0;
 }
 
-.gcome-products-compare-head {
+.gcome-mcompare-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 8px;
 }
 
-.gcome-pc-title {
+.gcome-mslide-compare-toggle {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 13px;
-  font-weight: 900;
-  color: var(--app-text, #1e293b);
-}
-
-.gcome-pc-count {
-  padding: 2px 8px;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  background: rgba(139, 92, 246, 0.08);
+  color: #5b21b6;
   border-radius: 999px;
-  background: rgba(124, 58, 237, 0.14);
-  color: #6d28d9;
-  font-size: 11px;
-  font-weight: 800;
-}
-
-html.dark .gcome-pc-count,
-.dark .gcome-pc-count {
-  background: rgba(168, 85, 247, 0.25);
-  color: #e9d5ff;
-}
-
-.gcome-pc-right {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.gcome-source-chips {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.gcome-src-pill {
-  padding: 3px 9px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 700;
-  background: rgba(148, 163, 184, 0.14);
-  color: var(--app-text, #334155);
-}
-
-.gcome-src-pill.src-meta { background: rgba(59, 130, 246, 0.14); color: #1d4ed8; }
-.gcome-src-pill.src-tiktok { background: rgba(236, 72, 153, 0.14); color: #be185d; }
-.gcome-src-pill.src-google { background: rgba(16, 185, 129, 0.14); color: #047857; }
-
-html.dark .gcome-src-pill.src-meta,
-.dark .gcome-src-pill.src-meta { background: rgba(59, 130, 246, 0.24); color: #93c5fd; }
-html.dark .gcome-src-pill.src-tiktok,
-.dark .gcome-src-pill.src-tiktok { background: rgba(236, 72, 153, 0.24); color: #f9a8d4; }
-html.dark .gcome-src-pill.src-google,
-.dark .gcome-src-pill.src-google { background: rgba(16, 185, 129, 0.24); color: #6ee7b7; }
-
-.gcome-pc-toggle-btn {
-  border: 1px solid rgba(124, 58, 237, 0.26);
-  background: var(--app-surface, #ffffff);
-  color: #6d28d9;
+  padding: 4px 11px 4px 5px;
   font-size: 11.5px;
   font-weight: 800;
-  padding: 5px 11px;
-  border-radius: 999px;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-html.dark .gcome-pc-toggle-btn,
-.dark .gcome-pc-toggle-btn {
-  background: rgba(15, 23, 42, 0.8);
-  color: #d8b4fe;
-  border-color: rgba(168, 85, 247, 0.4);
-}
-
-.gcome-products-bars-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 245px), 1fr));
-  gap: 10px;
-}
-
-.gcome-prod-bar-card {
-  border-radius: 15px;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.86);
-  border: 1px solid rgba(139, 92, 246, 0.18);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  animation: gcomeCardStagger 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
-  transition: border-color 0.2s ease, transform 0.2s ease;
-}
-
-.gcome-prod-bar-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(168, 85, 247, 0.45);
-}
-
-.gcome-prod-bar-card.is-selected-a {
-  border-color: #9333ea;
-  box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.2);
-}
-
-.gcome-prod-bar-card.is-selected-b {
-  border-color: #06b6d4;
-  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.22);
-}
-
-html.dark .gcome-prod-bar-card,
-.dark .gcome-prod-bar-card {
-  background: rgba(15, 23, 42, 0.78);
-  border-color: rgba(168, 85, 247, 0.28);
-}
-
-.gcome-pbc-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-}
-
-.gcome-pbc-id {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex: 1;
-}
-
-.gcome-pbc-thumb {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  object-fit: cover;
-  flex-shrink: 0;
-  border: 1px solid rgba(139, 92, 246, 0.24);
-}
-
-.gcome-pbc-rank {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
-  background: rgba(124, 58, 237, 0.14);
-  color: #6d28d9;
-  font-size: 11px;
-  font-weight: 900;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-
-html.dark .gcome-pbc-rank,
-.dark .gcome-pbc-rank {
-  background: rgba(168, 85, 247, 0.25);
-  color: #e9d5ff;
-}
-
-.gcome-pbc-names {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.gcome-pbc-names strong {
-  font-size: 12.5px;
-  font-weight: 800;
-  color: var(--app-text, #0f172a);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.gcome-pbc-names span {
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--app-text-muted, #64748b);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.gcome-pbc-stats {
-  text-align: right;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.gcome-pbc-stats strong {
-  font-size: 14px;
-  font-weight: 900;
-  color: #7c3aed;
-}
-
-html.dark .gcome-pbc-stats strong,
-.dark .gcome-pbc-stats strong {
-  color: #e879f9;
-}
-
-.gcome-pbc-stats small {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--app-text-muted, #64748b);
-}
-
-.gcome-pbc-track {
-  height: 7px;
-  width: 100%;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.18);
-  overflow: hidden;
-}
-
-.gcome-pbc-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #7c3aed, #a855f7, #ec4899);
-  transform-origin: left center;
-  animation: gcomeFillExpand 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.gcome-pbc-fill.is-top {
-  background: linear-gradient(90deg, #8b5cf6, #ec4899, #f59e0b);
-  box-shadow: 0 0 12px rgba(236, 72, 153, 0.45);
-}
-
-.gcome-pbc-fill.is-alt {
-  background: linear-gradient(90deg, #0284c7, #22d3ee, #10b981);
-}
-
-.gcome-pbc-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.gcome-pbc-btn {
-  flex: 1;
-  border: 1px solid rgba(139, 92, 246, 0.24);
-  background: rgba(139, 92, 246, 0.08);
-  color: #6d28d9;
-  border-radius: 8px;
-  padding: 4px 8px;
-  font-size: 10.5px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.gcome-pbc-btn.is-active {
-  background: #7c3aed;
-  border-color: #7c3aed;
-  color: #ffffff;
-}
-
-.gcome-pbc-btn.is-vs {
-  border-color: rgba(6, 182, 212, 0.32);
-  background: rgba(6, 182, 212, 0.08);
+.gcome-mslide-compare-toggle.is-on {
+  background: rgba(6, 182, 212, 0.16);
+  border-color: rgba(6, 182, 212, 0.55);
   color: #0e7490;
 }
 
-.gcome-pbc-btn.is-vs.is-active {
-  background: #0891b2;
-  border-color: #0891b2;
+html.dark .gcome-mslide-compare-toggle,
+.dark .gcome-mslide-compare-toggle {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #e9d5ff;
+}
+
+html.dark .gcome-mslide-compare-toggle.is-on,
+.dark .gcome-mslide-compare-toggle.is-on {
+  background: rgba(34, 211, 238, 0.22);
+  border-color: rgba(34, 211, 238, 0.65);
+  color: #67e8f9;
+}
+
+.gcome-mswitch-track {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.45);
+  transition: background 0.22s ease;
+  flex-shrink: 0;
+}
+
+.gcome-mslide-compare-toggle.is-on .gcome-mswitch-track {
+  background: linear-gradient(135deg, #06b6d4, #8b5cf6);
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+}
+
+.gcome-mswitch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.3);
+  transition: transform 0.24s cubic-bezier(0.34, 1.5, 0.64, 1);
+}
+
+.gcome-mslide-compare-toggle.is-on .gcome-mswitch-knob {
+  transform: translateX(14px);
+}
+
+.gcome-mprev-chip {
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  background: transparent;
+  color: #64748b;
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.gcome-mprev-chip.is-active {
+  background: rgba(6, 182, 212, 0.14);
+  border-color: rgba(6, 182, 212, 0.5);
+  color: #0e7490;
+}
+
+html.dark .gcome-mprev-chip,
+.dark .gcome-mprev-chip {
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
+html.dark .gcome-mprev-chip.is-active,
+.dark .gcome-mprev-chip.is-active {
+  background: rgba(34, 211, 238, 0.2);
+  border-color: rgba(34, 211, 238, 0.6);
+  color: #67e8f9;
+}
+
+.gcome-mproducts-slider {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 0;
+}
+
+.gcome-mproducts-slider::-webkit-scrollbar {
+  display: none;
+}
+
+.gcome-mprod-pill {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 33px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: var(--app-surface, #ffffff);
+  color: var(--app-text, #1e293b);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.gcome-mprod-pill small {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.gcome-mprod-pill.is-a {
+  background: linear-gradient(135deg, #6d28d9 0%, #a855f7 100%);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(109, 40, 217, 0.34);
+}
+
+.gcome-mprod-pill.is-a small {
+  background: rgba(255, 255, 255, 0.24);
   color: #ffffff;
 }
 
-html.dark .gcome-pbc-btn,
-.dark .gcome-pbc-btn {
-  background: rgba(139, 92, 246, 0.18);
-  color: #ddd6fe;
-  border-color: rgba(168, 85, 247, 0.35);
+.gcome-mprod-pill.is-b {
+  background: linear-gradient(135deg, #0891b2 0%, #22d3ee 100%);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(6, 182, 212, 0.34);
 }
 
-html.dark .gcome-pbc-btn.is-vs,
-.dark .gcome-pbc-btn.is-vs {
-  background: rgba(6, 182, 212, 0.16);
-  color: #67e8f9;
-  border-color: rgba(34, 211, 238, 0.38);
+.gcome-mprod-pill.is-b small {
+  background: rgba(255, 255, 255, 0.24);
+  color: #ffffff;
 }
 
-@media (max-width: 720px) {
-  .gcome-visits-hub {
-    padding: 14px;
-    border-radius: 20px;
-  }
-  .gcome-visits-hero-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .gcome-visits-hero-metrics .gcome-vm-card:first-child {
-    grid-column: 1 / -1;
-  }
-  .gcome-visits-svg-wrap {
-    height: 196px;
-  }
+.gcome-mprod-badge {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.26);
+  color: #ffffff;
 }
 
+html.dark .gcome-mprod-pill,
+.dark .gcome-mprod-pill {
+  background: rgba(15, 23, 42, 0.84);
+  border-color: rgba(168, 85, 247, 0.32);
+  color: #e2e8f0;
+}
 
+html.dark .gcome-mprod-pill small,
+.dark .gcome-mprod-pill small {
+  background: rgba(148, 163, 184, 0.22);
+  color: #cbd5e1;
+}
+
+@media (max-width: 640px) {
+  .gcome-mchart-shell {
+    padding: 13px 12px 12px;
+    border-radius: 22px;
+  }
+  .gcome-mchart-canvas-wrap {
+    margin: 4px -12px 0;
+    height: 220px;
+  }
+}
 
 

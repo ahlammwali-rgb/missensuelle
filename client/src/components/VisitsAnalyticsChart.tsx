@@ -1,19 +1,13 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
-  Activity,
   ArrowDownRight,
   ArrowUpRight,
   BarChart3,
   Calendar,
-  Eye,
   GitCompareArrows,
-  Layers,
   RefreshCw,
   RotateCcw,
-  ShoppingBag,
-  Sparkles,
   TrendingUp,
-  Users,
 } from "lucide-react";
 import { getCatalogProducts, type Order } from "@/lib/store-data";
 import {
@@ -24,7 +18,6 @@ import {
   type VisitCompareMode,
   type VisitDateFilterKey,
   type VisitSeriesPoint,
-  type VisitSource,
 } from "@shared/siteVisits";
 
 type Props = {
@@ -38,22 +31,14 @@ type Props = {
 const DATE_PRESETS: Array<{ key: VisitDateFilterKey; label: string }> = [
   { key: "today", label: "Aujourd'hui" },
   { key: "yesterday", label: "Hier" },
-  { key: "7d", label: "7 jours" },
-  { key: "14d", label: "14 jours" },
-  { key: "30d", label: "30 jours" },
+  { key: "7d", label: "7j" },
+  { key: "14d", label: "14j" },
+  { key: "30d", label: "30j" },
   { key: "all", label: "Tout" },
   { key: "custom", label: "Dates" },
 ];
 
-const SOURCE_META: Record<VisitSource, { label: string; badgeClass: string }> = {
-  facebook: { label: "Meta / Facebook", badgeClass: "src-meta" },
-  tiktok: { label: "TikTok Ads", badgeClass: "src-tiktok" },
-  google: { label: "Google", badgeClass: "src-google" },
-  direct: { label: "Direct / Lien", badgeClass: "src-direct" },
-  other: { label: "Autres sites", badgeClass: "src-other" },
-};
-
-function useAnimatedNumber(target: number, animKey: number, durationMs = 900): number {
+function useAnimatedNumber(target: number, animKey: number, durationMs = 850): number {
   const [display, setDisplay] = useState(target);
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
@@ -100,7 +85,7 @@ function buildSmoothCurvePath(coords: SvgCoord[]): string {
   return d;
 }
 
-function formatNumber(n: number): string {
+function formatNum(n: number): string {
   return new Intl.NumberFormat("fr-DZ").format(n);
 }
 
@@ -119,11 +104,12 @@ export function VisitsAnalyticsChart({
   const [customTo, setCustomTo] = useState(() => getAlgiersDateKey());
   const [selectedProductKey, setSelectedProductKey] = useState<string>("all");
   const [compareMode, setCompareMode] = useState<VisitCompareMode>("previous_period");
-  const [compareProductKey, setCompareProductKey] = useState<string>(() => catalog[1]?.id || catalog[0]?.id || "__home__");
+  const [compareProductKey, setCompareProductKey] = useState<string>(
+    () => catalog[1]?.id || catalog[0]?.id || "__home__",
+  );
   const [chartStyle, setChartStyle] = useState<"area" | "bars">("area");
   const [animKey, setAnimKey] = useState(1);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-  const [showCompareTable, setShowCompareTable] = useState(true);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -143,49 +129,52 @@ export function VisitsAnalyticsChart({
     [data, orders, catalog, dateFilter, selectedProductKey, compareMode, compareProductKey, customFrom, customTo],
   );
 
-  // Trigger entrance WAW animation whenever filters or mode change
   useEffect(() => {
     setAnimKey(k => k + 1);
     setHoveredIdx(null);
   }, [dateFilter, selectedProductKey, compareMode, compareProductKey, chartStyle, customFrom, customTo]);
 
-  // All selectable product options (merged catalog + any visited keys)
-  const productOptions = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; image?: string }>();
-    map.set("__home__", { key: "__home__", label: "🏠 Accueil Boutique" });
-    map.set("__catalogue__", { key: "__catalogue__", label: "🛍️ Page Catalogue" });
-    map.set("__checkout__", { key: "__checkout__", label: "🧾 Page Commande" });
-    for (const p of catalog) {
-      map.set(p.id, { key: p.id, label: p.name, image: p.image });
-    }
+  // Slide pills list (Tout le site + Produits catalogue + Pages)
+  const productSlideItems = useMemo(() => {
+    const viewsByKey = new Map<string, number>();
     for (const r of summary.productRows) {
-      if (!map.has(r.productKey)) {
-        map.set(r.productKey, { key: r.productKey, label: r.name });
-      }
+      viewsByKey.set(r.productKey, r.views);
     }
-    return Array.from(map.values());
+    const items: Array<{ key: string; label: string; views: number }> = [];
+    const pushItem = (key: string, label: string) => {
+      if (items.some(i => i.key === key)) return;
+      items.push({ key, label, views: viewsByKey.get(key) ?? 0 });
+    };
+    for (const p of catalog) {
+      pushItem(p.id, p.name);
+    }
+    pushItem("__home__", "Accueil");
+    pushItem("__catalogue__", "Catalogue");
+    pushItem("__checkout__", "Commande");
+    for (const r of summary.productRows) {
+      pushItem(r.productKey, r.name);
+    }
+    return items;
   }, [catalog, summary.productRows]);
 
-  const productMetaByKey = useMemo(() => {
-    const map = new Map<string, { label: string; image?: string }>();
-    for (const opt of productOptions) {
-      map.set(opt.key, { label: opt.label, image: opt.image });
+  const productLabelByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    map.set("all", "Tout le site");
+    for (const item of productSlideItems) {
+      map.set(item.key, item.label);
     }
     return map;
-  }, [productOptions]);
+  }, [productSlideItems]);
 
-  const animatedTotalViews = useAnimatedNumber(summary.totalViews, animKey, 950);
-  const animatedUniqueVisitors = useAnimatedNumber(summary.uniqueVisitors, animKey, 850);
-  const animatedOrdersCount = useAnimatedNumber(summary.ordersInPeriod, animKey, 800);
+  const animatedTotalViews = useAnimatedNumber(summary.totalViews, animKey, 850);
 
-  // SVG Geometry (viewBox 760 x 220)
-  const W = 760;
-  const H = 220;
-  const PAD_L = 44;
-  const PAD_R = 16;
+  // Edge-to-edge SVG dimensions (full width bleed!)
+  const W = 800;
+  const H = 236;
+  const PAD_X = 6;
   const PAD_T = 20;
-  const PAD_B = 34;
-  const plotW = W - PAD_L - PAD_R;
+  const PAD_B = 28;
+  const plotW = W - PAD_X * 2;
   const plotH = H - PAD_T - PAD_B;
 
   const points: VisitSeriesPoint[] = summary.points;
@@ -195,13 +184,13 @@ export function VisitsAnalyticsChart({
       if (pt.views > m) m = pt.views;
       if (pt.compareViews !== null && pt.compareViews > m) m = pt.compareViews;
     }
-    return Math.ceil(m * 1.18);
+    return Math.ceil(m * 1.15);
   }, [points]);
 
   const primaryCoords: SvgCoord[] = useMemo(() => {
     const count = points.length;
     return points.map((pt, i) => {
-      const x = count <= 1 ? PAD_L + plotW / 2 : PAD_L + (i / (count - 1)) * plotW;
+      const x = count <= 1 ? W / 2 : PAD_X + (i / (count - 1)) * plotW;
       const y = PAD_T + plotH - (pt.views / rawMax) * plotH;
       return { x, y };
     });
@@ -211,7 +200,7 @@ export function VisitsAnalyticsChart({
     if (compareMode === "none") return [];
     const count = points.length;
     return points.map((pt, i) => {
-      const x = count <= 1 ? PAD_L + plotW / 2 : PAD_L + (i / (count - 1)) * plotW;
+      const x = count <= 1 ? W / 2 : PAD_X + (i / (count - 1)) * plotW;
       const val = pt.compareViews ?? 0;
       const y = PAD_T + plotH - (val / rawMax) * plotH;
       return { x, y };
@@ -239,13 +228,6 @@ export function VisitsAnalyticsChart({
     return `${compareLineD} L ${last.x.toFixed(1)} ${baseline} L ${first.x.toFixed(1)} ${baseline} Z`;
   }, [compareLineD, compareCoords, plotH]);
 
-  const yTicks = useMemo(() => {
-    return [0, 0.25, 0.5, 0.75, 1].map(ratio => ({
-      val: Math.round(rawMax * ratio),
-      y: PAD_T + plotH - ratio * plotH,
-    }));
-  }, [rawMax, plotH]);
-
   const handleSvgPointer = (clientX: number) => {
     const svgEl = svgRef.current;
     if (!svgEl || points.length === 0) return;
@@ -268,209 +250,128 @@ export function VisitsAnalyticsChart({
   const activeCoord = hoveredIdx !== null ? primaryCoords[hoveredIdx] : null;
   const activeCompareCoord = hoveredIdx !== null ? compareCoords[hoveredIdx] : null;
 
-  const primaryLegendName =
-    selectedProductKey === "all"
-      ? "Tout le site"
-      : productMetaByKey.get(selectedProductKey)?.label || selectedProductKey;
-
+  const primaryLegendName = productLabelByKey.get(selectedProductKey) || selectedProductKey;
   const compareLegendName =
     compareMode === "previous_period"
-      ? "Période précédente"
+      ? "Période préc."
       : compareMode === "product"
-      ? productMetaByKey.get(compareProductKey)?.label || compareProductKey
+      ? productLabelByKey.get(compareProductKey) || compareProductKey
       : "";
 
-  const maxProductViews = Math.max(1, ...summary.productRows.map(r => r.views));
+  const toggleProductCompareSlide = () => {
+    if (compareMode === "product") {
+      setCompareMode("previous_period");
+      return;
+    }
+    if (selectedProductKey === "all") {
+      const firstProd = productSlideItems[0]?.key || "__home__";
+      const secondProd = productSlideItems[1]?.key || "__catalogue__";
+      setSelectedProductKey(firstProd);
+      setCompareProductKey(secondProd);
+    } else if (compareProductKey === selectedProductKey) {
+      const alt = productSlideItems.find(p => p.key !== selectedProductKey)?.key || "__home__";
+      setCompareProductKey(alt);
+    }
+    setCompareMode("product");
+  };
+
+  const handleProductPillTap = (key: string) => {
+    if (compareMode === "product") {
+      if (key === "all") {
+        setCompareMode("previous_period");
+        setSelectedProductKey("all");
+        return;
+      }
+      if (key === selectedProductKey) return;
+      setCompareProductKey(key);
+      return;
+    }
+    setSelectedProductKey(selectedProductKey === key ? "all" : key);
+  };
+
+  const activeFilterIdx = Math.max(0, DATE_PRESETS.findIndex(p => p.key === dateFilter));
 
   return (
-    <section className="gcome-visits-hub" aria-label="Analytique des visites du site et des produits">
-      <div className="gcome-visits-ambient" aria-hidden="true" />
-
-      {/* ===== HEADER: TITRE + COMPTEUR PRINCIPAL + ACTIONS ===== */}
-      <div className="gcome-visits-head">
-        <div className="gcome-visits-title-wrap">
-          <div className="gcome-visits-live-badge">
-            <span className="gcome-live-dot" aria-hidden="true" />
-            <span>TRAFIC SITE &amp; PRODUITS · LIVE</span>
-            <span className="gcome-range-chip">{summary.rangeLabel}</span>
+    <section className="gcome-mchart-shell" aria-label="Graphe des visites site et produits">
+      {/* ===== 1. EN-TÊTE STYLE APP MOBILE: CHIFFRE + INDICATEURS + ACTION SLIDE ===== */}
+      <div className="gcome-mchart-top">
+        <div className="gcome-mchart-stat">
+          <div className="gcome-mchart-eyebrow">
+            <span className="gcome-mchart-live-dot" aria-hidden="true" />
+            <span>VISITES SITE</span>
+            <span className="gcome-mchart-range-pill">{summary.rangeLabel}</span>
           </div>
-          <h2 className="gcome-visits-heading">
-            Visites &amp; Audience Boutique
-          </h2>
-          <p className="gcome-visits-sub">
-            {selectedProductKey === "all"
-              ? "Suivi temps réel des visites globales et par fiche produit"
-              : `Focus produit : ${primaryLegendName}`}
-            {compareMode !== "none" && compareLegendName ? ` · Comparé à ${compareLegendName}` : ""}
-          </p>
-        </div>
 
-        <div className="gcome-visits-hero-metrics">
-          <div className="gcome-vm-card is-primary">
-            <div className="gcome-vm-top">
-              <Eye size={15} />
-              <span>Visites</span>
-              {summary.deltaPct !== null && (
-                <span className={`gcome-vm-delta ${summary.deltaPct >= 0 ? "is-up" : "is-down"}`}>
-                  {summary.deltaPct >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                  {summary.deltaPct > 0 ? `+${summary.deltaPct}%` : `${summary.deltaPct}%`}
+          <div className="gcome-mchart-num-row">
+            <strong className="gcome-mchart-big-num">{formatNum(animatedTotalViews)}</strong>
+            {summary.deltaPct !== null && (
+              <span className={`gcome-mchart-delta ${summary.deltaPct >= 0 ? "is-up" : "is-down"}`}>
+                {summary.deltaPct >= 0 ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
+                {summary.deltaPct > 0 ? `+${summary.deltaPct}%` : `${summary.deltaPct}%`}
+              </span>
+            )}
+          </div>
+
+          {/* Indicateurs compacts inline */}
+          <div className="gcome-mchart-indicators">
+            <span className="gcome-mind-chip is-purple">
+              <i />
+              {primaryLegendName} : <b>{formatNum(summary.totalViews)}</b>
+            </span>
+            {compareMode !== "none" && compareLegendName && (
+              <>
+                {compareMode === "product" && (
+                  <button
+                    type="button"
+                    className="gcome-mswap-btn"
+                    onClick={() => {
+                      const prevA = selectedProductKey;
+                      setSelectedProductKey(compareProductKey);
+                      setCompareProductKey(prevA);
+                    }}
+                    title="Inverser Produit A et Produit B"
+                  >
+                    ⇄
+                  </button>
+                )}
+                <span className="gcome-mind-chip is-cyan">
+                  <i />
+                  {compareLegendName} : <b>{formatNum(summary.compareTotalViews ?? 0)}</b>
                 </span>
-              )}
-            </div>
-            <strong className="gcome-vm-num">{formatNumber(animatedTotalViews)}</strong>
-            <span className="gcome-vm-hint">
-              {compareMode !== "none" && summary.compareTotalViews !== null
-                ? `vs ${formatNumber(summary.compareTotalViews)} (${compareLegendName})`
-                : summary.hourlyMode
-                ? "Vue heure par heure"
-                : "Total sur la période"}
+              </>
+            )}
+            <span className="gcome-mind-chip is-muted">
+              Uniques <b>{formatNum(summary.uniqueVisitors)}</b>
             </span>
-          </div>
-
-          <div className="gcome-vm-card is-cyan">
-            <div className="gcome-vm-top">
-              <Users size={15} />
-              <span>Visiteurs uniques</span>
-            </div>
-            <strong className="gcome-vm-num">{formatNumber(animatedUniqueVisitors)}</strong>
-            <span className="gcome-vm-hint">Sessions distinctes</span>
-          </div>
-
-          <div className="gcome-vm-card is-mint">
-            <div className="gcome-vm-top">
-              <ShoppingBag size={15} />
-              <span>Conversion</span>
-            </div>
-            <strong className="gcome-vm-num">
-              {summary.conversionRate === null ? "—" : `${summary.conversionRate}%`}
-            </strong>
-            <span className="gcome-vm-hint">
-              {formatNumber(animatedOrdersCount)} commande{animatedOrdersCount > 1 ? "s" : ""} liée
-              {animatedOrdersCount > 1 ? "s" : ""}
+            <span className="gcome-mind-chip is-mint">
+              Conv. <b>{summary.conversionRate === null ? "—" : `${summary.conversionRate}%`}</b>
             </span>
           </div>
         </div>
-      </div>
 
-      {/* ===== BARRE DES FILTRES (DATE + PRODUIT + COMPARAISON + VUE) ===== */}
-      <div className="gcome-visits-controls">
-        {/* Filtre Date */}
-        <div className="gcome-visits-filter-group">
-          <span className="gcome-filter-label">
-            <Calendar size={13} /> Période
-          </span>
-          <div className="gcome-date-pills" role="tablist" aria-label="Filtrer par date">
-            {DATE_PRESETS.map(p => (
-              <button
-                key={p.key}
-                type="button"
-                className={`gcome-date-pill${dateFilter === p.key ? " is-active" : ""}`}
-                onClick={() => setDateFilter(p.key)}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          {dateFilter === "custom" && (
-            <div className="gcome-custom-dates">
-              <input
-                type="date"
-                value={customFrom}
-                onChange={e => setCustomFrom(e.target.value)}
-                aria-label="Date de début"
-              />
-              <span>→</span>
-              <input
-                type="date"
-                value={customTo}
-                onChange={e => setCustomTo(e.target.value)}
-                aria-label="Date de fin"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Filtre Produit + Comparaison + Style + Replay */}
-        <div className="gcome-visits-filter-group is-right">
-          <label className="gcome-select-pill">
-            <Sparkles size={13} />
-            <select
-              value={selectedProductKey}
-              onChange={e => setSelectedProductKey(e.target.value)}
-              aria-label="Filtrer par produit"
-            >
-              <option value="all">🌐 Tout le site (Tous les produits)</option>
-              {productOptions.map(opt => (
-                <option key={opt.key} value={opt.key}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="gcome-select-pill is-compare">
-            <GitCompareArrows size={13} />
-            <select
-              value={compareMode}
-              onChange={e => {
-                const next = e.target.value as VisitCompareMode;
-                setCompareMode(next);
-                if (next === "product" && compareProductKey === selectedProductKey) {
-                  const alt = productOptions.find(o => o.key !== selectedProductKey)?.key || "__home__";
-                  setCompareProductKey(alt);
-                }
-              }}
-              aria-label="Mode de comparaison"
-            >
-              <option value="previous_period">📈 Comparer : Période préc.</option>
-              <option value="product">⚔️ Comparer : Produit vs Produit</option>
-              <option value="none">➖ Sans comparaison</option>
-            </select>
-          </label>
-
-          {compareMode === "product" && (
-            <label className="gcome-select-pill is-compare-target">
-              <span>VS</span>
-              <select
-                value={compareProductKey}
-                onChange={e => setCompareProductKey(e.target.value)}
-                aria-label="Produit à comparer"
-              >
-                {productOptions.map(opt => (
-                  <option key={opt.key} value={opt.key}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          <div className="gcome-view-switch" role="group" aria-label="Style de graphique">
-            <button
-              type="button"
-              className={`gcome-view-btn${chartStyle === "area" ? " is-active" : ""}`}
-              onClick={() => setChartStyle("area")}
-              title="Courbe néon animée"
-            >
-              <TrendingUp size={14} />
-              <span>Courbe</span>
-            </button>
-            <button
-              type="button"
-              className={`gcome-view-btn${chartStyle === "bars" ? " is-active" : ""}`}
-              onClick={() => setChartStyle("bars")}
-              title="Barres comparatives animées"
-            >
-              <BarChart3 size={14} />
-              <span>Barres</span>
-            </button>
-          </div>
+        {/* Switch Slide Courbe/Barres + Replay + Refresh */}
+        <div className="gcome-mchart-actions">
+          <button
+            type="button"
+            className="gcome-mslide-mode-switch"
+            onClick={() => setChartStyle(s => (s === "area" ? "bars" : "area"))}
+            aria-label="Basculer entre courbe et barres"
+            title={chartStyle === "area" ? "Passer en barres" : "Passer en courbe"}
+          >
+            <span className={`gcome-mslide-thumb${chartStyle === "bars" ? " is-right" : ""}`} />
+            <span className={`gcome-mslide-opt${chartStyle === "area" ? " is-on" : ""}`}>
+              <TrendingUp size={13} />
+            </span>
+            <span className={`gcome-mslide-opt${chartStyle === "bars" ? " is-on" : ""}`}>
+              <BarChart3 size={13} />
+            </span>
+          </button>
 
           <button
             type="button"
-            className="gcome-icon-chip"
+            className="gcome-mchart-icon-btn"
             onClick={() => setAnimKey(k => k + 1)}
-            title="Rejouer l'animation d'entrée"
+            title="Rejouer l'animation"
             aria-label="Rejouer l'animation"
           >
             <RotateCcw size={14} />
@@ -479,10 +380,10 @@ export function VisitsAnalyticsChart({
           {onRefresh && (
             <button
               type="button"
-              className="gcome-icon-chip"
+              className="gcome-mchart-icon-btn"
               onClick={onRefresh}
               disabled={isRefreshing}
-              title="Actualiser les visites en direct"
+              title="Actualiser"
               aria-label="Actualiser les visites"
             >
               <RefreshCw size={14} className={isRefreshing ? "spin" : ""} />
@@ -491,382 +392,337 @@ export function VisitsAnalyticsChart({
         </div>
       </div>
 
-      {/* ===== ZONE GRAPHE SVG ANIMÉE "WAW" ===== */}
-      <div className="gcome-visits-canvas-shell" key={animKey}>
-        {compareMode !== "none" && (
-          <div className="gcome-chart-legend">
-            <span className="gcome-legend-item is-primary">
-              <i />
-              <span>{primaryLegendName}</span>
-              <b>{formatNumber(summary.totalViews)}</b>
-            </span>
-            <span className="gcome-legend-item is-compare">
-              <i />
-              <span>{compareLegendName}</span>
-              <b>{formatNumber(summary.compareTotalViews ?? 0)}</b>
-            </span>
-          </div>
-        )}
+      {/* ===== 2. BARRE SLIDE DES DATES (MOBILE APP SLIDER) ===== */}
+      <div className="gcome-mslider-row" role="tablist" aria-label="Filtres de date">
+        <div className="gcome-mdate-track">
+          <span
+            className="gcome-mdate-slider-bg"
+            style={{
+              width: `calc((100% - 8px) / ${DATE_PRESETS.length})`,
+              transform: `translateX(${activeFilterIdx * 100}%)`,
+            }}
+            aria-hidden="true"
+          />
+          {DATE_PRESETS.map(p => (
+            <button
+              key={p.key}
+              type="button"
+              className={`gcome-mdate-btn${dateFilter === p.key ? " is-active" : ""}`}
+              onClick={() => setDateFilter(p.key)}
+            >
+              {p.key === "custom" ? <Calendar size={12} /> : null}
+              <span>{p.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
-        <div
-          className="gcome-visits-svg-wrap"
-          onMouseLeave={() => setHoveredIdx(null)}
+      {dateFilter === "custom" && (
+        <div className="gcome-mcustom-dates">
+          <input
+            type="date"
+            value={customFrom}
+            onChange={e => setCustomFrom(e.target.value)}
+            aria-label="Date de début"
+          />
+          <span>→</span>
+          <input
+            type="date"
+            value={customTo}
+            onChange={e => setCustomTo(e.target.value)}
+            aria-label="Date de fin"
+          />
+        </div>
+      )}
+
+      {/* ===== 3. LE GRAND GRAPHE PLEINE LARGEUR BORD-À-BORD ===== */}
+      <div
+        className="gcome-mchart-canvas-wrap"
+        key={animKey}
+        onMouseLeave={() => setHoveredIdx(null)}
+      >
+        <svg
+          ref={svgRef}
+          className="gcome-mchart-svg"
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label="Courbe des visites sur le site"
+          onMouseMove={e => handleSvgPointer(e.clientX)}
+          onTouchStart={e => e.touches[0] && handleSvgPointer(e.touches[0].clientX)}
+          onTouchMove={e => e.touches[0] && handleSvgPointer(e.touches[0].clientX)}
         >
-          <svg
-            ref={svgRef}
-            className="gcome-visits-svg"
-            viewBox={`0 0 ${W} ${H}`}
-            preserveAspectRatio="none"
-            role="img"
-            aria-label="Graphique du nombre de visites sur le site"
-            onMouseMove={e => handleSvgPointer(e.clientX)}
-            onTouchStart={e => e.touches[0] && handleSvgPointer(e.touches[0].clientX)}
-            onTouchMove={e => e.touches[0] && handleSvgPointer(e.touches[0].clientX)}
-          >
-            <defs>
-              <linearGradient id={`area-prim-${uid}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#a855f7" stopOpacity="0.46" />
-                <stop offset="55%" stopColor="#ec4899" stopOpacity="0.18" />
-                <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.01" />
-              </linearGradient>
+          <defs>
+            <linearGradient id={`mc-area-a-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#a855f7" stopOpacity="0.48" />
+              <stop offset="58%" stopColor="#ec4899" stopOpacity="0.16" />
+              <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.01" />
+            </linearGradient>
 
-              <linearGradient id={`stroke-prim-${uid}`} x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#7c3aed" />
-                <stop offset="50%" stopColor="#a855f7" />
-                <stop offset="100%" stopColor="#ec4899" />
-              </linearGradient>
+            <linearGradient id={`mc-stroke-a-${uid}`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#7c3aed" />
+              <stop offset="50%" stopColor="#a855f7" />
+              <stop offset="100%" stopColor="#ec4899" />
+            </linearGradient>
 
-              <linearGradient id={`area-comp-${uid}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.22" />
-                <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.01" />
-              </linearGradient>
+            <linearGradient id={`mc-area-b-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.24" />
+              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.01" />
+            </linearGradient>
 
-              <linearGradient id={`bar-prim-${uid}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#c084fc" />
-                <stop offset="45%" stopColor="#8b5cf6" />
-                <stop offset="100%" stopColor="#ec4899" />
-              </linearGradient>
+            <linearGradient id={`mc-bar-a-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#c084fc" />
+              <stop offset="50%" stopColor="#8b5cf6" />
+              <stop offset="100%" stopColor="#ec4899" />
+            </linearGradient>
 
-              <linearGradient id={`bar-comp-${uid}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#67e8f9" />
-                <stop offset="100%" stopColor="#0284c7" />
-              </linearGradient>
+            <linearGradient id={`mc-bar-b-${uid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#67e8f9" />
+              <stop offset="100%" stopColor="#0284c7" />
+            </linearGradient>
 
-              <filter id={`glow-prim-${uid}`} x="-15%" y="-25%" width="130%" height="150%">
-                <feGaussianBlur stdDeviation="3.2" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
+            <filter id={`mc-glow-${uid}`} x="-12%" y="-25%" width="124%" height="150%">
+              <feGaussianBlur stdDeviation="3.4" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
 
-              <clipPath id={`sweep-clip-${uid}`}>
-                <rect
-                  x="0"
-                  y="0"
-                  width={W}
-                  height={H}
-                  className="gcome-svg-sweep-rect"
-                />
-              </clipPath>
-            </defs>
+            <clipPath id={`mc-sweep-${uid}`}>
+              <rect x="0" y="0" width={W} height={H} className="gcome-svg-sweep-rect" />
+            </clipPath>
+          </defs>
 
-            {/* Horizontal subtle gridlines + Y labels */}
-            {yTicks.map((t, idx) => (
+          {/* Subtle horizontal guide lines */}
+          {[0.25, 0.5, 0.75, 1].map((ratio, idx) => {
+            const y = PAD_T + plotH - ratio * plotH;
+            const val = Math.round(rawMax * ratio);
+            return (
               <g key={idx}>
-                <line
-                  x1={PAD_L}
-                  y1={t.y}
-                  x2={W - PAD_R}
-                  y2={t.y}
-                  className="gcome-grid-line"
-                />
-                <text
-                  x={PAD_L - 8}
-                  y={t.y + 3.5}
-                  textAnchor="end"
-                  className="gcome-axis-label"
-                >
-                  {t.val}
+                <line x1={0} y1={y} x2={W} y2={y} className="gcome-grid-line" />
+                <text x={8} y={y - 4} className="gcome-mchart-ylabel">
+                  {val}
                 </text>
               </g>
-            ))}
+            );
+          })}
 
-            {/* CHART RENDER */}
-            {chartStyle === "area" ? (
-              <g clipPath={`url(#sweep-clip-${uid})`}>
-                {compareLineD && (
-                  <>
-                    <path d={compareAreaD} fill={`url(#area-comp-${uid})`} className="gcome-area-fade" />
-                    <path
-                      d={compareLineD}
-                      fill="none"
-                      stroke="#22d3ee"
-                      strokeWidth="2.4"
-                      strokeDasharray="6 5"
-                      strokeLinecap="round"
-                    />
-                  </>
-                )}
-
-                {primaryAreaD && (
-                  <path d={primaryAreaD} fill={`url(#area-prim-${uid})`} className="gcome-area-fade" />
-                )}
-
-                {primaryLineD && (
+          {chartStyle === "area" ? (
+            <g clipPath={`url(#mc-sweep-${uid})`}>
+              {compareLineD && (
+                <>
+                  <path d={compareAreaD} fill={`url(#mc-area-b-${uid})`} className="gcome-area-fade" />
                   <path
-                    d={primaryLineD}
+                    d={compareLineD}
                     fill="none"
-                    stroke={`url(#stroke-prim-${uid})`}
-                    strokeWidth="3.4"
+                    stroke="#22d3ee"
+                    strokeWidth="2.5"
+                    strokeDasharray="6 5"
                     strokeLinecap="round"
-                    strokeLinejoin="round"
-                    filter={`url(#glow-prim-${uid})`}
                   />
-                )}
+                </>
+              )}
 
-                {/* Subtle nodes & glowing live dot on the last point */}
-                {primaryCoords.map((c, idx) => {
-                  const isLast = idx === primaryCoords.length - 1;
-                  if (!isLast && points.length > 16) return null;
-                  return (
-                    <g key={idx}>
-                      {isLast && (
-                        <circle cx={c.x} cy={c.y} r="9" className="gcome-live-pulse-ring" />
-                      )}
-                      <circle
-                        cx={c.x}
-                        cy={c.y}
-                        r={isLast ? 4.8 : 3.2}
-                        className={isLast ? "gcome-live-dot-core" : "gcome-node-dot"}
-                      />
-                    </g>
-                  );
-                })}
-              </g>
-            ) : (
-              <g>
-                {points.map((pt, i) => {
-                  const slotW = plotW / Math.max(1, points.length);
-                  const hasCompare = compareMode !== "none";
-                  const barW = hasCompare
-                    ? Math.max(4, Math.min(18, slotW * 0.34))
-                    : Math.max(5, Math.min(26, slotW * 0.56));
-                  const cx = primaryCoords[i]?.x ?? PAD_L;
-                  const baseline = PAD_T + plotH;
-                  const hA = Math.max(2, (pt.views / rawMax) * plotH);
-                  const hB = pt.compareViews !== null ? Math.max(2, (pt.compareViews / rawMax) * plotH) : 0;
-                  const delay = `${Math.min(i * 25, 650)}ms`;
-                  return (
-                    <g key={pt.key}>
-                      {hasCompare && (
-                        <rect
-                          x={cx + 2}
-                          y={baseline - hB}
-                          width={barW}
-                          height={hB}
-                          rx={Math.min(6, barW / 2)}
-                          fill={`url(#bar-comp-${uid})`}
-                          className="gcome-bar-rise"
-                          style={{ animationDelay: delay }}
-                        />
-                      )}
+              {primaryAreaD && (
+                <path d={primaryAreaD} fill={`url(#mc-area-a-${uid})`} className="gcome-area-fade" />
+              )}
+
+              {primaryLineD && (
+                <path
+                  d={primaryLineD}
+                  fill="none"
+                  stroke={`url(#mc-stroke-a-${uid})`}
+                  strokeWidth="3.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  filter={`url(#mc-glow-${uid})`}
+                />
+              )}
+
+              {primaryCoords.map((c, idx) => {
+                const isLast = idx === primaryCoords.length - 1;
+                if (!isLast && points.length > 16) return null;
+                return (
+                  <g key={idx}>
+                    {isLast && <circle cx={c.x} cy={c.y} r="9" className="gcome-live-pulse-ring" />}
+                    <circle
+                      cx={c.x}
+                      cy={c.y}
+                      r={isLast ? 5 : 3}
+                      className={isLast ? "gcome-live-dot-core" : "gcome-node-dot"}
+                    />
+                  </g>
+                );
+              })}
+            </g>
+          ) : (
+            <g>
+              {points.map((pt, i) => {
+                const slotW = plotW / Math.max(1, points.length);
+                const hasCompare = compareMode !== "none";
+                const barW = hasCompare
+                  ? Math.max(5, Math.min(20, slotW * 0.34))
+                  : Math.max(6, Math.min(28, slotW * 0.54));
+                const cx = primaryCoords[i]?.x ?? PAD_X;
+                const baseline = PAD_T + plotH;
+                const hA = Math.max(3, (pt.views / rawMax) * plotH);
+                const hB = pt.compareViews !== null ? Math.max(3, (pt.compareViews / rawMax) * plotH) : 0;
+                const delay = `${Math.min(i * 22, 600)}ms`;
+                return (
+                  <g key={pt.key}>
+                    {hasCompare && (
                       <rect
-                        x={hasCompare ? cx - barW - 1 : cx - barW / 2}
-                        y={baseline - hA}
+                        x={cx + 2}
+                        y={baseline - hB}
                         width={barW}
-                        height={hA}
+                        height={hB}
                         rx={Math.min(6, barW / 2)}
-                        fill={`url(#bar-prim-${uid})`}
+                        fill={`url(#mc-bar-b-${uid})`}
                         className="gcome-bar-rise"
                         style={{ animationDelay: delay }}
                       />
-                    </g>
-                  );
-                })}
-              </g>
-            )}
-
-            {/* Hover Crosshair & Highlighted Points */}
-            {activeCoord && (
-              <g className="gcome-crosshair">
-                <line
-                  x1={activeCoord.x}
-                  y1={PAD_T}
-                  x2={activeCoord.x}
-                  y2={PAD_T + plotH}
-                  className="gcome-crosshair-line"
-                />
-                {activeCompareCoord && (
-                  <circle cx={activeCompareCoord.x} cy={activeCompareCoord.y} r="5.5" fill="#22d3ee" stroke="#fff" strokeWidth="2" />
-                )}
-                <circle cx={activeCoord.x} cy={activeCoord.y} r="6.5" fill="#ec4899" stroke="#fff" strokeWidth="2.2" />
-              </g>
-            )}
-
-            {/* X-axis Labels */}
-            {points.map((pt, i) => {
-              if (!pt.shortLabel) return null;
-              const x = primaryCoords[i]?.x ?? PAD_L;
-              return (
-                <text
-                  key={pt.key}
-                  x={x}
-                  y={H - 10}
-                  textAnchor={i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"}
-                  className="gcome-axis-label"
-                >
-                  {pt.shortLabel}
-                </text>
-              );
-            })}
-          </svg>
-
-          {/* Neon Scan Beam Effect during SVG sweep animation */}
-          <div className="gcome-scan-beam" aria-hidden="true" />
-
-          {/* Floating Tooltip on Hover / Touch */}
-          {activePoint && activeCoord && (
-            <div
-              className="gcome-visits-tooltip"
-              style={{
-                left: `${Math.min(78, Math.max(12, (activeCoord.x / W) * 100))}%`,
-              }}
-            >
-              <div className="gcome-tt-date">{activePoint.label}</div>
-              <div className="gcome-tt-row is-primary">
-                <span>{primaryLegendName}</span>
-                <strong>{formatNumber(activePoint.views)} visites</strong>
-              </div>
-              {compareMode !== "none" && activePoint.compareViews !== null && (
-                <div className="gcome-tt-row is-compare">
-                  <span>{compareLegendName}</span>
-                  <strong>{formatNumber(activePoint.compareViews)} visites</strong>
-                </div>
-              )}
-              {activePoint.orders > 0 && (
-                <div className="gcome-tt-row is-orders">
-                  <span>Commandes</span>
-                  <strong>{activePoint.orders} cmd</strong>
-                </div>
-              )}
-            </div>
+                    )}
+                    <rect
+                      x={hasCompare ? cx - barW - 1 : cx - barW / 2}
+                      y={baseline - hA}
+                      width={barW}
+                      height={hA}
+                      rx={Math.min(6, barW / 2)}
+                      fill={`url(#mc-bar-a-${uid})`}
+                      className="gcome-bar-rise"
+                      style={{ animationDelay: delay }}
+                    />
+                  </g>
+                );
+              })}
+            </g>
           )}
-        </div>
+
+          {activeCoord && (
+            <g>
+              <line
+                x1={activeCoord.x}
+                y1={PAD_T}
+                x2={activeCoord.x}
+                y2={PAD_T + plotH}
+                className="gcome-crosshair-line"
+              />
+              {activeCompareCoord && (
+                <circle cx={activeCompareCoord.x} cy={activeCompareCoord.y} r="5.5" fill="#22d3ee" stroke="#fff" strokeWidth="2" />
+              )}
+              <circle cx={activeCoord.x} cy={activeCoord.y} r="6.5" fill="#ec4899" stroke="#fff" strokeWidth="2.2" />
+            </g>
+          )}
+
+          {/* X labels neatly anchored inside bottom edge */}
+          {points.map((pt, i) => {
+            if (!pt.shortLabel) return null;
+            const x = primaryCoords[i]?.x ?? PAD_X;
+            const anchor = i === 0 ? "start" : i === points.length - 1 ? "end" : "middle";
+            return (
+              <text key={pt.key} x={x} y={H - 8} textAnchor={anchor} className="gcome-axis-label">
+                {pt.shortLabel}
+              </text>
+            );
+          })}
+        </svg>
+
+        {/* Scan beam WAW sweep */}
+        <div className="gcome-scan-beam" aria-hidden="true" />
+
+        {/* Live Floating Pill Tooltip when touching/hovering */}
+        {activePoint && activeCoord && (
+          <div
+            className="gcome-visits-tooltip"
+            style={{
+              left: `${Math.min(82, Math.max(18, (activeCoord.x / W) * 100))}%`,
+            }}
+          >
+            <div className="gcome-tt-date">{activePoint.label}</div>
+            <div className="gcome-tt-row is-primary">
+              <span>{primaryLegendName}</span>
+              <strong>{formatNum(activePoint.views)}</strong>
+            </div>
+            {compareMode !== "none" && activePoint.compareViews !== null && (
+              <div className="gcome-tt-row is-compare">
+                <span>{compareLegendName}</span>
+                <strong>{formatNum(activePoint.compareViews)}</strong>
+              </div>
+            )}
+            {activePoint.orders > 0 && (
+              <div className="gcome-tt-row is-orders">
+                <span>Commandes</span>
+                <strong>{activePoint.orders}</strong>
+              </div>
+            )}
+          </div>
+        )}
 
         {summary.totalViews === 0 && !isLoading && (
-          <div className="gcome-visits-empty-banner">
-            <Activity size={15} />
-            <span>
-              Compteur en direct actif — chaque visite cliente sur la boutique ou sur une fiche produit apparaîtra ici instantanément.
-            </span>
+          <div className="gcome-mchart-zero-hint">
+            Compteur temps réel prêt — chaque visite s'affichera ici automatiquement
           </div>
         )}
       </div>
 
-      {/* ===== COMPARATEUR VISUEL PAR PRODUIT ===== */}
-      <div className="gcome-products-compare-wrap">
-        <div className="gcome-products-compare-head">
-          <div className="gcome-pc-title">
-            <Layers size={15} />
-            <span>Comparaison des visites selon les Produits</span>
-            <span className="gcome-pc-count">{summary.productRows.length}</span>
-          </div>
-          <div className="gcome-pc-right">
-            {summary.sourceTotals.length > 0 && (
-              <div className="gcome-source-chips">
-                {summary.sourceTotals.slice(0, 4).map(s => (
-                  <span key={s.source} className={`gcome-src-pill ${SOURCE_META[s.source].badgeClass}`}>
-                    {SOURCE_META[s.source].label} · <b>{s.pct}%</b>
-                  </span>
-                ))}
-              </div>
-            )}
-            <button
-              type="button"
-              className="gcome-pc-toggle-btn"
-              onClick={() => setShowCompareTable(v => !v)}
-            >
-              {showCompareTable ? "Réduire" : "Afficher le comparatif"}
-            </button>
-          </div>
+      {/* ===== 4. BOUTON SLIDE COMPARATEUR + CARROUSEL SLIDE DES PRODUITS ===== */}
+      <div className="gcome-mchart-footer">
+        {/* Boutons slide de comparaison */}
+        <div className="gcome-mcompare-controls">
+          <button
+            type="button"
+            className={`gcome-mslide-compare-toggle${compareMode === "product" ? " is-on" : ""}`}
+            onClick={toggleProductCompareSlide}
+            role="switch"
+            aria-checked={compareMode === "product"}
+          >
+            <span className="gcome-mswitch-track">
+              <span className="gcome-mswitch-knob" />
+            </span>
+            <GitCompareArrows size={13} />
+            <span>Comparer Produits</span>
+          </button>
+
+          <button
+            type="button"
+            className={`gcome-mprev-chip${compareMode === "previous_period" ? " is-active" : ""}`}
+            onClick={() =>
+              setCompareMode(m => (m === "previous_period" ? "none" : "previous_period"))
+            }
+          >
+            vs Période préc.
+          </button>
         </div>
 
-        {showCompareTable && (
-          <div className="gcome-products-bars-grid" key={`bars-${animKey}`}>
-            {summary.productRows.slice(0, 10).map((row, idx) => {
-              const meta = productMetaByKey.get(row.productKey);
-              const pctWidth = row.views > 0 ? Math.max(6, Math.round((row.views / maxProductViews) * 100)) : 0;
-              const isSelectedA = selectedProductKey === row.productKey;
-              const isSelectedB = compareMode === "product" && compareProductKey === row.productKey;
-              return (
-                <div
-                  key={row.productKey}
-                  className={`gcome-prod-bar-card${isSelectedA ? " is-selected-a" : ""}${isSelectedB ? " is-selected-b" : ""}`}
-                  style={{ animationDelay: `${Math.min(idx * 45, 400)}ms` }}
-                >
-                  <div className="gcome-pbc-top">
-                    <div className="gcome-pbc-id">
-                      {meta?.image ? (
-                        <img src={meta.image} alt="" className="gcome-pbc-thumb" loading="lazy" />
-                      ) : (
-                        <span className="gcome-pbc-rank">#{idx + 1}</span>
-                      )}
-                      <div className="gcome-pbc-names">
-                        <strong title={row.name}>{row.name}</strong>
-                        <span>
-                          {formatNumber(row.uniqueVisitors)} uniques · {row.orders} cmd
-                          {row.conversionRate !== null ? ` · ${row.conversionRate}% conv.` : ""}
-                        </span>
-                      </div>
-                    </div>
+        {/* Slider horizontal scrollable au doigt des produits */}
+        <div className="gcome-mproducts-slider" aria-label="Filtrer ou comparer selon les produits">
+          <button
+            type="button"
+            className={`gcome-mprod-pill${selectedProductKey === "all" && compareMode !== "product" ? " is-a" : ""}`}
+            onClick={() => handleProductPillTap("all")}
+          >
+            <span>🌐 Tout</span>
+          </button>
 
-                    <div className="gcome-pbc-stats">
-                      <strong>{formatNumber(row.views)}</strong>
-                      <small>{row.sharePct}% trafic</small>
-                    </div>
-                  </div>
-
-                  <div className="gcome-pbc-track">
-                    <div
-                      className={`gcome-pbc-fill${idx === 0 ? " is-top" : idx % 2 === 1 ? " is-alt" : ""}`}
-                      style={{
-                        width: `${pctWidth}%`,
-                        animationDelay: `${Math.min(idx * 55, 450)}ms`,
-                      }}
-                    />
-                  </div>
-
-                  <div className="gcome-pbc-actions">
-                    <button
-                      type="button"
-                      className={`gcome-pbc-btn${isSelectedA ? " is-active" : ""}`}
-                      onClick={() => setSelectedProductKey(isSelectedA ? "all" : row.productKey)}
-                    >
-                      {isSelectedA ? "✓ Filtré" : "Filtrer courbe"}
-                    </button>
-                    <button
-                      type="button"
-                      className={`gcome-pbc-btn is-vs${isSelectedB ? " is-active" : ""}`}
-                      onClick={() => {
-                        if (selectedProductKey === "all") {
-                          const firstOther = summary.productRows.find(r => r.productKey !== row.productKey)?.productKey || "__home__";
-                          setSelectedProductKey(firstOther);
-                        } else if (selectedProductKey === row.productKey) {
-                          return;
-                        }
-                        setCompareMode("product");
-                        setCompareProductKey(row.productKey);
-                      }}
-                    >
-                      {isSelectedB ? "✓ Produit B" : "Comparer VS"}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+          {productSlideItems.map(item => {
+            const isA = selectedProductKey === item.key;
+            const isB = compareMode === "product" && compareProductKey === item.key;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                className={`gcome-mprod-pill${isA ? " is-a" : ""}${isB ? " is-b" : ""}`}
+                onClick={() => handleProductPillTap(item.key)}
+              >
+                {isA && compareMode === "product" && <b className="gcome-mprod-badge is-a">A</b>}
+                {isB && <b className="gcome-mprod-badge is-b">B</b>}
+                <span>{item.label}</span>
+                {item.views > 0 && <small>{formatNum(item.views)}</small>}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
