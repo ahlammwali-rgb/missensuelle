@@ -174,9 +174,13 @@ describe("carrier history stages & indicators", () => {
     expect(summary.activeCount).toBe(2);
     expect(summary.stalled48hCount).toBe(1);
     expect(summary.multiAttemptsCount).toBe(1);
+    expect(summary.urgentReclamationCount).toBe(2); // MS-2 (delivered uncollected) + MS-3 (stalled 48h + multi attempts + NRP)
     expect(summary.totalScans).toBe(10);
     expect(summary.avgDeliveryHours).toBe(36); // (48h + 24h) / 2 = 36h
 
+    expect(matchesTransferredFilter("reclamation_urgent", inspections.get("MS-3")!)).toBe(true);
+    expect(matchesTransferredFilter("reclamation_urgent", inspections.get("MS-2")!)).toBe(true);
+    expect(matchesTransferredFilter("reclamation_urgent", inspections.get("MS-1")!)).toBe(false);
     expect(matchesTransferredFilter("stalled_48h", inspections.get("MS-3")!)).toBe(true);
     expect(matchesTransferredFilter("multi_attempts", inspections.get("MS-3")!)).toBe(true);
     expect(matchesTransferredFilter("delivered_uncollected", inspections.get("MS-2")!)).toBe(true);

@@ -507,33 +507,32 @@ export function TransferredOrdersPanel({
 
   return (
     <div className="transferred-panel">
-      {/* Executive Header */}
+      {/* Compact Dashboard Executive Header */}
       <div className="trp-hero-card">
         <div className="trp-hero-main">
           <div className="trp-hero-badge-icon">
-            <Truck size={24} />
+            <Truck size={20} />
           </div>
-          <div style={{ minWidth: 0 }}>
-            <div className="trp-hero-eyebrow-row">
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="trp-hero-title-row">
+              <h1 className="trp-hero-title">
+                Suivi & Réclamations <span>({analytics.totalCount})</span>
+              </h1>
               <span className={`trp-live-chip${isTrackingFetching ? " is-syncing" : ""}`}>
                 <span className="trp-live-dot" />
-                {isTrackingFetching ? "Synchronisation…" : "Suivi Historique Live"}
+                {isTrackingFetching ? "Sync…" : `Live · ${syncClockText}`}
               </span>
-              <span className="trp-sync-time">MAJ {syncClockText}</span>
             </div>
-            <h1 className="trp-hero-title">
-              Expéditions & Suivi Historique <span>({analytics.totalCount})</span>
-            </h1>
             <div className="trp-hero-meta-strip">
               <span className="trp-meta-pill">
-                <Banknote size={13} /> COD total : {formatDZD(analytics.totalCodAmount)}
+                <Banknote size={12} /> {formatDZD(analytics.totalCodAmount)} COD
               </span>
               <span className="trp-meta-pill">
-                <Activity size={13} /> {analytics.totalScans} scans historiques ({analytics.trackedWithHistoryCount}/{analytics.totalCount} suivis)
+                <Activity size={12} /> {analytics.totalScans} scans ({analytics.trackedWithHistoryCount}/{analytics.totalCount})
               </span>
               {avgDurationLabel && (
                 <span className="trp-meta-pill">
-                  <Clock size={13} /> Délai moy. livraison : {avgDurationLabel}
+                  <Clock size={12} /> Délai {avgDurationLabel}
                 </span>
               )}
             </div>
@@ -547,8 +546,8 @@ export function TransferredOrdersPanel({
             onClick={() => void handleForceRefreshAll()}
             disabled={isTrackingFetching}
           >
-            <RefreshCw size={15} className={isTrackingFetching ? "animate-spin" : ""} />
-            <span>{isTrackingFetching ? "Synchronisation…" : "Actualiser Suivis"}</span>
+            <RefreshCw size={14} className={isTrackingFetching ? "animate-spin" : ""} />
+            <span>{isTrackingFetching ? "Sync…" : "Actualiser"}</span>
           </button>
 
           <button
@@ -557,22 +556,22 @@ export function TransferredOrdersPanel({
             onClick={exportCSV}
             title="Exporter en CSV"
           >
-            <FileDown size={15} />
-            <span>Export CSV</span>
+            <FileDown size={14} />
+            <span>CSV</span>
           </button>
         </div>
       </div>
 
-      {/* 4 Executive KPI Cards */}
+      {/* 4 Compact Dashboard-Style KPI Blocks */}
       <div className="trp-kpi-grid">
         <button
           type="button"
-          className={`trp-kpi-card${filterSituation === "encours" ? " is-active" : ""}`}
+          className={`trp-kpi-card is-indigo${filterSituation === "encours" ? " is-active" : ""}`}
           onClick={() => toggleFilter("encours")}
         >
           <div className="trp-kpi-top">
             <span className="trp-kpi-label">En Circulation</span>
-            <span className="trp-kpi-icon is-indigo"><Truck size={15} /></span>
+            <span className="trp-kpi-icon is-indigo"><Truck size={14} /></span>
           </div>
           <div className="trp-kpi-value-row">
             <span className="trp-kpi-value">{analytics.activeCount}</span>
@@ -580,94 +579,100 @@ export function TransferredOrdersPanel({
               {analytics.stages.out_for_delivery.count} livreur
             </span>
           </div>
-          <div className="trp-kpi-amount">{formatDZD(analytics.activeCodAmount)}</div>
-          <div className="trp-kpi-sub">
-            {analytics.stages.prep.count} prép. · {analytics.stages.transit.count} transit
+          <div className="trp-kpi-foot">
+            <span className="trp-kpi-amount">{formatDZD(analytics.activeCodAmount)}</span>
+            <span className="trp-kpi-sub">{analytics.stages.prep.count} prép · {analytics.stages.transit.count} hub</span>
           </div>
         </button>
 
         <button
           type="button"
-          className={`trp-kpi-card${filterSituation === "delivered" ? " is-active" : ""}`}
+          className={`trp-kpi-card is-emerald${filterSituation === "delivered" ? " is-active" : ""}`}
           onClick={() => toggleFilter("delivered")}
         >
           <div className="trp-kpi-top">
             <span className="trp-kpi-label">Livrées</span>
-            <span className="trp-kpi-icon is-green"><PackageCheck size={15} /></span>
+            <span className="trp-kpi-icon is-green"><PackageCheck size={14} /></span>
           </div>
           <div className="trp-kpi-value-row">
             <span className="trp-kpi-value">{analytics.deliveredCount}</span>
             <span className="trp-kpi-badge is-green">{analytics.deliveryRatePct}%</span>
           </div>
-          <div className="trp-kpi-amount">{formatDZD(analytics.deliveredAmount)}</div>
-          <div className="trp-kpi-bar-track">
-            <div
-              className="trp-kpi-bar-fill"
-              style={{ width: `${analytics.deliveryRatePct}%`, background: "#10b981" }}
-            />
+          <div className="trp-kpi-foot">
+            <span className="trp-kpi-amount">{formatDZD(analytics.deliveredAmount)}</span>
+            <div className="trp-kpi-bar-track">
+              <div
+                className="trp-kpi-bar-fill"
+                style={{ width: `${analytics.deliveryRatePct}%`, background: "linear-gradient(90deg, #10b981, #34d399)" }}
+              />
+            </div>
           </div>
         </button>
 
         <button
           type="button"
-          className={`trp-kpi-card${filterSituation === "delivered_cashed" ? " is-active" : ""}`}
+          className={`trp-kpi-card is-cyan${filterSituation === "delivered_cashed" ? " is-active" : ""}`}
           onClick={() => toggleFilter("delivered_cashed")}
         >
           <div className="trp-kpi-top">
-            <span className="trp-kpi-label">Trésorerie Encaissée</span>
-            <span className="trp-kpi-icon is-cyan"><ShieldCheck size={15} /></span>
+            <span className="trp-kpi-label">Encaissées COD</span>
+            <span className="trp-kpi-icon is-cyan"><ShieldCheck size={14} /></span>
           </div>
           <div className="trp-kpi-value-row">
-            <span className="trp-kpi-value" style={{ fontSize: "20px" }}>
-              {formatDZD(analytics.cashedAmount)}
-            </span>
+            <span className="trp-kpi-value is-money">{formatDZD(analytics.cashedAmount)}</span>
             <span className="trp-kpi-badge is-cyan">
               {analytics.cashedCount}/{analytics.deliveredCount}
             </span>
           </div>
-          <div className="trp-kpi-sub">
-            {analytics.uncollectedDeliveredCount > 0
-              ? `${analytics.uncollectedDeliveredCount} livrées à encaisser (${formatDZD(analytics.uncollectedDeliveredAmount)})`
-              : `${analytics.cashCollectionRatePct}% des livrées encaissées`}
-          </div>
-          <div className="trp-kpi-bar-track">
-            <div
-              className="trp-kpi-bar-fill"
-              style={{ width: `${analytics.cashCollectionRatePct}%`, background: "#0ea5e9" }}
-            />
+          <div className="trp-kpi-foot">
+            <span className="trp-kpi-sub">
+              {analytics.uncollectedDeliveredCount > 0
+                ? `${analytics.uncollectedDeliveredCount} à enc. (${formatDZD(analytics.uncollectedDeliveredAmount)})`
+                : `${analytics.cashCollectionRatePct}% encaissé`}
+            </span>
+            <div className="trp-kpi-bar-track">
+              <div
+                className="trp-kpi-bar-fill"
+                style={{ width: `${analytics.cashCollectionRatePct}%`, background: "linear-gradient(90deg, #0ea5e9, #38bdf8)" }}
+              />
+            </div>
           </div>
         </button>
 
         <button
           type="button"
-          className={`trp-kpi-card${filterSituation === "returned" ? " is-active" : ""}`}
-          onClick={() => toggleFilter("returned")}
+          className={`trp-kpi-card is-rose${filterSituation === "reclamation_urgent" ? " is-active" : ""}`}
+          onClick={() => toggleFilter("reclamation_urgent")}
         >
           <div className="trp-kpi-top">
-            <span className="trp-kpi-label">Retours & Échecs</span>
-            <span className="trp-kpi-icon is-red"><RotateCcw size={15} /></span>
+            <span className="trp-kpi-label">À Réclamer</span>
+            <span className="trp-kpi-icon is-red"><AlertTriangle size={14} /></span>
           </div>
           <div className="trp-kpi-value-row">
-            <span className="trp-kpi-value">{analytics.returnedCount}</span>
-            <span className="trp-kpi-badge is-red">{analytics.returnRatePct}%</span>
+            <span className="trp-kpi-value">{analytics.urgentReclamationCount}</span>
+            <span className="trp-kpi-badge is-red">{analytics.returnedCount} ret. ({analytics.returnRatePct}%)</span>
           </div>
-          <div className="trp-kpi-amount">{formatDZD(analytics.returnedAmount)}</div>
-          <div className="trp-kpi-sub">
-            {analytics.totalAttemptScans} tentatives de livraison enregistrées
+          <div className="trp-kpi-foot">
+            <span className="trp-kpi-amount">{formatDZD(analytics.urgentReclamationAmount)}</span>
+            <span className="trp-kpi-sub">{analytics.stalled48hCount} +48h · {analytics.multiAttemptsCount} rel.</span>
           </div>
         </button>
       </div>
 
-      {/* Carrier History Pipeline & Diagnostic Signals */}
-      <div className="trp-pipeline-card">
-        <div className="trp-pipeline-head">
-          <div className="trp-pipeline-title">
-            <Package size={16} />
-            <span>Étapes du Parcours Colis</span>
+      {/* Unified Overview, History Pipeline, Reclamation Queue & Search Console */}
+      <div className="trp-overview-card">
+        <div className="trp-overview-head">
+          <div className="trp-overview-title-wrap">
+            <Package size={15} className="trp-overview-icon" />
+            <span className="trp-overview-title">Vue d'Ensemble & Étapes Historique</span>
+            <span className="trp-overview-avg">Moy. {analytics.avgScansPerTracked} scans</span>
           </div>
-          <span className="trp-swipe-hint">Glisser →</span>
-          <div className="trp-pipeline-summary">
-            Moy. {analytics.avgScansPerTracked} scans/colis · Cliquez sur une étape pour filtrer
+          <div className="trp-overview-right">
+            <span className="trp-swipe-hint">Glisser →</span>
+            <span className="trp-filter-count-pill">
+              <SlidersHorizontal size={11} />
+              {filteredOrders.length} / {analytics.totalCount}
+            </span>
           </div>
         </div>
 
@@ -690,6 +695,7 @@ export function TransferredOrdersPanel({
           })}
         </div>
 
+        {/* Compact 7 Stage Dashboard Chips */}
         <div className="trp-stages-grid">
           {stageMeta.map(st => {
             const metric = analytics.stages[st.id];
@@ -701,26 +707,46 @@ export function TransferredOrdersPanel({
                 className={`trp-stage-btn${isActive ? " is-active" : ""}`}
                 onClick={() => toggleFilter(st.id)}
               >
-                <div className="trp-stage-top">
+                <div className="trp-stage-head">
                   <span className="trp-stage-dot" style={{ background: st.color }} />
-                  <span className="trp-stage-pct">{metric.pct}%</span>
+                  <span className="trp-stage-name">{st.label}</span>
+                  <span className="trp-stage-count">{metric.count}</span>
                 </div>
-                <div className="trp-stage-count">{metric.count}</div>
-                <div className="trp-stage-name">{st.label}</div>
-                <div className="trp-stage-amount">{formatDZD(metric.amount)}</div>
+                <div className="trp-stage-sub">
+                  <span>{metric.pct}%</span>
+                  <span>{formatDZD(metric.amount)}</span>
+                </div>
               </button>
             );
           })}
         </div>
 
-        <div className="trp-signals-row">
+        {/* Agent de Réclamation 1-Tap Fluid Queues */}
+        <div className="trp-signals-row" role="group" aria-label="Files agent de réclamation">
+          <button
+            type="button"
+            className={`trp-signal-chip${filterSituation === "all" ? " is-active" : ""}`}
+            onClick={() => setFilterSituation("all")}
+          >
+            <span>Tout <strong>({analytics.totalCount})</strong></span>
+          </button>
+
+          <button
+            type="button"
+            className={`trp-signal-chip is-urgent${filterSituation === "reclamation_urgent" ? " is-active" : ""}`}
+            onClick={() => toggleFilter("reclamation_urgent")}
+          >
+            <AlertTriangle size={12} />
+            <span>À Réclamer <strong>({analytics.urgentReclamationCount})</strong></span>
+          </button>
+
           <button
             type="button"
             className={`trp-signal-chip ${analytics.stalled48hCount > 0 ? "is-danger" : ""}${filterSituation === "stalled_48h" ? " is-active" : ""}`}
             onClick={() => toggleFilter("stalled_48h")}
           >
-            <AlertTriangle size={13} />
-            <span>Bloqués +48h sans scan : <strong>{analytics.stalled48hCount}</strong></span>
+            <Clock size={12} />
+            <span>+48h sans scan <strong>({analytics.stalled48hCount})</strong></span>
           </button>
 
           <button
@@ -728,8 +754,8 @@ export function TransferredOrdersPanel({
             className={`trp-signal-chip ${analytics.multiAttemptsCount > 0 ? "is-warn" : ""}${filterSituation === "multi_attempts" ? " is-active" : ""}`}
             onClick={() => toggleFilter("multi_attempts")}
           >
-            <PhoneMissed size={13} />
-            <span>2+ tentatives / relances : <strong>{analytics.multiAttemptsCount}</strong></span>
+            <PhoneMissed size={12} />
+            <span>2+ tentatives <strong>({analytics.multiAttemptsCount})</strong></span>
           </button>
 
           <button
@@ -737,8 +763,8 @@ export function TransferredOrdersPanel({
             className={`trp-signal-chip ${analytics.uncollectedDeliveredCount > 0 ? "is-warn" : ""}${filterSituation === "delivered_uncollected" ? " is-active" : ""}`}
             onClick={() => toggleFilter("delivered_uncollected")}
           >
-            <Banknote size={13} />
-            <span>Livrées non encaissées : <strong>{analytics.uncollectedDeliveredCount}</strong></span>
+            <Banknote size={12} />
+            <span>Non encaissées <strong>({analytics.uncollectedDeliveredCount})</strong></span>
           </button>
 
           <button
@@ -746,88 +772,92 @@ export function TransferredOrdersPanel({
             className={`trp-signal-chip is-success${filterSituation === "delivered_cashed" ? " is-active" : ""}`}
             onClick={() => toggleFilter("delivered_cashed")}
           >
-            <ShieldCheck size={13} />
-            <span>Encaissées confirmées : <strong>{analytics.cashedCount}</strong></span>
+            <ShieldCheck size={12} />
+            <span>Encaissées <strong>({analytics.cashedCount})</strong></span>
+          </button>
+
+          <button
+            type="button"
+            className={`trp-signal-chip ${analytics.returnedCount > 0 ? "is-danger" : ""}${filterSituation === "returned" ? " is-active" : ""}`}
+            onClick={() => toggleFilter("returned")}
+          >
+            <RotateCcw size={12} />
+            <span>Retours <strong>({analytics.returnedCount})</strong></span>
           </button>
 
           {analytics.recoveredCount > 0 && (
             <span className="trp-signal-chip is-info">
-              <Check size={13} />
-              <span>Recouvrées : <strong>{analytics.recoveredCount}</strong> ({formatDZD(analytics.recoveredAmount)})</span>
+              <Check size={12} />
+              <span>Recouvrées <strong>({analytics.recoveredCount})</strong></span>
             </span>
           )}
         </div>
-      </div>
 
-      {/* Filters & Search Toolbar */}
-      <div className="trp-toolbar">
-        <div className="trans-search-box">
-          <Search size={16} className="trans-search-icon" />
-          <input
-            type="text"
-            placeholder="Rechercher par client, téléphone, wilaya, n° commande ou tracking…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {search && (
-            <button
-              type="button"
-              className="trans-clear-search"
-              onClick={() => setSearch("")}
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
-
-        <div className="trp-toolbar-right">
-          <div
-            className="trans-carrier-filters"
-            role="group"
-            aria-label="Filtrer par société de livraison"
-            style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}
-          >
-            {[
-              { id: "all" as const, label: `Toutes (${carrierCounts.all})` },
-              { id: "ecotrack" as const, label: `🚚 ${ecoCarrierName} (${carrierCounts.ecotrack})` },
-              { id: "ecom" as const, label: `📦 E-com Delivery (${carrierCounts.ecom})` },
-              ...(carrierCounts.other > 0
-                ? [{ id: "other" as const, label: `📋 Autres (${carrierCounts.other})` }]
-                : []),
-            ].map(opt => {
-              const active = filterCarrier === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  className={`trans-carrier-pill-btn${active ? " is-active" : ""}`}
-                  onClick={() => setFilterCarrier(opt.id)}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
+        {/* Integrated Search & Carrier Bar */}
+        <div className="trp-search-strip">
+          <div className="trans-search-box trp-search-compact">
+            <Search size={15} className="trans-search-icon" />
+            <input
+              type="text"
+              placeholder="Rechercher client, tél, wilaya, n° commande, tracking…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                type="button"
+                className="trans-clear-search"
+                onClick={() => setSearch("")}
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
 
-          <span className="trp-filter-count-pill">
-            <SlidersHorizontal size={12} />
-            {filteredOrders.length} / {analytics.totalCount}
-          </span>
-
-          {hasActiveFilters && (
-            <button
-              type="button"
-              className="trp-reset-btn"
-              onClick={() => {
-                setFilterSituation("all");
-                setFilterCarrier("all");
-                setSearch("");
-              }}
+          <div className="trp-toolbar-right">
+            <div
+              className="trans-carrier-filters"
+              role="group"
+              aria-label="Filtrer par société de livraison"
+              style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}
             >
-              <X size={13} />
-              <span>Réinitialiser</span>
-            </button>
-          )}
+              {[
+                { id: "all" as const, label: `Toutes (${carrierCounts.all})` },
+                { id: "ecotrack" as const, label: `🚚 ${ecoCarrierName} (${carrierCounts.ecotrack})` },
+                { id: "ecom" as const, label: `📦 E-com (${carrierCounts.ecom})` },
+                ...(carrierCounts.other > 0
+                  ? [{ id: "other" as const, label: `📋 Autres (${carrierCounts.other})` }]
+                  : []),
+              ].map(opt => {
+                const active = filterCarrier === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`trans-carrier-pill-btn${active ? " is-active" : ""}`}
+                    onClick={() => setFilterCarrier(opt.id)}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                className="trp-reset-btn"
+                onClick={() => {
+                  setFilterSituation("all");
+                  setFilterCarrier("all");
+                  setSearch("");
+                }}
+              >
+                <X size={12} />
+                <span>Réinitialiser</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

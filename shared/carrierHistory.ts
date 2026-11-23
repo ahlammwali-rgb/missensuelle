@@ -16,6 +16,7 @@ export type HistoryStageId =
 
 export type TransferredFilterKey =
   | "all"
+  | "reclamation_urgent"
   | "encours"
   | HistoryStageId
   | "delivered_cashed"
@@ -33,6 +34,7 @@ export type OrderHistoryInspection = {
   isDeliveredUncollected: boolean;
   isRecovered: boolean;
   isStalled48h: boolean;
+  isUrgentReclamation: boolean;
   hoursSinceLastScan: number | null;
   deliveryDurationHours: number | null;
   lastScanLabel: string | null;
@@ -67,6 +69,8 @@ export type TransferredHistoryAnalytics = {
   stalled48hAmount: number;
   multiAttemptsCount: number;
   multiAttemptsAmount: number;
+  urgentReclamationCount: number;
+  urgentReclamationAmount: number;
   totalScans: number;
   totalAttemptScans: number;
   trackedWithHistoryCount: number;
@@ -193,6 +197,12 @@ export function inspectOrderCarrierHistory(
     hoursSinceLastScan !== null &&
     hoursSinceLastScan >= 48;
 
+  const isUrgentReclamation =
+    isStalled48h ||
+    attemptCount >= 2 ||
+    stage === "no_answer" ||
+    isDeliveredUncollected;
+
   let deliveryDurationHours: number | null = null;
   if (isDelivered && fallbackStartMs !== null && latestScanMs !== null && latestScanMs >= fallbackStartMs) {
     const hrs = (latestScanMs - fallbackStartMs) / 3_600_000;
@@ -211,6 +221,7 @@ export function inspectOrderCarrierHistory(
     isDeliveredUncollected,
     isRecovered,
     isStalled48h,
+    isUrgentReclamation,
     hoursSinceLastScan,
     deliveryDurationHours,
     lastScanLabel,
@@ -222,6 +233,7 @@ export function matchesTransferredFilter(
   info: OrderHistoryInspection
 ): boolean {
   if (filterKey === "all") return true;
+  if (filterKey === "reclamation_urgent") return info.isUrgentReclamation;
   if (filterKey === "encours") return !info.isDelivered && info.stage !== "returned";
   if (filterKey === "delivered_cashed") return info.isCashed;
   if (filterKey === "delivered_uncollected") return info.isDeliveredUncollected;
@@ -271,6 +283,8 @@ export function computeTransferredHistoryAnalytics(
   let stalled48hAmount = 0;
   let multiAttemptsCount = 0;
   let multiAttemptsAmount = 0;
+  let urgentReclamationCount = 0;
+  let urgentReclamationAmount = 0;
   let totalScans = 0;
   let totalAttemptScans = 0;
   let trackedWithHistoryCount = 0;
@@ -326,6 +340,10 @@ export function computeTransferredHistoryAnalytics(
       multiAttemptsCount += 1;
       multiAttemptsAmount += amt;
     }
+    if (info.isUrgentReclamation) {
+      urgentReclamationCount += 1;
+      urgentReclamationAmount += amt;
+    }
   }
 
   const totalCount = orders.length;
@@ -365,6 +383,8 @@ export function computeTransferredHistoryAnalytics(
     stalled48hAmount,
     multiAttemptsCount,
     multiAttemptsAmount,
+    urgentReclamationCount,
+    urgentReclamationAmount,
     totalScans,
     totalAttemptScans,
     trackedWithHistoryCount,
