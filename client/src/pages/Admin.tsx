@@ -1892,6 +1892,21 @@ const LANDING_TEMPLATES: {
     hasPackOffer: true,
   },
   {
+    id: "petit-meche",
+    title: "Template · Bordeaux & Or Royal (Petit Mèche)",
+    subtitle: "Landing mobile RTL bordeaux/or avec pastilles couleurs & formulaire direct",
+    inspiredBy: "Modèle Petit Mèche Miss Sensuelle",
+    previewImage: "/images/petit-meche/01-petit-meche.jpg",
+    accentColor: "#7d0c2a",
+    bgGradient: "linear-gradient(135deg, #fbf0ea 0%, #e9c25e 100%)",
+    features: [
+      "Visuels pleine largeur + bannière commande bordeaux/or",
+      "Pastilles multi-couleurs avec aperçu des teintes",
+      "Liste déroulante 58 wilayas & communes + bouton collant animé",
+    ],
+    hasPackOffer: false,
+  },
+  {
     id: "standard",
     title: "Template 5 · Fiche Boutique Classique",
     subtitle: "Page produit e-commerce standard bilingue FR / AR",
@@ -1917,6 +1932,7 @@ function resolveProductTemplate(product: Product): LandingTemplateId {
   if (product.id === "p-009" || product.slug === "perruque-longue") return "perruque";
   if (product.id === "p-010" || product.slug === "badil-microblading") return "badil";
   if (product.id === "p-011" || product.slug === "pyjama-ete") return "pyjama";
+  if (product.id === "p-012" || product.slug === "petit-meche") return "petit-meche";
   return "standard";
 }
 
@@ -1968,10 +1984,10 @@ function CatalogPanel({ notify }: { notify: (message: string) => void }) {
       ...emptyProduct,
       landingTemplate: templateId,
       accent: tpl.accentColor,
-      category: templateId === "extensions" ? "extensions" : templateId === "doudoune" || templateId === "coat" ? "vestes" : templateId === "badil" ? "beaute" : "mode",
-      categoryLabel: templateId === "extensions" ? "Extensions cheveux" : templateId === "doudoune" || templateId === "coat" ? "Vestes & ensembles" : templateId === "badil" ? "Beauté & Maquillage" : templateId === "pyjama" ? "Pyjamas & Détente" : "Mode femme",
-      price: templateId === "extensions" ? 2700 : templateId === "doudoune" ? 7600 : templateId === "abaya" ? 7500 : templateId === "badil" || templateId === "pyjama" ? 1800 : 8500,
-      oldPrice: templateId === "extensions" ? 3500 : templateId === "doudoune" ? 9000 : templateId === "abaya" ? 14000 : templateId === "badil" || templateId === "pyjama" ? 2800 : 11000,
+      category: templateId === "extensions" || templateId === "petit-meche" ? "extensions" : templateId === "doudoune" || templateId === "coat" ? "vestes" : templateId === "badil" ? "beaute" : "mode",
+      categoryLabel: templateId === "extensions" || templateId === "petit-meche" ? "Extensions cheveux" : templateId === "doudoune" || templateId === "coat" ? "Vestes & ensembles" : templateId === "badil" ? "Beauté & Maquillage" : templateId === "pyjama" ? "Pyjamas & Détente" : "Mode femme",
+      price: templateId === "extensions" ? 2700 : templateId === "petit-meche" ? 2500 : templateId === "doudoune" ? 7600 : templateId === "abaya" ? 7500 : templateId === "badil" || templateId === "pyjama" ? 1800 : 8500,
+      oldPrice: templateId === "extensions" || templateId === "petit-meche" ? 3500 : templateId === "doudoune" ? 9000 : templateId === "abaya" ? 14000 : templateId === "badil" || templateId === "pyjama" ? 2800 : 11000,
       packPrice: templateId === "extensions" ? 4500 : templateId === "doudoune" ? 12900 : templateId === "badil" || templateId === "pyjama" ? 3000 : undefined,
     });
     setCreatorMode("manual");
@@ -3165,6 +3181,10 @@ function findMatchingCatalogProduct(catalog: Product[], orderProductId?: string,
   if (raw) {
     const exact = catalog.find(p => raw.includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(raw));
     if (exact) return exact;
+    if (raw.includes("petit") || raw.includes("mèche") || raw.includes("meche") || raw.includes("بيتي ميش") || raw.includes("ميش")) {
+      const pm = catalog.find(p => p.id === "p-012" || p.slug.includes("petit-meche"));
+      if (pm) return pm;
+    }
     if (raw.includes("extension") || raw.includes("extention") || raw.includes("إكستنشن") || raw.includes("شعر")) {
       const ext = catalog.find(p => p.id === "p-005" || p.slug.includes("extensions"));
       if (ext) return ext;

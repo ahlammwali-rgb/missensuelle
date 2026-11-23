@@ -3,7 +3,7 @@ import { replaceAnnotatedAbayaPhotos } from "./abaya-gallery";
 
 export type CategoryId = "mode" | "vestes" | "beaute" | "lentilles" | "extensions";
 
-export type LandingTemplateId = "doudoune" | "extensions" | "abaya" | "coat" | "perruque" | "badil" | "pyjama" | "standard";
+export type LandingTemplateId = "doudoune" | "extensions" | "abaya" | "coat" | "perruque" | "badil" | "pyjama" | "petit-meche" | "standard";
 
 export type ProductVariantImage = {
   name: string;
@@ -418,6 +418,39 @@ export const products: Product[] = [
     accent: "#e0145f",
     stock: 60,
   },
+  {
+    id: "p-012",
+    slug: "petit-meche",
+    name: "Petit Mèche",
+    category: "extensions",
+    categoryLabel: "Extensions cheveux",
+    price: 2500,
+    oldPrice: 3500,
+    landingTemplate: "petit-meche",
+    badge: "عرض خاص",
+    description: "Extension Petit Mèche Miss Sensuelle effet naturel invisible, pose facile en quelques secondes en 5 nuances.",
+    details: [
+      "تمنحك كثافة وطولاً طبيعياً في ثوانٍ بدون أي ضرر للشعر",
+      "متوفرة بـ 5 ألوان جذابة: أسود، شاتان فونسي، شاتان فاتح، بلوند ذهبي، بلوند بلاتيني",
+      "عرض خاص: 2500 DA فقط بدلاً من 3500 DA",
+      "توصيل سريع 58 ولاية مع الدفع عند الاستلام",
+    ],
+    colors: ["أسود", "شاتان فونسي", "شاتان فاتح", "بلوند ذهبي", "بلوند بلاتيني"],
+    image: "/images/petit-meche/01-petit-meche.jpg",
+    gallery: [
+      "/images/petit-meche/01-petit-meche.jpg",
+      "/images/petit-meche/02-petit-meche.jpg",
+      "/images/petit-meche/03-petit-meche.jpg",
+      "/images/petit-meche/04-petit-meche.jpg",
+      "/images/petit-meche/05-petit-meche.jpg",
+      "/images/petit-meche/06-petit-meche.jpg",
+    ],
+    arName: "بيتي ميش",
+    arCategoryLabel: "وصلات الشعر",
+    arDescription: "وصلات شعر Petit Mèche بمظهر طبيعي وتركيب سريع بـ 5 ألوان رائعة.",
+    accent: "#7d0c2a",
+    stock: 50,
+  },
 ];
 
 export const wilayas = [
@@ -556,7 +589,8 @@ export function getCatalogProducts(): Product[] {
           (normalized.length >= 7 && product.id === "p-008") ||
           product.id === "p-009" ||
           product.id === "p-010" ||
-          product.id === "p-011") &&
+          product.id === "p-011" ||
+          product.id === "p-012") &&
         !savedIds.has(product.id),
     );
     if (missingBuiltIns.length || colorsChanged) {

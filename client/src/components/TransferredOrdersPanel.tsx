@@ -13,14 +13,26 @@ import {
   FileDown,
   MapPin,
   Calendar,
-  DollarSign,
-  ChevronRight,
   ShieldCheck,
   Eye,
   X,
+  Activity,
+  RotateCcw,
+  Banknote,
+  Package,
+  PhoneMissed,
+  SlidersHorizontal,
 } from "lucide-react";
 import type { CheckoutOrder } from "@shared/checkout";
 import { classifyCarrierTracking, isCarrierTrackingDelivered } from "@shared/carrierStatus";
+import {
+  computeTransferredHistoryAnalytics,
+  inspectOrderCarrierHistory,
+  matchesTransferredFilter,
+  type HistoryStageId,
+  type OrderHistoryInspection,
+  type TransferredFilterKey,
+} from "@shared/carrierHistory";
 import { formatDZD, type OrderStatus } from "@/lib/store-data";
 import { trpc } from "@/lib/trpc";
 
@@ -57,8 +69,11 @@ export function TransferredOrdersPanel({
   onRefreshOrders,
 }: TransferredOrdersPanelProps) {
   const [search, setSearch] = useState("");
-  const [filterSituation, setFilterSituation] = useState<string>("all");
+  const [filterSituation, setFilterSituation] = useState<TransferredFilterKey>("all");
   const [filterCarrier, setFilterCarrier] = useState<"all" | "ecotrack" | "ecom" | "other">("all");
+  const [lastSyncAt, setLastSyncAt] = useState<string>(() =>
+    new Date().toLocaleTimeString("fr-DZ", { hour: "2-digit", minute: "2-digit" })
+  );
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const syncedDeliveredIdsRef = useRef<Set<string>>(new Set());
   const [selectedTimelineOrder, setSelectedTimelineOrder] = useState<{
@@ -221,26 +236,39 @@ export function TransferredOrdersPanel({
     return { all: transferredOrders.length, ecotrack, ecom, other };
   }, [transferredOrders, ecoShipments, ecomShipments]);
 
-  // Filtered by search, carrier and situation
+  // Compute per-order inspection & history metrics once
+  const inspectionMap = useMemo(() => {
+    const map = new Map<string, OrderHistoryInspection>();
+    const nowMs = Date.now();
+    for (const o of transferredOrders) {
+      const isEco = Boolean(ecoShipments[o.id]) || o.carrier === "ecotrack";
+      const sh = isEco ? (ecoShipments[o.id] || shipments[o.id]) : (ecomShipments[o.id] || shipments[o.id]);
+      const trk = sh?.tracking ? trackingMap[sh.tracking] : null;
+      map.set(o.id, inspectOrderCarrierHistory(o, trk, sh?.at, nowMs));
+    }
+    return map;
+  }, [transferredOrders, ecoShipments, ecomShipments, shipments, trackingMap]);
+
+  // Aggregate step-based & financial analytics from carrier history
+  const analytics = useMemo(
+    () => computeTransferredHistoryAnalytics(transferredOrders, inspectionMap),
+    [transferredOrders, inspectionMap]
+  );
+
+  // Filtered by search, carrier, history stage & diagnostic alerts
   const filteredOrders = useMemo(() => {
     return transferredOrders.filter(o => {
       if (filterCarrier !== "all" && getOrderCarrier(o) !== filterCarrier) {
         return false;
       }
 
-      const sh = ecoShipments[o.id] || ecomShipments[o.id] || shipments[o.id];
-      const trk = sh?.tracking ? trackingMap[sh.tracking] : null;
-      const cat = classifyCarrierTracking(trk);
-
-      if (filterSituation !== "all") {
-        if (filterSituation === "livre" && cat !== "delivered") return false;
-        if (filterSituation === "encours" && cat !== "in_transit" && cat !== "postponed") return false;
-        if (filterSituation === "ne_repond_pas" && cat !== "no_answer") return false;
-        if (filterSituation === "reporte" && cat !== "postponed") return false;
-        if (filterSituation === "retour" && cat !== "returned") return false;
+      const info = inspectionMap.get(o.id);
+      if (filterSituation !== "all" && info && !matchesTransferredFilter(filterSituation, info)) {
+        return false;
       }
 
       if (!search.trim()) return true;
+      const sh = ecoShipments[o.id] || ecomShipments[o.id] || shipments[o.id];
       const q = search.toLowerCase();
       const matchTrk = sh?.tracking?.toLowerCase().includes(q);
       const matchOrder = `${o.id} ${o.customer} ${o.phone} ${o.wilaya} ${o.commune} ${o.product}`
@@ -248,28 +276,7 @@ export function TransferredOrdersPanel({
         .includes(q);
       return matchOrder || matchTrk;
     });
-  }, [transferredOrders, shipments, ecoShipments, ecomShipments, trackingMap, search, filterSituation, filterCarrier]);
-
-  // Statistics
-  const stats = useMemo(() => {
-    let delivered = 0;
-    let inTransit = 0;
-    let noAnswer = 0;
-    let returned = 0;
-
-    for (const o of transferredOrders) {
-      const sh = ecoShipments[o.id] || ecomShipments[o.id] || shipments[o.id];
-      const trk = sh?.tracking ? trackingMap[sh.tracking] : null;
-      const cat = classifyCarrierTracking(trk);
-
-      if (cat === "delivered") delivered++;
-      else if (cat === "no_answer") noAnswer++;
-      else if (cat === "returned") returned++;
-      else inTransit++;
-    }
-
-    return { total: transferredOrders.length, delivered, inTransit, noAnswer, returned };
-  }, [transferredOrders, ecoShipments, ecomShipments, shipments, trackingMap]);
+  }, [transferredOrders, shipments, ecoShipments, ecomShipments, inspectionMap, search, filterSituation, filterCarrier]);
 
   const exportCSV = () => {
     const header = [
@@ -368,29 +375,70 @@ export function TransferredOrdersPanel({
     };
   };
 
+  const stageMeta: ReadonlyArray<{ id: HistoryStageId; label: string; color: string }> = [
+    { id: "prep", label: "Préparation", color: "#64748b" },
+    { id: "transit", label: "Transit / Hub", color: "#6366f1" },
+    { id: "out_for_delivery", label: "Chez Livreur", color: "#0ea5e9" },
+    { id: "no_answer", label: "Ne Répond Pas", color: "#f97316" },
+    { id: "postponed", label: "Reporté", color: "#eab308" },
+    { id: "delivered", label: "Livrées", color: "#10b981" },
+    { id: "returned", label: "Retours / Échecs", color: "#ef4444" },
+  ];
+
+  const toggleFilter = (next: TransferredFilterKey) => {
+    setFilterSituation(prev => (prev === next ? "all" : next));
+  };
+
+  const hasActiveFilters = filterSituation !== "all" || filterCarrier !== "all" || Boolean(search.trim());
+  const latestDataUpdatedMs = Math.max(trackingQuery.dataUpdatedAt || 0, ecotrackTrackingQuery.dataUpdatedAt || 0);
+  const syncClockText = latestDataUpdatedMs > 0
+    ? new Date(latestDataUpdatedMs).toLocaleTimeString("fr-DZ", { hour: "2-digit", minute: "2-digit" })
+    : lastSyncAt;
+  const avgDurationLabel = analytics.avgDeliveryHours === null
+    ? null
+    : analytics.avgDeliveryHours < 24
+      ? `${analytics.avgDeliveryHours}h`
+      : `${Math.floor(analytics.avgDeliveryHours / 24)}j ${analytics.avgDeliveryHours % 24}h`;
+
   return (
     <div className="transferred-panel">
-      {/* Header */}
-      <div className="transferred-header">
-        <div className="transferred-title-block">
-          <div className="transferred-icon-wrapper">
-            <Truck size={24} className="transferred-main-icon" />
+      {/* Executive Header */}
+      <div className="trp-hero-card">
+        <div className="trp-hero-main">
+          <div className="trp-hero-badge-icon">
+            <Truck size={24} />
           </div>
-          <div>
-            <div className="transferred-eyebrow">Espace Expéditions & Transporteurs</div>
-            <h1 className="transferred-title">
-              Commandes Transférées <span>({transferredOrders.length})</span>
+          <div style={{ minWidth: 0 }}>
+            <div className="trp-hero-eyebrow-row">
+              <span className={`trp-live-chip${isTrackingFetching ? " is-syncing" : ""}`}>
+                <span className="trp-live-dot" />
+                {isTrackingFetching ? "Synchronisation…" : "Suivi Historique Live"}
+              </span>
+              <span className="trp-sync-time">MAJ {syncClockText}</span>
+            </div>
+            <h1 className="trp-hero-title">
+              Expéditions & Suivi Historique <span>({analytics.totalCount})</span>
             </h1>
-            <p className="transferred-desc">
-              Toutes les commandes sorties du Dashboard actif avec synchronisation en direct des statuts de livraison.
-            </p>
+            <div className="trp-hero-meta-strip">
+              <span className="trp-meta-pill">
+                <Banknote size={13} /> COD total : {formatDZD(analytics.totalCodAmount)}
+              </span>
+              <span className="trp-meta-pill">
+                <Activity size={13} /> {analytics.totalScans} scans historiques ({analytics.trackedWithHistoryCount}/{analytics.totalCount} suivis)
+              </span>
+              {avgDurationLabel && (
+                <span className="trp-meta-pill">
+                  <Clock size={13} /> Délai moy. livraison : {avgDurationLabel}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="transferred-header-actions">
+        <div className="trp-hero-actions">
           <button
             type="button"
-            className="trans-btn trans-btn-refresh"
+            className="trans-btn trp-btn-primary"
             onClick={() => {
               syncDeliveriesMutation.mutate();
               void ecomStatusQuery.refetch();
@@ -398,7 +446,8 @@ export function TransferredOrdersPanel({
               void trackingQuery.refetch();
               void ecotrackTrackingQuery.refetch();
               if (onRefreshOrders) onRefreshOrders();
-              notify("Actualisation des statuts de livraison…");
+              setLastSyncAt(new Date().toLocaleTimeString("fr-DZ", { hour: "2-digit", minute: "2-digit" }));
+              notify("Actualisation des statuts et historiques…");
             }}
             disabled={isTrackingFetching || syncDeliveriesMutation.isPending}
           >
@@ -418,56 +467,203 @@ export function TransferredOrdersPanel({
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="transferred-stats-grid">
-        <div
-          className={`trans-stat-card ${filterSituation === "all" ? "active" : ""}`}
-          onClick={() => setFilterSituation("all")}
+      {/* 4 Executive KPI Cards */}
+      <div className="trp-kpi-grid">
+        <button
+          type="button"
+          className={`trp-kpi-card${filterSituation === "encours" ? " is-active" : ""}`}
+          onClick={() => toggleFilter("encours")}
         >
-          <div className="stat-label">Total Transférées</div>
-          <div className="stat-val val-purple">{stats.total}</div>
-          <div className="stat-sub">Toutes expéditions</div>
+          <div className="trp-kpi-top">
+            <span className="trp-kpi-label">En Circulation</span>
+            <span className="trp-kpi-icon is-indigo"><Truck size={15} /></span>
+          </div>
+          <div className="trp-kpi-value-row">
+            <span className="trp-kpi-value">{analytics.activeCount}</span>
+            <span className="trp-kpi-badge is-indigo">
+              {analytics.stages.out_for_delivery.count} livreur
+            </span>
+          </div>
+          <div className="trp-kpi-amount">{formatDZD(analytics.activeCodAmount)}</div>
+          <div className="trp-kpi-sub">
+            {analytics.stages.prep.count} prép. · {analytics.stages.transit.count} transit
+          </div>
+        </button>
+
+        <button
+          type="button"
+          className={`trp-kpi-card${filterSituation === "delivered" ? " is-active" : ""}`}
+          onClick={() => toggleFilter("delivered")}
+        >
+          <div className="trp-kpi-top">
+            <span className="trp-kpi-label">Livrées</span>
+            <span className="trp-kpi-icon is-green"><PackageCheck size={15} /></span>
+          </div>
+          <div className="trp-kpi-value-row">
+            <span className="trp-kpi-value">{analytics.deliveredCount}</span>
+            <span className="trp-kpi-badge is-green">{analytics.deliveryRatePct}%</span>
+          </div>
+          <div className="trp-kpi-amount">{formatDZD(analytics.deliveredAmount)}</div>
+          <div className="trp-kpi-bar-track">
+            <div
+              className="trp-kpi-bar-fill"
+              style={{ width: `${analytics.deliveryRatePct}%`, background: "#10b981" }}
+            />
+          </div>
+        </button>
+
+        <button
+          type="button"
+          className={`trp-kpi-card${filterSituation === "delivered_cashed" ? " is-active" : ""}`}
+          onClick={() => toggleFilter("delivered_cashed")}
+        >
+          <div className="trp-kpi-top">
+            <span className="trp-kpi-label">Trésorerie Encaissée</span>
+            <span className="trp-kpi-icon is-cyan"><ShieldCheck size={15} /></span>
+          </div>
+          <div className="trp-kpi-value-row">
+            <span className="trp-kpi-value" style={{ fontSize: "20px" }}>
+              {formatDZD(analytics.cashedAmount)}
+            </span>
+            <span className="trp-kpi-badge is-cyan">
+              {analytics.cashedCount}/{analytics.deliveredCount}
+            </span>
+          </div>
+          <div className="trp-kpi-sub">
+            {analytics.uncollectedDeliveredCount > 0
+              ? `${analytics.uncollectedDeliveredCount} livrées à encaisser (${formatDZD(analytics.uncollectedDeliveredAmount)})`
+              : `${analytics.cashCollectionRatePct}% des livrées encaissées`}
+          </div>
+          <div className="trp-kpi-bar-track">
+            <div
+              className="trp-kpi-bar-fill"
+              style={{ width: `${analytics.cashCollectionRatePct}%`, background: "#0ea5e9" }}
+            />
+          </div>
+        </button>
+
+        <button
+          type="button"
+          className={`trp-kpi-card${filterSituation === "returned" ? " is-active" : ""}`}
+          onClick={() => toggleFilter("returned")}
+        >
+          <div className="trp-kpi-top">
+            <span className="trp-kpi-label">Retours & Échecs</span>
+            <span className="trp-kpi-icon is-red"><RotateCcw size={15} /></span>
+          </div>
+          <div className="trp-kpi-value-row">
+            <span className="trp-kpi-value">{analytics.returnedCount}</span>
+            <span className="trp-kpi-badge is-red">{analytics.returnRatePct}%</span>
+          </div>
+          <div className="trp-kpi-amount">{formatDZD(analytics.returnedAmount)}</div>
+          <div className="trp-kpi-sub">
+            {analytics.totalAttemptScans} tentatives de livraison enregistrées
+          </div>
+        </button>
+      </div>
+
+      {/* Carrier History Pipeline & Diagnostic Signals */}
+      <div className="trp-pipeline-card">
+        <div className="trp-pipeline-head">
+          <div className="trp-pipeline-title">
+            <Package size={16} />
+            <span>Pipeline des Étapes (Historique Transporteur)</span>
+          </div>
+          <div className="trp-pipeline-summary">
+            Moy. {analytics.avgScansPerTracked} scans/colis · Cliquez sur une étape pour filtrer
+          </div>
         </div>
 
-        <div
-          className={`trans-stat-card ${filterSituation === "encours" ? "active" : ""}`}
-          onClick={() => setFilterSituation("encours")}
-        >
-          <div className="stat-label">En Cours</div>
-          <div className="stat-val val-blue">{stats.inTransit}</div>
-          <div className="stat-sub">En transit & tournée</div>
+        <div className="trp-progress-stack" aria-hidden="true">
+          {stageMeta.map(st => {
+            const metric = analytics.stages[st.id];
+            if (metric.count <= 0) return null;
+            return (
+              <div
+                key={st.id}
+                className="trp-progress-seg"
+                style={{
+                  width: `${Math.max(metric.pct, 2)}%`,
+                  background: st.color,
+                  opacity: filterSituation === "all" || filterSituation === st.id ? 1 : 0.3,
+                }}
+                title={`${st.label}: ${metric.count} (${metric.pct}%)`}
+              />
+            );
+          })}
         </div>
 
-        <div
-          className={`trans-stat-card ${filterSituation === "livre" ? "active" : ""}`}
-          onClick={() => setFilterSituation("livre")}
-        >
-          <div className="stat-label">Livrées</div>
-          <div className="stat-val val-green">{stats.delivered}</div>
-          <div className="stat-sub">Remises & encaissées</div>
+        <div className="trp-stages-grid">
+          {stageMeta.map(st => {
+            const metric = analytics.stages[st.id];
+            const isActive = filterSituation === st.id;
+            return (
+              <button
+                key={st.id}
+                type="button"
+                className={`trp-stage-btn${isActive ? " is-active" : ""}`}
+                onClick={() => toggleFilter(st.id)}
+              >
+                <div className="trp-stage-top">
+                  <span className="trp-stage-dot" style={{ background: st.color }} />
+                  <span className="trp-stage-pct">{metric.pct}%</span>
+                </div>
+                <div className="trp-stage-count">{metric.count}</div>
+                <div className="trp-stage-name">{st.label}</div>
+                <div className="trp-stage-amount">{formatDZD(metric.amount)}</div>
+              </button>
+            );
+          })}
         </div>
 
-        <div
-          className={`trans-stat-card ${filterSituation === "ne_repond_pas" ? "active" : ""}`}
-          onClick={() => setFilterSituation("ne_repond_pas")}
-        >
-          <div className="stat-label">Ne Répond Pas</div>
-          <div className="stat-val val-orange">{stats.noAnswer}</div>
-          <div className="stat-sub">Relance livreur requise</div>
-        </div>
+        <div className="trp-signals-row">
+          <button
+            type="button"
+            className={`trp-signal-chip ${analytics.stalled48hCount > 0 ? "is-danger" : ""}${filterSituation === "stalled_48h" ? " is-active" : ""}`}
+            onClick={() => toggleFilter("stalled_48h")}
+          >
+            <AlertTriangle size={13} />
+            <span>Bloqués +48h sans scan : <strong>{analytics.stalled48hCount}</strong></span>
+          </button>
 
-        <div
-          className={`trans-stat-card ${filterSituation === "retour" ? "active" : ""}`}
-          onClick={() => setFilterSituation("retour")}
-        >
-          <div className="stat-label">Retours / Échecs</div>
-          <div className="stat-val val-red">{stats.returned}</div>
-          <div className="stat-sub">Refus ou non livrable</div>
+          <button
+            type="button"
+            className={`trp-signal-chip ${analytics.multiAttemptsCount > 0 ? "is-warn" : ""}${filterSituation === "multi_attempts" ? " is-active" : ""}`}
+            onClick={() => toggleFilter("multi_attempts")}
+          >
+            <PhoneMissed size={13} />
+            <span>2+ tentatives / relances : <strong>{analytics.multiAttemptsCount}</strong></span>
+          </button>
+
+          <button
+            type="button"
+            className={`trp-signal-chip ${analytics.uncollectedDeliveredCount > 0 ? "is-warn" : ""}${filterSituation === "delivered_uncollected" ? " is-active" : ""}`}
+            onClick={() => toggleFilter("delivered_uncollected")}
+          >
+            <Banknote size={13} />
+            <span>Livrées non encaissées : <strong>{analytics.uncollectedDeliveredCount}</strong></span>
+          </button>
+
+          <button
+            type="button"
+            className={`trp-signal-chip is-success${filterSituation === "delivered_cashed" ? " is-active" : ""}`}
+            onClick={() => toggleFilter("delivered_cashed")}
+          >
+            <ShieldCheck size={13} />
+            <span>Encaissées confirmées : <strong>{analytics.cashedCount}</strong></span>
+          </button>
+
+          {analytics.recoveredCount > 0 && (
+            <span className="trp-signal-chip is-info">
+              <Check size={13} />
+              <span>Recouvrées : <strong>{analytics.recoveredCount}</strong> ({formatDZD(analytics.recoveredAmount)})</span>
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Filters & Search */}
-      <div className="transferred-toolbar">
+      {/* Filters & Search Toolbar */}
+      <div className="trp-toolbar">
         <div className="trans-search-box">
           <Search size={16} className="trans-search-icon" />
           <input
@@ -487,32 +683,54 @@ export function TransferredOrdersPanel({
           )}
         </div>
 
-        <div
-          className="trans-carrier-filters"
-          role="group"
-          aria-label="Filtrer par société de livraison"
-          style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}
-        >
-          {[
-            { id: "all" as const, label: `Toutes (${carrierCounts.all})` },
-            { id: "ecotrack" as const, label: `🚚 ${ecoCarrierName} (${carrierCounts.ecotrack})` },
-            { id: "ecom" as const, label: `📦 E-com Delivery (${carrierCounts.ecom})` },
-            ...(carrierCounts.other > 0
-              ? [{ id: "other" as const, label: `📋 Autres (${carrierCounts.other})` }]
-              : []),
-          ].map(opt => {
-            const active = filterCarrier === opt.id;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                className={`trans-carrier-pill-btn${active ? " is-active" : ""}`}
-                onClick={() => setFilterCarrier(opt.id)}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
+        <div className="trp-toolbar-right">
+          <div
+            className="trans-carrier-filters"
+            role="group"
+            aria-label="Filtrer par société de livraison"
+            style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}
+          >
+            {[
+              { id: "all" as const, label: `Toutes (${carrierCounts.all})` },
+              { id: "ecotrack" as const, label: `🚚 ${ecoCarrierName} (${carrierCounts.ecotrack})` },
+              { id: "ecom" as const, label: `📦 E-com Delivery (${carrierCounts.ecom})` },
+              ...(carrierCounts.other > 0
+                ? [{ id: "other" as const, label: `📋 Autres (${carrierCounts.other})` }]
+                : []),
+            ].map(opt => {
+              const active = filterCarrier === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={`trans-carrier-pill-btn${active ? " is-active" : ""}`}
+                  onClick={() => setFilterCarrier(opt.id)}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <span className="trp-filter-count-pill">
+            <SlidersHorizontal size={12} />
+            {filteredOrders.length} / {analytics.totalCount}
+          </span>
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="trp-reset-btn"
+              onClick={() => {
+                setFilterSituation("all");
+                setFilterCarrier("all");
+                setSearch("");
+              }}
+            >
+              <X size={13} />
+              <span>Réinitialiser</span>
+            </button>
+          )}
         </div>
       </div>
 

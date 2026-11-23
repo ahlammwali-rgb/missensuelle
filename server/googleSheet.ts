@@ -201,7 +201,10 @@ export async function importGoogleSheetToOrders(
 
     const prodLower = `${product} ${variant}`.toLowerCase();
     let productId = "p-007";
-    if (prodLower.includes("extention") || prodLower.includes("extension") || prodLower.includes("إكستنشن") || prodLower.includes("شعر") || prodLower.includes("p-005")) {
+    if (prodLower.includes("petit") || prodLower.includes("mèche") || prodLower.includes("meche") || prodLower.includes("بيتي ميش") || prodLower.includes("p-012")) {
+      productId = "p-012";
+      if (!idxProd || !row[idxProd]) product = "Petit Mèche";
+    } else if (prodLower.includes("extention") || prodLower.includes("extension") || prodLower.includes("إكستنشن") || prodLower.includes("شعر") || prodLower.includes("p-005")) {
       productId = "p-005";
       if (!idxProd || !row[idxProd]) product = "Extensions Cheveux Naturel";
     } else if (prodLower.includes("doudoune") || prodLower.includes("دواقون") || prodLower.includes("جاكيت") || prodLower.includes("hiver") || prodLower.includes("p-008")) {
