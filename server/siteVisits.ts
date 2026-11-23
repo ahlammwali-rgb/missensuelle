@@ -262,7 +262,7 @@ function scheduleVisitsSave() {
   debounceTimer = setTimeout(() => {
     debounceTimer = null;
     saveQueue = saveQueue.then(() => pushCloudVisits()).catch(() => {});
-  }, 8000);
+  }, 3000);
   if (typeof debounceTimer.unref === "function") {
     debounceTimer.unref();
   }

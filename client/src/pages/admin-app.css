@@ -7743,7 +7743,7 @@ html.dark .pixel-diagnostics,
 }
 
 /* =====================================================================
-   GCOME FULL-WIDTH MOBILE-APP VISITS CHART + SLIDE CONTROLS + ANIMATIONS
+   RAW FULL-SCREEN-WIDTH SITE VIEWS GRAPH (NO CARD / NO BOX)
    ===================================================================== */
 
 @keyframes gcomeSweepReveal {
@@ -7764,11 +7764,6 @@ html.dark .pixel-diagnostics,
   100% { left: 99%; opacity: 0; }
 }
 
-@keyframes gcomeBarRise {
-  0% { transform: scaleY(0); opacity: 0.25; }
-  100% { transform: scaleY(1); opacity: 1; }
-}
-
 @keyframes gcomeLiveRing {
   0% { transform: scale(0.8); opacity: 0.9; }
   70% { transform: scale(2.2); opacity: 0; }
@@ -7780,70 +7775,77 @@ html.dark .pixel-diagnostics,
   100% { r: 15px; stroke-opacity: 0; }
 }
 
-.gcome-mchart-shell {
-  position: relative;
+.admin-shell.gcome-shell .admin-content:has(.gcome-raw-visits) {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.admin-shell.gcome-shell .admin-app-dashboard:has(.gcome-raw-visits) > *:not(.gcome-raw-visits) {
+  padding-left: 42px;
+  padding-right: 42px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1120px) {
+  .admin-shell.gcome-shell .admin-app-dashboard:has(.gcome-raw-visits) > *:not(.gcome-raw-visits) {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .admin-shell.gcome-shell .admin-app-dashboard:has(.gcome-raw-visits) > *:not(.gcome-raw-visits) {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
+.gcome-raw-visits {
   width: 100%;
   max-width: 100%;
-  min-width: 0;
+  margin: 0 0 10px;
+  padding: 6px 0 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   box-sizing: border-box;
-  border-radius: 26px;
-  padding: 16px 16px 14px;
-  margin-bottom: 16px;
-  background:
-    radial-gradient(circle at 12% 0%, rgba(139, 92, 246, 0.14), transparent 46%),
-    radial-gradient(circle at 92% 14%, rgba(236, 72, 153, 0.11), transparent 44%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.99) 0%, rgba(247, 244, 255, 0.97) 100%);
-  border: 1.5px solid rgba(139, 92, 246, 0.24);
-  box-shadow:
-    0 18px 40px -14px rgba(76, 29, 149, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.92);
   overflow: hidden;
 }
 
-html.dark .gcome-mchart-shell,
-.dark .gcome-mchart-shell {
-  background:
-    radial-gradient(circle at 14% 0%, rgba(168, 85, 247, 0.30), transparent 45%),
-    radial-gradient(circle at 90% 8%, rgba(236, 72, 153, 0.22), transparent 42%),
-    radial-gradient(circle at 50% 100%, rgba(34, 211, 238, 0.14), transparent 55%),
-    linear-gradient(165deg, rgba(13, 17, 40, 0.98) 0%, rgba(7, 10, 24, 0.99) 100%);
-  border-color: rgba(168, 85, 247, 0.56);
-  box-shadow:
-    0 22px 44px -12px rgba(0, 0, 0, 0.8),
-    0 0 28px -6px rgba(168, 85, 247, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-/* Header App Mobile */
-.gcome-mchart-top {
+.gcome-raw-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 12px;
-  min-width: 0;
+  padding: 0 42px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
 }
 
-.gcome-mchart-stat {
+@media (max-width: 1120px) {
+  .gcome-raw-top {
+    padding: 0 28px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .gcome-raw-top {
+    padding: 0 14px;
+  }
+}
+
+.gcome-raw-stat {
   min-width: 0;
   flex: 1 1 auto;
 }
 
-.gcome-mchart-eyebrow {
+.gcome-raw-label-row {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 7px;
-  font-size: 10.5px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  color: #6d28d9;
   margin-bottom: 2px;
-}
-
-html.dark .gcome-mchart-eyebrow,
-.dark .gcome-mchart-eyebrow {
-  color: #e9d5ff;
 }
 
 .gcome-mchart-live-dot {
@@ -7865,38 +7867,41 @@ html.dark .gcome-mchart-eyebrow,
   animation: gcomeLiveRing 1.9s cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
 
-.gcome-mchart-range-pill {
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: rgba(124, 58, 237, 0.12);
-  color: #5b21b6;
-  font-size: 10px;
-  font-weight: 800;
+.gcome-raw-eyebrow {
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #6d28d9;
 }
 
-html.dark .gcome-mchart-range-pill,
-.dark .gcome-mchart-range-pill {
-  background: rgba(34, 211, 238, 0.18);
-  color: #67e8f9;
+html.dark .gcome-raw-eyebrow,
+.dark .gcome-raw-eyebrow {
+  color: #d8b4fe;
 }
 
-.gcome-mchart-num-row {
+.gcome-raw-period-txt {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--app-text-muted, #64748b);
+}
+
+.gcome-raw-num-row {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.gcome-mchart-big-num {
-  font-size: clamp(28px, 6vw, 40px);
+.gcome-raw-big-num {
+  font-size: clamp(30px, 7vw, 42px);
   font-weight: 900;
-  line-height: 1.05;
+  line-height: 1.02;
   letter-spacing: -0.035em;
-  color: #080b18;
+  color: var(--app-text, #080b18);
 }
 
-html.dark .gcome-mchart-big-num,
-.dark .gcome-mchart-big-num {
+html.dark .gcome-raw-big-num,
+.dark .gcome-raw-big-num {
   color: #ffffff;
   text-shadow: 0 0 18px rgba(192, 132, 252, 0.45);
 }
@@ -7905,7 +7910,7 @@ html.dark .gcome-mchart-big-num,
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 900;
@@ -7930,260 +7935,98 @@ html.dark .gcome-mchart-delta.is-down,
   color: #fca5a5;
 }
 
-/* Indicateurs compacts */
-.gcome-mchart-indicators {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.gcome-mind-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  background: rgba(148, 163, 184, 0.12);
-  color: #334155;
-  max-width: 100%;
-}
-
-.gcome-mind-chip i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-  flex-shrink: 0;
-}
-
-.gcome-mind-chip.is-purple {
-  background: rgba(139, 92, 246, 0.13);
-  color: #5b21b6;
-}
-.gcome-mind-chip.is-purple i {
-  background: linear-gradient(135deg, #7c3aed, #ec4899);
-  box-shadow: 0 0 8px rgba(236, 72, 153, 0.65);
-}
-
-.gcome-mind-chip.is-cyan {
-  background: rgba(6, 182, 212, 0.13);
-  color: #0e7490;
-}
-.gcome-mind-chip.is-cyan i {
-  background: #22d3ee;
-  box-shadow: 0 0 8px rgba(34, 211, 238, 0.65);
-}
-
-.gcome-mind-chip.is-mint {
-  background: rgba(16, 185, 129, 0.12);
-  color: #047857;
-}
-
-html.dark .gcome-mind-chip,
-.dark .gcome-mind-chip {
-  background: rgba(148, 163, 184, 0.16);
-  color: #e2e8f0;
-}
-html.dark .gcome-mind-chip.is-purple,
-.dark .gcome-mind-chip.is-purple {
-  background: rgba(168, 85, 247, 0.24);
-  color: #f3e8ff;
-}
-html.dark .gcome-mind-chip.is-cyan,
-.dark .gcome-mind-chip.is-cyan {
-  background: rgba(34, 211, 238, 0.2);
-  color: #cffafe;
-}
-html.dark .gcome-mind-chip.is-mint,
-.dark .gcome-mind-chip.is-mint {
-  background: rgba(16, 185, 129, 0.22);
-  color: #6ee7b7;
-}
-
-.gcome-mswap-btn {
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  background: var(--app-surface, #fff);
-  color: #6d28d9;
-  border-radius: 999px;
-  padding: 2px 7px;
-  font-size: 11px;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-html.dark .gcome-mswap-btn,
-.dark .gcome-mswap-btn {
-  background: rgba(15, 23, 42, 0.85);
-  color: #d8b4fe;
-  border-color: rgba(168, 85, 247, 0.45);
-}
-
-/* Header Action Slide Controls */
-.gcome-mchart-actions {
+.gcome-raw-right {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
 }
 
-.gcome-mslide-mode-switch {
-  position: relative;
-  display: inline-grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
-  width: 64px;
-  height: 32px;
-  padding: 3px;
-  border-radius: 999px;
-  border: 1px solid rgba(124, 58, 237, 0.24);
-  background: rgba(148, 163, 184, 0.15);
-  cursor: pointer;
-}
-
-html.dark .gcome-mslide-mode-switch,
-.dark .gcome-mslide-mode-switch {
-  background: rgba(15, 23, 42, 0.82);
-  border-color: rgba(168, 85, 247, 0.42);
-}
-
-.gcome-mslide-thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 28px;
-  height: 24px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #6d28d9, #a855f7);
-  box-shadow: 0 3px 10px rgba(109, 40, 217, 0.38);
-  transition: transform 0.26s cubic-bezier(0.34, 1.5, 0.64, 1);
-}
-
-.gcome-mslide-thumb.is-right {
-  transform: translateX(28px);
-}
-
-.gcome-mslide-opt {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  color: #64748b;
-  transition: color 0.2s ease;
-}
-
-.gcome-mslide-opt.is-on {
-  color: #ffffff;
-}
-
-.gcome-mchart-icon-btn {
+.gcome-raw-refresh {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: 1px solid rgba(124, 58, 237, 0.22);
-  background: var(--app-surface, #ffffff);
+  border: 0;
+  background: rgba(124, 58, 237, 0.1);
   color: #6d28d9;
   display: inline-grid;
   place-items: center;
   cursor: pointer;
-  transition: transform 0.18s ease;
 }
 
-.gcome-mchart-icon-btn:active {
-  transform: scale(0.92);
+html.dark .gcome-raw-refresh,
+.dark .gcome-raw-refresh {
+  background: rgba(168, 85, 247, 0.2);
+  color: #e9d5ff;
 }
 
-html.dark .gcome-mchart-icon-btn,
-.dark .gcome-mchart-icon-btn {
-  background: rgba(15, 23, 42, 0.82);
-  border-color: rgba(168, 85, 247, 0.42);
-  color: #d8b4fe;
-}
-
-/* Segmented Slide Date Track */
-.gcome-mslider-row {
-  width: 100%;
+/* Minimal Date Strip (No heavy box) */
+.gcome-raw-dates {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
-  margin-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 42px 8px;
+  box-sizing: border-box;
 }
-.gcome-mslider-row::-webkit-scrollbar {
+.gcome-raw-dates::-webkit-scrollbar {
   display: none;
 }
 
-.gcome-mdate-track {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(60px, 1fr));
-  align-items: center;
-  padding: 4px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.14);
-  border: 1px solid rgba(139, 92, 246, 0.18);
-  min-width: 100%;
-  box-sizing: border-box;
+@media (max-width: 1120px) {
+  .gcome-raw-dates {
+    padding: 0 28px 8px;
+  }
 }
 
-html.dark .gcome-mdate-track,
-.dark .gcome-mdate-track {
-  background: rgba(15, 23, 42, 0.78);
-  border-color: rgba(168, 85, 247, 0.34);
+@media (max-width: 1024px) {
+  .gcome-raw-dates {
+    padding: 0 14px 6px;
+  }
 }
 
-.gcome-mdate-slider-bg {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  height: calc(100% - 8px);
-  border-radius: 999px;
-  background: linear-gradient(135deg, #6d28d9 0%, #a855f7 60%, #ec4899 100%);
-  box-shadow: 0 5px 14px rgba(109, 40, 217, 0.36);
-  transition: transform 0.3s cubic-bezier(0.34, 1.35, 0.64, 1);
-  pointer-events: none;
-}
-
-.gcome-mdate-btn {
-  position: relative;
-  z-index: 1;
-  border: 0;
-  background: transparent;
-  padding: 6px 6px;
-  border-radius: 999px;
+.gcome-raw-date-btn {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 4px;
-  font-size: 11.5px;
+  border: 0;
+  background: transparent;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
   font-weight: 800;
-  color: #475569;
+  color: var(--app-text-muted, #64748b);
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.2s ease;
+  transition: all 0.18s ease;
 }
 
-.gcome-mdate-btn.is-active {
+.gcome-raw-date-btn.is-active {
+  background: linear-gradient(135deg, #6d28d9 0%, #a855f7 60%, #ec4899 100%);
   color: #ffffff;
+  box-shadow: 0 5px 14px rgba(109, 40, 217, 0.32);
 }
 
-html.dark .gcome-mdate-btn,
-.dark .gcome-mdate-btn {
-  color: #cbd5e1;
+html.dark .gcome-raw-date-btn,
+.dark .gcome-raw-date-btn {
+  color: #94a3b8;
 }
-html.dark .gcome-mdate-btn.is-active,
-.dark .gcome-mdate-btn.is-active {
+
+html.dark .gcome-raw-date-btn.is-active,
+.dark .gcome-raw-date-btn.is-active {
   color: #ffffff;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.52);
 }
 
 .gcome-mcustom-dates {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  padding: 0 14px 8px;
 }
 
 .gcome-mcustom-dates input {
@@ -8204,22 +8047,23 @@ html.dark .gcome-mcustom-dates input,
   border-color: rgba(168, 85, 247, 0.45);
 }
 
-/* Full-Bleed Edge-to-Edge Canvas Taking Full Stage */
-.gcome-mchart-canvas-wrap {
+/* Full Edge-to-Edge SVG Graph Canvas (Zero Card / Zero Box) */
+.gcome-raw-canvas {
   position: relative;
-  margin: 4px -16px 0;
-  height: 244px;
+  width: 100%;
+  height: 204px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
   overflow: hidden;
   touch-action: pan-y;
-  background: linear-gradient(180deg, rgba(139, 92, 246, 0.03) 0%, rgba(139, 92, 246, 0.08) 100%);
-  border-top: 1px solid rgba(139, 92, 246, 0.12);
-  border-bottom: 1px solid rgba(139, 92, 246, 0.12);
 }
 
-html.dark .gcome-mchart-canvas-wrap,
-.dark .gcome-mchart-canvas-wrap {
-  background: linear-gradient(180deg, rgba(2, 6, 23, 0.35) 0%, rgba(15, 23, 42, 0.72) 100%);
-  border-color: rgba(168, 85, 247, 0.25);
+@media (max-width: 640px) {
+  .gcome-raw-canvas {
+    height: 186px;
+  }
 }
 
 .gcome-mchart-svg {
@@ -8229,7 +8073,7 @@ html.dark .gcome-mchart-canvas-wrap,
 }
 
 .gcome-grid-line {
-  stroke: rgba(148, 163, 184, 0.18);
+  stroke: rgba(148, 163, 184, 0.16);
   stroke-dasharray: 3 5;
   stroke-width: 1;
 }
@@ -8237,18 +8081,6 @@ html.dark .gcome-mchart-canvas-wrap,
 html.dark .gcome-grid-line,
 .dark .gcome-grid-line {
   stroke: rgba(148, 163, 184, 0.14);
-}
-
-.gcome-mchart-ylabel {
-  fill: rgba(100, 116, 139, 0.78);
-  font-size: 9.5px;
-  font-weight: 800;
-  font-family: inherit;
-}
-
-html.dark .gcome-mchart-ylabel,
-.dark .gcome-mchart-ylabel {
-  fill: rgba(148, 163, 184, 0.72);
 }
 
 .gcome-axis-label {
@@ -8269,12 +8101,6 @@ html.dark .gcome-axis-label,
 
 .gcome-area-fade {
   animation: gcomeAreaFade 1.1s ease-out forwards;
-}
-
-.gcome-bar-rise {
-  transform-box: fill-box;
-  transform-origin: bottom;
-  animation: gcomeBarRise 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .gcome-live-dot-core {
@@ -8318,12 +8144,12 @@ html.dark .gcome-axis-label,
   top: 8px;
   transform: translateX(-50%);
   z-index: 5;
-  min-width: 148px;
-  padding: 8px 10px;
-  border-radius: 13px;
+  min-width: 118px;
+  padding: 7px 10px;
+  border-radius: 12px;
   background: rgba(15, 23, 42, 0.92);
   border: 1px solid rgba(192, 132, 252, 0.55);
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.45), 0 0 18px rgba(168, 85, 247, 0.35);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.45), 0 0 16px rgba(168, 85, 247, 0.35);
   color: #f8fafc;
   pointer-events: none;
   backdrop-filter: blur(10px);
@@ -8333,9 +8159,7 @@ html.dark .gcome-axis-label,
   font-size: 10px;
   font-weight: 800;
   color: #c4b5fd;
-  margin-bottom: 4px;
-  border-bottom: 1px dashed rgba(148, 163, 184, 0.25);
-  padding-bottom: 3px;
+  margin-bottom: 3px;
 }
 
 .gcome-tt-row {
@@ -8343,253 +8167,11 @@ html.dark .gcome-axis-label,
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  font-size: 11px;
-  margin-top: 2px;
-}
-
-.gcome-tt-row.is-primary strong { color: #f472b6; }
-.gcome-tt-row.is-compare strong { color: #67e8f9; }
-.gcome-tt-row.is-orders strong { color: #6ee7b7; }
-
-.gcome-mchart-zero-hint {
-  position: absolute;
-  left: 50%;
-  bottom: 34px;
-  transform: translateX(-50%);
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgba(124, 58, 237, 0.1);
-  border: 1px dashed rgba(124, 58, 237, 0.28);
-  font-size: 11px;
-  font-weight: 700;
-  color: #6d28d9;
-  white-space: nowrap;
-  max-width: calc(100% - 24px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  pointer-events: none;
-}
-
-html.dark .gcome-mchart-zero-hint,
-.dark .gcome-mchart-zero-hint {
-  background: rgba(139, 92, 246, 0.2);
-  border-color: rgba(192, 132, 252, 0.42);
-  color: #e9d5ff;
-}
-
-/* Footer: iOS Slide Compare Switch + Horizontal Product Slide Carousel */
-.gcome-mchart-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  margin-top: 11px;
-  min-width: 0;
-}
-
-.gcome-mcompare-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.gcome-mslide-compare-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid rgba(139, 92, 246, 0.25);
-  background: rgba(139, 92, 246, 0.08);
-  color: #5b21b6;
-  border-radius: 999px;
-  padding: 4px 11px 4px 5px;
   font-size: 11.5px;
-  font-weight: 800;
-  cursor: pointer;
-  transition: all 0.2s ease;
 }
 
-.gcome-mslide-compare-toggle.is-on {
-  background: rgba(6, 182, 212, 0.16);
-  border-color: rgba(6, 182, 212, 0.55);
-  color: #0e7490;
-}
-
-html.dark .gcome-mslide-compare-toggle,
-.dark .gcome-mslide-compare-toggle {
-  background: rgba(139, 92, 246, 0.2);
-  border-color: rgba(168, 85, 247, 0.4);
-  color: #e9d5ff;
-}
-
-html.dark .gcome-mslide-compare-toggle.is-on,
-.dark .gcome-mslide-compare-toggle.is-on {
-  background: rgba(34, 211, 238, 0.22);
-  border-color: rgba(34, 211, 238, 0.65);
-  color: #67e8f9;
-}
-
-.gcome-mswitch-track {
-  position: relative;
-  width: 34px;
-  height: 20px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.45);
-  transition: background 0.22s ease;
-  flex-shrink: 0;
-}
-
-.gcome-mslide-compare-toggle.is-on .gcome-mswitch-track {
-  background: linear-gradient(135deg, #06b6d4, #8b5cf6);
-  box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
-}
-
-.gcome-mswitch-knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.3);
-  transition: transform 0.24s cubic-bezier(0.34, 1.5, 0.64, 1);
-}
-
-.gcome-mslide-compare-toggle.is-on .gcome-mswitch-knob {
-  transform: translateX(14px);
-}
-
-.gcome-mprev-chip {
-  border: 1px solid rgba(148, 163, 184, 0.32);
-  background: transparent;
-  color: #64748b;
-  border-radius: 999px;
-  padding: 5px 11px;
-  font-size: 11.5px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.gcome-mprev-chip.is-active {
-  background: rgba(6, 182, 212, 0.14);
-  border-color: rgba(6, 182, 212, 0.5);
-  color: #0e7490;
-}
-
-html.dark .gcome-mprev-chip,
-.dark .gcome-mprev-chip {
-  color: #94a3b8;
-  border-color: rgba(148, 163, 184, 0.28);
-}
-
-html.dark .gcome-mprev-chip.is-active,
-.dark .gcome-mprev-chip.is-active {
-  background: rgba(34, 211, 238, 0.2);
-  border-color: rgba(34, 211, 238, 0.6);
-  color: #67e8f9;
-}
-
-.gcome-mproducts-slider {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  scroll-snap-type: x proximity;
-  -webkit-overflow-scrolling: touch;
-  padding: 2px 0;
-}
-
-.gcome-mproducts-slider::-webkit-scrollbar {
-  display: none;
-}
-
-.gcome-mprod-pill {
-  flex: 0 0 auto;
-  scroll-snap-align: start;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 33px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  background: var(--app-surface, #ffffff);
-  color: var(--app-text, #1e293b);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-
-.gcome-mprod-pill small {
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.18);
-  font-size: 10.5px;
-  font-weight: 800;
-}
-
-.gcome-mprod-pill.is-a {
-  background: linear-gradient(135deg, #6d28d9 0%, #a855f7 100%);
-  border-color: transparent;
-  color: #ffffff;
-  box-shadow: 0 6px 14px rgba(109, 40, 217, 0.34);
-}
-
-.gcome-mprod-pill.is-a small {
-  background: rgba(255, 255, 255, 0.24);
-  color: #ffffff;
-}
-
-.gcome-mprod-pill.is-b {
-  background: linear-gradient(135deg, #0891b2 0%, #22d3ee 100%);
-  border-color: transparent;
-  color: #ffffff;
-  box-shadow: 0 6px 14px rgba(6, 182, 212, 0.34);
-}
-
-.gcome-mprod-pill.is-b small {
-  background: rgba(255, 255, 255, 0.24);
-  color: #ffffff;
-}
-
-.gcome-mprod-badge {
-  width: 17px;
-  height: 17px;
-  border-radius: 50%;
-  font-size: 10px;
-  font-weight: 900;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.26);
-  color: #ffffff;
-}
-
-html.dark .gcome-mprod-pill,
-.dark .gcome-mprod-pill {
-  background: rgba(15, 23, 42, 0.84);
-  border-color: rgba(168, 85, 247, 0.32);
-  color: #e2e8f0;
-}
-
-html.dark .gcome-mprod-pill small,
-.dark .gcome-mprod-pill small {
-  background: rgba(148, 163, 184, 0.22);
-  color: #cbd5e1;
-}
-
-@media (max-width: 640px) {
-  .gcome-mchart-shell {
-    padding: 13px 12px 12px;
-    border-radius: 22px;
-  }
-  .gcome-mchart-canvas-wrap {
-    margin: 4px -12px 0;
-    height: 220px;
-  }
+.gcome-tt-row.is-primary strong {
+  color: #f472b6;
 }
 
 

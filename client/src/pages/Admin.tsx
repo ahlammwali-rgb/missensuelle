@@ -268,7 +268,7 @@ function AdminPageContent() {
     }
   }, [isProfileModalOpen]);
   const ordersQuery = trpc.admin.orders.useQuery(undefined, { refetchInterval: 15000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false });
-  const visitsQuery = trpc.admin.siteVisits.useQuery(undefined, { enabled: section === "dashboard", refetchInterval: 30000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false });
+  const visitsQuery = trpc.admin.siteVisits.useQuery(undefined, { enabled: section === "dashboard", refetchInterval: 15000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false });
   const abandonedQuery = trpc.admin.abandonedOrders.useQuery(undefined, { refetchInterval: 15000, refetchIntervalInBackground: false, refetchOnWindowFocus: true, retry: false });
   const utils = trpc.useUtils();
   const updateOrderStatus = trpc.admin.updateOrderStatus.useMutation();
