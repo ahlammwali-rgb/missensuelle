@@ -16,6 +16,7 @@ import {
 import { getServerPixelConfig } from "../persistentStore";
 import { syncAllCarrierDeliveries } from "../carrierSync";
 import { recordEcoTrackWebhookStatus } from "../ecotrackDelivery";
+import { ensureVisitStoreReady, recordSiteVisit } from "../siteVisits";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { publicTrackingScript } from "./siteTracking";
@@ -38,6 +39,36 @@ async function startServer() {
   app.get(/^\/tracking\/bootstrap\.[a-f0-9]{16}\.js$/, sendLiveBootstrap);
   registerOAuthRoutes(app);
   registerCheckoutHttpRoutes(app);
+  app.post("/api/analytics/visit", async (req, res) => {
+    try {
+      const body = (req.body && typeof req.body === "object" ? req.body : {}) as Record<string, unknown>;
+      const xForwardedFor = req.headers["x-forwarded-for"];
+      const ip =
+        typeof xForwardedFor === "string"
+          ? xForwardedFor.split(",")[0]?.trim()
+          : Array.isArray(xForwardedFor)
+          ? xForwardedFor[0]
+          : req.socket?.remoteAddress;
+      const rawSource = typeof body.source === "string" ? body.source : "direct";
+      const source =
+        rawSource === "facebook" || rawSource === "tiktok" || rawSource === "google" || rawSource === "direct" || rawSource === "other"
+          ? rawSource
+          : "direct";
+      const result = await recordSiteVisit({
+        productId: typeof body.productId === "string" ? body.productId.slice(0, 80) : undefined,
+        productName: typeof body.productName === "string" ? body.productName.slice(0, 140) : undefined,
+        slug: typeof body.slug === "string" ? body.slug.slice(0, 120) : undefined,
+        path: typeof body.path === "string" ? body.path.slice(0, 200) : "/",
+        source,
+        visitorId: typeof body.visitorId === "string" ? body.visitorId.slice(0, 64) : undefined,
+        ip,
+        userAgent: typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : undefined,
+      });
+      return res.status(202).json(result);
+    } catch {
+      return res.status(200).json({ recorded: false });
+    }
+  });
   app.get("/api/ecotrack/webhook", (_req, res) => {
     res.json({ ok: true, service: "ecotrack-webhook" });
   });
@@ -91,6 +122,7 @@ async function startServer() {
   server.listen(port, "0.0.0.0", () => {
     console.log(`Server listening on port ${port}`);
     startGoogleSheetAutoSync();
+    setTimeout(() => void ensureVisitStoreReady().catch(() => {}), 4_000).unref();
     const runCarrierAutoSync = async () => {
       try {
         await syncAllCarrierDeliveries({ includeEcom: true, includeEcoTrack: true });

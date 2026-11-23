@@ -1,4 +1,5 @@
 import { sitePixelConfig, type PublicPixelConfig } from "@shared/site-pixels";
+import { trackSiteVisit } from "./visit-tracker";
 
 export type PixelConfig = PublicPixelConfig;
 type PixelEvent = "ViewContent" | "InitiateCheckout" | "Purchase" | "AddToCart";
@@ -280,6 +281,17 @@ export function trackPixelEvent(name: PixelEvent, data: Record<string, unknown> 
       win.ttq?.track?.("CompletePayment", tiktokPayload);
       win.ttq?.track?.("PlaceAnOrder", tiktokPayload);
       win.ttq?.track?.("SubmitForm", tiktokPayload);
+    }
+  }
+  if (name === "ViewContent") {
+    const contentIds = Array.isArray(data.content_ids) ? data.content_ids : [];
+    const prodId = String(data.content_id ?? contentIds[0] ?? "").trim();
+    const prodName = String(data.content_name ?? "").trim();
+    if (prodId) {
+      trackSiteVisit({
+        productId: prodId,
+        productName: prodName || prodId,
+      });
     }
   }
   win.__missPixelEvents = [...(win.__missPixelEvents ?? []), { name, at: new Date().toISOString() }].slice(-10);

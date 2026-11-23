@@ -95,6 +95,7 @@ import {
   saveRuntimeGeminiKey,
 } from "./aiLanding";
 import { reconcileCarrierBatchOrders, syncAllCarrierDeliveries } from "./carrierSync";
+import { getSiteVisitAnalytics } from "./siteVisits";
 import { z } from "zod";
 
 function isOwnerUser(user: { openId?: string | null; loginMethod?: string | null } | null | undefined): boolean {
@@ -303,6 +304,7 @@ export const appRouter = router({
         activityLogs: getStaffActivityLogs(800),
       };
     }),
+    siteVisits: adminProcedure.query(() => getSiteVisitAnalytics()),
     staffUpsert: adminProcedure
       .input(staffMemberSchema)
       .mutation(async ({ ctx, input }) => {

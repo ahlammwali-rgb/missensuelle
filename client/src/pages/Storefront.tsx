@@ -6,6 +6,7 @@ import { CartDrawer, ScrollReveal, StoreFooter, StoreHeader, useLanguage } from 
 import { categories, formatDZD, getCatalogProducts, getProduct, isCatalogSyncDone, darkHeroImage, beautyImage, products, type CartLine, type CategoryId, type Order, type Product, wilayas } from "@/lib/store-data";
 import { abayaCommunesByWilaya, abayaWilayas } from "@/lib/abaya-communes";
 import { trackPixelEvent } from "@/lib/tracking";
+import { trackSiteVisit } from "@/lib/visit-tracker";
 import { trpc } from "@/lib/trpc";
 import { shippingFeeFor } from "@shared/shipping";
 import { EmeraldOrder } from "@/components/AbayaOrder";
@@ -445,7 +446,23 @@ function ProductPage({ onAdd, slugOverride }: { onAdd: (product: typeof products
     });
     return () => window.cancelAnimationFrame(raf);
   }, [slug, product?.id]);
-  useEffect(() => { if (product) trackPixelEvent("ViewContent", { content_type: "product", content_id: product.id, content_ids: [product.id], content_name: product.name, value: product.price, currency: "DZD" }); }, [product?.id]);
+  useEffect(() => {
+    if (product) {
+      trackSiteVisit({
+        productId: product.id,
+        productName: product.name,
+        slug: product.slug,
+      });
+      trackPixelEvent("ViewContent", {
+        content_type: "product",
+        content_id: product.id,
+        content_ids: [product.id],
+        content_name: product.name,
+        value: product.price,
+        currency: "DZD",
+      });
+    }
+  }, [product?.id]);
   useEffect(() => { document.body.classList.toggle("vest-experience", Boolean(isVest)); return () => document.body.classList.remove("vest-experience"); }, [isVest]);
   if (!product && !syncDone) return <LandingFallback />;
   if (!product) return <div className="not-found-inline"><h1>Cette pièce a disparu.</h1><Link href="/catalogue" className="button button-dark">Retour à la boutique</Link></div>;
@@ -670,6 +687,16 @@ function RouteContent({ onAdd, cart, onClear }: { onAdd: (product: typeof produc
   const [pyjama] = useRoute("/pyjama");
   const [pyjamaEte] = useRoute("/pyjama-ete");
   const [pyjamaSensuelle] = useRoute("/pyjama-sensuelle");
+
+  useEffect(() => {
+    if (home) {
+      trackSiteVisit({ productId: "__home__", productName: "Accueil Boutique", path: "/" });
+    } else if (catalogue) {
+      trackSiteVisit({ productId: "__catalogue__", productName: "Page Catalogue", path: "/catalogue" });
+    } else if (checkout) {
+      trackSiteVisit({ productId: "__checkout__", productName: "Page Commande / Panier", path: "/commande" });
+    }
+  }, [home, catalogue, checkout, location]);
 
   if (catalogue) return <CataloguePage onAdd={onAdd} />;
   if (product || produits || productEn) return <ProductPage onAdd={onAdd} />;

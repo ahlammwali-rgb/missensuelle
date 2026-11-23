@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 import { formatDZD, getCatalogProducts, type Order, type OrderStatus } from "@/lib/store-data";
 import { formatOrderDate, getOrderStats, parseOrderDate } from "@/lib/admin-orders";
+import type { VisitAnalyticsData } from "@shared/siteVisits";
+import { VisitsAnalyticsChart } from "@/components/VisitsAnalyticsChart";
 import {
   GcomeKpiBellIcon,
   GcomeKpiChartIcon,
@@ -38,6 +40,7 @@ import {
 
 type Props = {
   orders: Order[];
+  allOrders?: Order[];
   filtered: Order[];
   activeStatus: "all" | OrderStatus;
   setActiveStatus: (value: "all" | OrderStatus) => void;
@@ -59,6 +62,10 @@ type Props = {
   onSetCarrier?: (id: string, carrier: "ecom" | "ecotrack") => void;
   heroBanner?: ReactNode;
   stockPanel: ReactNode;
+  visitAnalytics?: VisitAnalyticsData;
+  visitAnalyticsLoading?: boolean;
+  visitAnalyticsFetching?: boolean;
+  onRefreshVisits?: () => void;
 };
 
 const activeDashboardStatuses: OrderStatus[] = ["nouvelle", "confirmee", "reportee", "ne_repond_pas", "annulee"];
@@ -154,6 +161,7 @@ function KpiSparkline({
 
 export function AdminDashboard({
   orders,
+  allOrders,
   filtered,
   activeStatus,
   setActiveStatus,
@@ -175,6 +183,10 @@ export function AdminDashboard({
   onSetCarrier,
   heroBanner,
   stockPanel,
+  visitAnalytics,
+  visitAnalyticsLoading,
+  visitAnalyticsFetching,
+  onRefreshVisits,
 }: Props) {
   const stats = useMemo(() => getOrderStats(orders), [orders]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -259,6 +271,15 @@ export function AdminDashboard({
 
   return (
     <div className="admin-app-dashboard">
+      {/* ===== VISITES SITE & PRODUITS WAW (AVANT LES 4 BLOCS) ===== */}
+      <VisitsAnalyticsChart
+        data={visitAnalytics}
+        isLoading={visitAnalyticsLoading}
+        isRefreshing={visitAnalyticsFetching}
+        onRefresh={onRefreshVisits}
+        orders={allOrders ?? orders}
+      />
+
       {/* ===== KPI CARDS GCOME ===== */}
       <section className="app-kpi-grid">
         <div className="app-kpi-card kpi-gradient-purple">
