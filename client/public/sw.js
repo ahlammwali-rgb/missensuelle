@@ -1,5 +1,5 @@
-// Miss Sensuelle Admin Service Worker v6 (Web Push + Deep-Link Routing)
-const CACHE_NAME = "ms-admin-v6";
+// Miss Sensuelle Admin Service Worker v7 (Web Push + Deep-Link Routing)
+const CACHE_NAME = "ms-admin-v7";
 const PRECACHE_URLS = [
   "/admin",
   "/manifest.json",

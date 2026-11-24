@@ -96,6 +96,38 @@ import {
 } from "./aiLanding";
 import { reconcileCarrierBatchOrders, syncAllCarrierDeliveries } from "./carrierSync";
 import { getSiteVisitAnalytics } from "./siteVisits";
+import {
+  financeAdSpendManualSchema,
+  financeCampaignMappingSchema,
+  financeExchangeRateInputSchema,
+  financeExpenseInputSchema,
+  financeLotInputSchema,
+  financeSettingsPatchSchema,
+} from "../shared/finance";
+import { importAdSpendCsv, syncConfiguredAdPlatforms } from "./adPlatforms";
+import {
+  askFinanceAiCopilot,
+  generateFinanceAiBriefing,
+  suggestCampaignMappingsWithAi,
+} from "./financeAi";
+import { buildFinanceOverviewForRequest } from "./financeOverviewService";
+import {
+  clearFinanceAdCredentials,
+  deleteFinanceAdSpend,
+  deleteFinanceExchangeRate,
+  deleteFinanceExpense,
+  deleteFinanceLot,
+  getFinanceStateSnapshot,
+  getMergedCatalogRefs,
+  saveFinanceAdCredentials,
+  saveFinanceCampaignMapping,
+  setOrderFinanceOverride,
+  updateFinanceSettings,
+  upsertFinanceAdSpendManual,
+  upsertFinanceExchangeRate,
+  upsertFinanceExpense,
+  upsertFinanceLot,
+} from "./financeStore";
 import { z } from "zod";
 
 function isOwnerUser(user: { openId?: string | null; loginMethod?: string | null } | null | undefined): boolean {
@@ -135,6 +167,16 @@ async function ecomGuard<T>(fn: () => Promise<T>): Promise<T> {
     throw error;
   }
 }
+
+const ownerFinanceProcedure = adminProcedure.use(({ ctx, next }) => {
+  if (!isOwnerUser(ctx.user)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Seule la propriétaire peut accéder au module Finance IA.",
+    });
+  }
+  return next({ ctx });
+});
 
 export const appRouter = router({
   system: systemRouter,
@@ -751,6 +793,172 @@ export const appRouter = router({
       .input(z.object({ url: z.string().optional(), force: z.boolean().optional() }).optional())
       .mutation(async ({ input }) => {
         return await syncGoogleSheetOrders(input?.url, input?.force ?? true);
+      }),
+  }),
+  finance: router({
+    catalogOptions: ownerFinanceProcedure.query(async () => {
+      await getFinanceStateSnapshot();
+      return getMergedCatalogRefs();
+    }),
+    overview: ownerFinanceProcedure
+      .input(
+        z
+          .object({
+            viewMode: z.enum(["cohort", "cashflow"]).optional(),
+            startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+            endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+            refreshCarriers: z.boolean().optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input }) => {
+        return await buildFinanceOverviewForRequest(input);
+      }),
+    upsertLot: ownerFinanceProcedure.input(financeLotInputSchema).mutation(async ({ input }) => {
+      return await upsertFinanceLot(input);
+    }),
+    deleteLot: ownerFinanceProcedure.input(z.object({ id: z.string().min(1) })).mutation(async ({ input }) => {
+      return await deleteFinanceLot(input.id);
+    }),
+    upsertExpense: ownerFinanceProcedure.input(financeExpenseInputSchema).mutation(async ({ input }) => {
+      return await upsertFinanceExpense(input);
+    }),
+    deleteExpense: ownerFinanceProcedure.input(z.object({ id: z.string().min(1) })).mutation(async ({ input }) => {
+      return await deleteFinanceExpense(input.id);
+    }),
+    saveExchangeRate: ownerFinanceProcedure.input(financeExchangeRateInputSchema).mutation(async ({ input }) => {
+      return await upsertFinanceExchangeRate(input);
+    }),
+    deleteExchangeRate: ownerFinanceProcedure.input(z.object({ id: z.string().min(1) })).mutation(async ({ input }) => {
+      return await deleteFinanceExchangeRate(input.id);
+    }),
+    upsertAdSpendManual: ownerFinanceProcedure.input(financeAdSpendManualSchema).mutation(async ({ input }) => {
+      return await upsertFinanceAdSpendManual(input, "manual");
+    }),
+    importAdSpendCsv: ownerFinanceProcedure
+      .input(
+        z.object({
+          platform: z.enum(["meta", "tiktok"]),
+          csvText: z.string().min(10).max(2_000_000),
+          defaultCurrency: z.enum(["USD", "EUR", "DZD"]).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await importAdSpendCsv(input);
+      }),
+    deleteAdSpend: ownerFinanceProcedure.input(z.object({ id: z.string().min(1) })).mutation(async ({ input }) => {
+      return await deleteFinanceAdSpend(input.id);
+    }),
+    saveCampaignMapping: ownerFinanceProcedure.input(financeCampaignMappingSchema).mutation(async ({ input }) => {
+      return await saveFinanceCampaignMapping(input);
+    }),
+    autoMapCampaignsWithAi: ownerFinanceProcedure
+      .input(
+        z.object({
+          unmapped: z.array(
+            z.object({
+              campaignId: z.string(),
+              campaignName: z.string(),
+              platform: z.enum(["meta", "tiktok"]),
+            })
+          ),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await getFinanceStateSnapshot();
+        const catalog = getMergedCatalogRefs();
+        const suggestions = await suggestCampaignMappingsWithAi(input.unmapped, catalog);
+        for (const s of suggestions) {
+          const orig = input.unmapped.find(u => u.campaignId === s.campaignId);
+          if (orig && s.productId) {
+            await saveFinanceCampaignMapping({
+              campaignId: s.campaignId,
+              campaignName: orig.campaignName,
+              platform: orig.platform,
+              productId: s.productId,
+              variantKey: s.variantKey || "",
+              confidence: s.confidence,
+              mappedBy: "ai",
+            });
+          }
+        }
+        return { mappedCount: suggestions.length, suggestions };
+      }),
+    updateSettings: ownerFinanceProcedure.input(financeSettingsPatchSchema).mutation(async ({ input }) => {
+      return await updateFinanceSettings(input);
+    }),
+    saveAdCredentials: ownerFinanceProcedure
+      .input(
+        z.object({
+          platform: z.enum(["meta", "tiktok"]),
+          accountId: z.string().trim().min(1).max(120),
+          accessToken: z.string().trim().max(1000).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await saveFinanceAdCredentials(input);
+      }),
+    clearAdCredentials: ownerFinanceProcedure
+      .input(z.object({ platform: z.enum(["meta", "tiktok"]) }))
+      .mutation(async ({ input }) => {
+        return await clearFinanceAdCredentials(input.platform);
+      }),
+    syncAdsNow: ownerFinanceProcedure
+      .input(
+        z
+          .object({
+            platform: z.enum(["all", "meta", "tiktok"]).optional(),
+            startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+            endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          })
+          .optional()
+      )
+      .mutation(async ({ input }) => {
+        return await syncConfiguredAdPlatforms(input);
+      }),
+    setOrderOverride: ownerFinanceProcedure
+      .input(
+        z.object({
+          orderId: z.string().min(1),
+          unitCostDzd: z.number().min(0).nullable().optional(),
+          lotId: z.string().nullable().optional(),
+          carrierFeeDzd: z.number().min(0).nullable().optional(),
+          packagingDzd: z.number().min(0).nullable().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await setOrderFinanceOverride(input);
+      }),
+    aiBriefing: ownerFinanceProcedure
+      .input(
+        z
+          .object({
+            viewMode: z.enum(["cohort", "cashflow"]).optional(),
+            startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+            endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          })
+          .optional()
+      )
+      .mutation(async ({ input }) => {
+        const overview = await buildFinanceOverviewForRequest(input);
+        return await generateFinanceAiBriefing(overview);
+      }),
+    aiChat: ownerFinanceProcedure
+      .input(
+        z.object({
+          question: z.string().min(1).max(1200),
+          viewMode: z.enum(["cohort", "cashflow"]).optional(),
+          startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const overview = await buildFinanceOverviewForRequest({
+          viewMode: input.viewMode,
+          startDate: input.startDate,
+          endDate: input.endDate,
+        });
+        return await askFinanceAiCopilot(input.question, overview);
       }),
   }),
 });

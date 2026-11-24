@@ -1,6 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { sitePixelConfig, type PublicPixelConfig } from "../shared/site-pixels";
+import {
+  createDefaultPersistedFinanceState,
+  DEFAULT_FINANCE_SETTINGS,
+  type PersistedFinanceState,
+} from "../shared/finance";
 import type {
   AbandonedCheckout,
   CheckoutOrder,
@@ -83,14 +88,34 @@ type PersistedState = {
   catalogProducts?: Record<string, unknown>[];
   pixelConfig?: PublicPixelConfig;
   sentVictoryTags?: string[];
+  financeState?: PersistedFinanceState;
 };
 
 const memoryStaffMembers = new Map<string, StaffMember>();
 let memoryStaffActivityLogs: StaffActivityLog[] = [];
 let memoryCatalogProducts: Record<string, unknown>[] = [];
 let memoryPixelConfig: PublicPixelConfig | null = null;
+let memoryFinanceState: PersistedFinanceState = createDefaultPersistedFinanceState();
 const memorySentVictoryTags = new Set<string>();
 const MAX_SENT_VICTORY_TAGS = 1500;
+
+export function getServerFinanceState(): PersistedFinanceState {
+  return memoryFinanceState;
+}
+
+export function setServerFinanceState(nextState: PersistedFinanceState): PersistedFinanceState {
+  memoryFinanceState = {
+    lots: Array.isArray(nextState.lots) ? nextState.lots : [],
+    expenses: Array.isArray(nextState.expenses) ? nextState.expenses : [],
+    adSpends: Array.isArray(nextState.adSpends) ? nextState.adSpends : [],
+    campaignMappings: nextState.campaignMappings && typeof nextState.campaignMappings === "object" ? nextState.campaignMappings : {},
+    exchangeRates: Array.isArray(nextState.exchangeRates) ? nextState.exchangeRates : [],
+    orderOverrides: nextState.orderOverrides && typeof nextState.orderOverrides === "object" ? nextState.orderOverrides : {},
+    settings: { ...DEFAULT_FINANCE_SETTINGS, ...(nextState.settings || {}) },
+    adCredentials: nextState.adCredentials && typeof nextState.adCredentials === "object" ? nextState.adCredentials : {},
+  };
+  return memoryFinanceState;
+}
 
 export function hasSentVictoryTag(tag: string): boolean {
   const clean = tag.trim();
@@ -527,7 +552,9 @@ async function pushCloudState(state: PersistedState): Promise<void> {
           state.catalogProducts && state.catalogProducts.length > 0
             ? state.catalogProducts
             : existing.state?.catalogProducts ?? memoryCatalogProducts,
+        pixelConfig: state.pixelConfig ?? existing.state?.pixelConfig ?? (memoryPixelConfig ?? undefined),
         sentVictoryTags: finalSentVictoryTags,
+        financeState: state.financeState ?? existing.state?.financeState ?? memoryFinanceState,
       };
 
       writeLocalState(finalState);
@@ -664,6 +691,34 @@ function mergeStateIntoMemory(
     };
   }
 
+  if (source.financeState && typeof source.financeState === "object") {
+    setServerFinanceState({
+      lots: source.financeState.lots?.length ? source.financeState.lots : memoryFinanceState.lots,
+      expenses: source.financeState.expenses?.length ? source.financeState.expenses : memoryFinanceState.expenses,
+      adSpends: source.financeState.adSpends?.length ? source.financeState.adSpends : memoryFinanceState.adSpends,
+      campaignMappings: {
+        ...(source.financeState.campaignMappings || {}),
+        ...(memoryFinanceState.campaignMappings || {}),
+      },
+      exchangeRates: source.financeState.exchangeRates?.length
+        ? source.financeState.exchangeRates
+        : memoryFinanceState.exchangeRates,
+      orderOverrides: {
+        ...(source.financeState.orderOverrides || {}),
+        ...(memoryFinanceState.orderOverrides || {}),
+      },
+      settings: {
+        ...DEFAULT_FINANCE_SETTINGS,
+        ...(source.financeState.settings || {}),
+        ...(memoryFinanceState.settings || {}),
+      },
+      adCredentials: {
+        ...(source.financeState.adCredentials || {}),
+        ...(memoryFinanceState.adCredentials || {}),
+      },
+    });
+  }
+
   const currentCounters = getCounters();
   const maxOrderId = memoryOrders.reduce(
     (max, o) => Math.max(max, (o.dbId ?? 0) + 1),
@@ -707,6 +762,7 @@ export async function ensurePersistentStoreLoaded(
           catalogProducts: memoryCatalogProducts,
           pixelConfig: memoryPixelConfig ?? undefined,
           sentVictoryTags: getSentVictoryTags(),
+          financeState: memoryFinanceState,
         });
       }
     })();
@@ -734,6 +790,7 @@ export function schedulePersistentStoreSave(
     catalogProducts: memoryCatalogProducts,
     pixelConfig: memoryPixelConfig ?? undefined,
     sentVictoryTags: getSentVictoryTags(),
+    financeState: memoryFinanceState,
   };
   writeLocalState(snapshot);
 

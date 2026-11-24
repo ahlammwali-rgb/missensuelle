@@ -15,6 +15,8 @@ import {
 } from "../checkout";
 import { getServerPixelConfig } from "../persistentStore";
 import { syncAllCarrierDeliveries } from "../carrierSync";
+import { syncConfiguredAdPlatforms } from "../adPlatforms";
+import { getFinanceStateSnapshot } from "../financeStore";
 import { recordEcoTrackWebhookStatus } from "../ecotrackDelivery";
 import { ensureVisitStoreReady, recordSiteVisit } from "../siteVisits";
 import { createContext } from "./context";
@@ -132,6 +134,18 @@ async function startServer() {
     };
     setTimeout(() => void runCarrierAutoSync(), 12_000).unref();
     setInterval(() => void runCarrierAutoSync(), 5 * 60 * 1000).unref();
+    const runAdsAutoSync = async () => {
+      try {
+        const state = await getFinanceStateSnapshot();
+        if (state.settings?.autoSyncAdsEnabled) {
+          await syncConfiguredAdPlatforms({ platform: "all" });
+        }
+      } catch {
+        // Ignore background ad API sync error
+      }
+    };
+    setTimeout(() => void runAdsAutoSync(), 45_000).unref();
+    setInterval(() => void runAdsAutoSync(), 2 * 60 * 60 * 1000).unref();
     if (process.env.NODE_ENV === "production") {
       const publicUrl = (process.env.RENDER_EXTERNAL_URL || "https://missensuelle.onrender.com").replace(/\/$/, "");
       setInterval(() => {
