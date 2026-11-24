@@ -396,3 +396,133 @@ export function computeTransferredHistoryAnalytics(
     stages,
   };
 }
+
+export type CarrierHistoryStep = NonNullable<CarrierTrackingSummary["historique"]>[number];
+
+/**
+ * Picks the chronologically newest scan in `historique` regardless of whether
+ * the upstream carrier returned events oldest-first or newest-first.
+ */
+export function getLatestCarrierHistoryStep(
+  trk?: CarrierTrackingSummary | null
+): CarrierHistoryStep | null {
+  const history = Array.isArray(trk?.historique) ? trk.historique : [];
+  if (history.length === 0) return null;
+
+  let bestIdx = history.length - 1;
+  let bestTs: number | null = null;
+  for (let i = 0; i < history.length; i++) {
+    const step = history[i];
+    if (!step) continue;
+    const ts = parseCarrierTimestamp(step.date);
+    if (ts !== null && (bestTs === null || ts >= bestTs)) {
+      bestTs = ts;
+      bestIdx = i;
+    }
+  }
+  return history[bestIdx] ?? history[history.length - 1] ?? null;
+}
+
+export interface TransferredCardStatusBadge {
+  label: string;
+  sub: string;
+  cls: string;
+  cardClass: string;
+  icon: string;
+  isFromHistory: boolean;
+  lastScan: CarrierHistoryStep | null;
+}
+
+/**
+ * Builds the right-side card badge using the latest status from `historique`
+ * while preserving semantic delivery state colors.
+ */
+export function buildTransferredCardStatusBadge(
+  trk?: CarrierTrackingSummary | null,
+  order?: Pick<CheckoutOrder, "isDelivered" | "status"> | null
+): TransferredCardStatusBadge {
+  const lastScan = getLatestCarrierHistoryStep(trk);
+  const effectiveSummary: CarrierTrackingSummary | null = trk
+    ? {
+        ...trk,
+        situation: trk.situation || lastScan?.situation || null,
+      }
+    : lastScan?.situation
+      ? { situation: lastScan.situation }
+      : null;
+
+  const rawCat = classifyCarrierTracking(effectiveSummary);
+  const cat =
+    order?.isDelivered && rawCat === "in_transit" ? "delivered" : rawCat;
+
+  const palette =
+    cat === "delivered"
+      ? {
+          cls: "trans-badge-livre",
+          cardClass: "trans-card-livre",
+          icon: "🟢",
+          fallbackLabel: "Livré",
+          fallbackSub: "Colis remis au client",
+        }
+      : cat === "no_answer"
+        ? {
+            cls: "trans-badge-norepond",
+            cardClass: "trans-card-norepond",
+            icon: "📞",
+            fallbackLabel: "Ne Répond Pas (Livreur)",
+            fallbackSub: "Tentative d'appel livreur",
+          }
+        : cat === "postponed"
+          ? {
+              cls: "trans-badge-reporte",
+              cardClass: "trans-card-reporte",
+              icon: "📅",
+              fallbackLabel: "Reporté",
+              fallbackSub: "Reprogrammé avec le client",
+            }
+          : cat === "returned"
+            ? {
+                cls: "trans-badge-retour",
+                cardClass: "trans-card-retour",
+                icon: "↩️",
+                fallbackLabel: "Retour / Refusé",
+                fallbackSub: "En cours de retour",
+              }
+            : {
+                cls: "trans-badge-encours",
+                cardClass: "trans-card-encours",
+                icon: "🚚",
+                fallbackLabel: "En Transit / Livraison",
+                fallbackSub: "En Préparation / Expédié",
+              };
+
+  const historySituation = lastScan?.situation?.trim();
+  const etaOrSit = trk?.etat_logistique?.trim() || trk?.situation?.trim();
+
+  if (historySituation) {
+    const subParts: string[] = [];
+    if (lastScan?.date?.trim()) subParts.push(lastScan.date.trim());
+    if (lastScan?.ville !== undefined && lastScan?.ville !== null && String(lastScan.ville).trim()) {
+      subParts.push(String(lastScan.ville).trim());
+    }
+    return {
+      label: historySituation,
+      sub: subParts.length > 0 ? subParts.join(" · ") : etaOrSit || palette.fallbackSub,
+      cls: palette.cls,
+      cardClass: palette.cardClass,
+      icon: palette.icon,
+      isFromHistory: true,
+      lastScan,
+    };
+  }
+
+  return {
+    label: etaOrSit || palette.fallbackLabel,
+    sub: trk?.situation?.trim() || trk?.etat_logistique?.trim() || palette.fallbackSub,
+    cls: palette.cls,
+    cardClass: palette.cardClass,
+    icon: palette.icon,
+    isFromHistory: false,
+    lastScan: null,
+  };
+}

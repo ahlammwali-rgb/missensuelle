@@ -424,7 +424,7 @@ export const appRouter = router({
               badge: "/icons/icon-192x192.png",
               tag: `test-order-${Date.now()}`,
               type: "new_order",
-              data: { url: "/admin", sound: "/sounds/shopify-chaching.mp3", type: "new_order" },
+              data: { url: "/admin?section=dashboard", section: "dashboard", sound: "/sounds/shopify-chaching.mp3", type: "new_order" },
             });
           } else if (input.type === "urgent_alert") {
             await sendAdminPushNotification({
@@ -434,7 +434,7 @@ export const appRouter = router({
               badge: "/icons/icon-192x192.png",
               tag: `test-urgent-${Date.now()}`,
               type: "urgent_alert",
-              data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert" },
+              data: { url: "/admin?section=dashboard", section: "dashboard", sound: "/sounds/alert-urgent.wav", type: "urgent_alert" },
             });
           } else if (input.type === "victory") {
             await sendAdminPushNotification({
@@ -444,7 +444,7 @@ export const appRouter = router({
               badge: "/icons/icon-192x192.png",
               tag: `test-victory-${Date.now()}`,
               type: "victory",
-              data: { url: "/admin", sound: "/sounds/victory-delivered.wav", type: "victory" },
+              data: { url: "/admin?section=transferred", section: "transferred", sound: "/sounds/victory-delivered.wav", type: "victory" },
             });
           }
         };

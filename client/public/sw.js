@@ -1,5 +1,5 @@
-// Miss Sensuelle Admin Service Worker v3 (Web Push + Authentic Sounds)
-const CACHE_NAME = "ms-admin-v3";
+// Miss Sensuelle Admin Service Worker v4 (Web Push + Deep-Link Routing)
+const CACHE_NAME = "ms-admin-v4";
 const PRECACHE_URLS = [
   "/admin",
   "/manifest.json",
@@ -69,18 +69,22 @@ self.addEventListener("push", (event) => {
     vibratePattern = [150, 80, 150, 80, 300]; // Victory pulse
   }
 
+  const deepUrl = data.data?.url || data.url || "/admin";
+  const isVictory = data.type === "victory" || data.type === "delivered";
   const options = {
     body: data.body,
     icon: data.icon || "/icons/icon-192x192.png",
     badge: data.badge || "/icons/icon-192x192.png",
     vibrate: vibratePattern,
     tag: data.tag || `ms-${data.type || "notif"}-${Date.now()}`,
-    renotify: true,
+    renotify: !isVictory,
     requireInteraction,
     data: {
-      url: data.url || "/admin",
+      url: deepUrl,
+      orderId: data.data?.orderId || data.orderId || "",
+      section: data.data?.section || data.section || "",
       type: data.type,
-      sound: data.data?.sound || (data.type === "urgent_alert" ? "/sounds/alert-urgent.wav" : data.type === "victory" ? "/sounds/victory-delivered.wav" : "/sounds/shopify-chaching.mp3")
+      sound: data.data?.sound || (data.type === "urgent_alert" ? "/sounds/alert-urgent.wav" : isVictory ? "/sounds/victory-delivered.wav" : "/sounds/shopify-chaching.mp3")
     }
   };
 
@@ -100,7 +104,8 @@ self.addEventListener("push", (event) => {
 // Handle notification click -> open or focus /admin
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) || "/admin";
+  const payload = event.notification.data || {};
+  const targetUrl = payload.url || "/admin";
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
@@ -108,7 +113,7 @@ self.addEventListener("notificationclick", (event) => {
         if (client.url.includes("/admin") && "focus" in client) {
           client.postMessage({
             type: "NOTIFICATION_CLICKED",
-            data: event.notification.data
+            data: { ...payload, url: targetUrl }
           });
           return client.focus();
         }

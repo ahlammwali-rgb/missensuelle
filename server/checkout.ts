@@ -386,7 +386,13 @@ export function updateMemoryOrderStatus(
           badge: "/icons/icon-192x192.png",
           tag: `alert-${found.id}`,
           type: "urgent_alert",
-          data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert" },
+          data: {
+            url: `/admin?section=dashboard&orderId=${encodeURIComponent(found.id)}`,
+            section: "dashboard",
+            orderId: found.id,
+            sound: "/sounds/alert-urgent.wav",
+            type: "urgent_alert",
+          },
         });
       } else if (statusKey === "annulee" && prefs.notifyAnnulee) {
         void sendAdminPushNotification({
@@ -396,7 +402,13 @@ export function updateMemoryOrderStatus(
           badge: "/icons/icon-192x192.png",
           tag: `alert-${found.id}`,
           type: "urgent_alert",
-          data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert" },
+          data: {
+            url: `/admin?section=dashboard&orderId=${encodeURIComponent(found.id)}`,
+            section: "dashboard",
+            orderId: found.id,
+            sound: "/sounds/alert-urgent.wav",
+            type: "urgent_alert",
+          },
         });
       } else if (statusKey === "reportee" && prefs.notifyReportee) {
         void sendAdminPushNotification({
@@ -406,9 +418,18 @@ export function updateMemoryOrderStatus(
           badge: "/icons/icon-192x192.png",
           tag: `alert-${found.id}`,
           type: "urgent_alert",
-          data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert" },
+          data: {
+            url: `/admin?section=dashboard&orderId=${encodeURIComponent(found.id)}`,
+            section: "dashboard",
+            orderId: found.id,
+            sound: "/sounds/alert-urgent.wav",
+            type: "urgent_alert",
+          },
         });
-      } else if ((statusKey === "livre" || statusKey === "livree") && prefs.notifyLivre) {
+      } else if ((statusKey === "livre" || statusKey === "livree") && prefs.notifyLivre && !found.deliveredNotified && !deliveredVictoryLockIds.has(found.id)) {
+        found.deliveredNotified = true;
+        deliveredVictoryLockIds.add(found.id);
+        saveStore();
         void sendAdminPushNotification({
           title: "🎉 COLIS LIVRÉ : Succès !",
           body: `Colis #${found.id} pour ${found.customer} (${found.total.toLocaleString("fr-DZ")} DZD) a été livré ! Encaissement validé.`,
@@ -416,7 +437,14 @@ export function updateMemoryOrderStatus(
           badge: "/icons/icon-192x192.png",
           tag: `victory-${found.id}`,
           type: "victory",
-          data: { url: "/admin", sound: "/sounds/victory-delivered.wav", type: "victory" },
+          data: {
+            url: `/admin?section=transferred&orderId=${encodeURIComponent(found.id)}`,
+            section: "transferred",
+            orderId: found.id,
+            isDelivered: true,
+            sound: "/sounds/victory-delivered.wav",
+            type: "victory",
+          },
         });
       }
     }
@@ -491,6 +519,8 @@ export async function recordOrderInteraction(
   return found;
 }
 
+const deliveredVictoryLockIds = new Set<string>();
+
 export async function markOrderDelivered(
   id: number,
   isDelivered: boolean = true,
@@ -504,14 +534,24 @@ export async function markOrderDelivered(
   found.isDelivered = isDelivered;
   if (isDelivered && !wasDelivered) {
     found.deliveredAt = new Date().toISOString();
-    appendOrderHistory(found, {
-      type: "delivered",
-      actorId: actor?.actorId || "system",
-      actorName: actor?.actorName || "Système / Livraison",
-      summary: `🎉 Colis Livré et encaissé (${found.total.toLocaleString("fr-DZ")} DA)${found.confirmedByName ? ` — Commission validée pour ${found.confirmedByName}` : ""}`,
-    });
+    const hasDeliveredHistory = (found.history ?? []).some(h => h.type === "delivered");
+    const alreadyNotified =
+      Boolean(found.deliveredNotified) ||
+      deliveredVictoryLockIds.has(found.id) ||
+      hasDeliveredHistory;
+    found.deliveredNotified = true;
+    deliveredVictoryLockIds.add(found.id);
+    if (!hasDeliveredHistory) {
+      appendOrderHistory(found, {
+        type: "delivered",
+        actorId: actor?.actorId || "system",
+        actorName: actor?.actorName || "Système / Livraison",
+        summary: `🎉 Colis Livré et encaissé (${found.total.toLocaleString("fr-DZ")} DA)${found.confirmedByName ? ` — Commission validée pour ${found.confirmedByName}` : ""}`,
+      });
+    }
     const prefs = getNotificationPreferences();
-    if (prefs.notifyLivre) {
+    if (prefs.notifyLivre && !alreadyNotified) {
+      const deepUrl = `/admin?section=transferred&orderId=${encodeURIComponent(found.id)}`;
       void sendAdminPushNotification({
         title: "🎉 COLIS LIVRÉ : Succès !",
         body: `Colis #${found.id} pour ${found.customer} (${found.total.toLocaleString("fr-DZ")} DZD) a été livré !`,
@@ -519,7 +559,13 @@ export async function markOrderDelivered(
         badge: "/icons/icon-192x192.png",
         tag: `victory-${found.id}`,
         type: "victory",
-        data: { url: "/admin", sound: "/sounds/victory-delivered.wav", type: "victory" },
+        data: {
+          url: deepUrl,
+          section: "transferred",
+          orderId: found.id,
+          sound: "/sounds/victory-delivered.wav",
+          type: "victory",
+        },
       });
     }
   } else if (!isDelivered) {
@@ -681,7 +727,13 @@ export function startPostponedReminderScheduler(intervalMs = 25000) {
               badge: "/icons/icon-192x192.png",
               tag: `reminder-${order.id}-${targetMs}`,
               type: "urgent_alert",
-              data: { url: "/admin", sound: "/sounds/alert-urgent.wav", type: "urgent_alert", orderId: order.id },
+              data: {
+                url: `/admin?section=dashboard&orderId=${encodeURIComponent(order.id)}`,
+                section: "dashboard",
+                sound: "/sounds/alert-urgent.wav",
+                type: "urgent_alert",
+                orderId: order.id,
+              },
             });
           }
         }
@@ -1226,7 +1278,7 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
         badge: "/icons/icon-192x192.png",
         tag: `order-${number}`,
         type: "new_order",
-        data: { url: "/admin", sound: "/sounds/shopify-chaching.mp3", type: "new_order" },
+        data: { url: `/admin?section=dashboard&orderId=${encodeURIComponent(number)}`, section: "dashboard", orderId: number, sound: "/sounds/shopify-chaching.mp3", type: "new_order" },
       });
     }
     return { orderId, orderNumber: number, total, created: true };
@@ -1290,7 +1342,7 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
         badge: "/icons/icon-192x192.png",
         tag: `order-${number}`,
         type: "new_order",
-        data: { url: "/admin", sound: "/sounds/shopify-chaching.mp3", type: "new_order" },
+        data: { url: `/admin?section=dashboard&orderId=${encodeURIComponent(number)}`, section: "dashboard", orderId: number, sound: "/sounds/shopify-chaching.mp3", type: "new_order" },
       });
     }
     return { orderId, orderNumber: number, total, created: true };

@@ -56,6 +56,7 @@ export async function sendAdminPushNotification(
     badge: payload.badge || "/icons/icon-192x192.png",
     tag: payload.tag || "general",
     type: payload.type || "new_order",
+    url: typeof payload.data?.url === "string" ? payload.data.url : "/admin",
     data: payload.data || { url: "/admin" },
   });
 

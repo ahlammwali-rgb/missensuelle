@@ -103,11 +103,14 @@ export function setServerPixelConfig(config: Partial<PublicPixelConfig>): Public
   return { ...memoryPixelConfig };
 }
 
-const LEGACY_EXTENSION_SHADES = new Set(["نور بليلح غري", "نور بليلج غري"]);
-const FIXED_EXTENSION_SHADE = "أسود بالياج رمادي";
+const EXTENSION_SHADE_ALIASES: Record<string, string> = {
+  "نور بليلح غري": "أسود بالياج رمادي",
+  "نور بليلج غري": "أسود بالياج رمادي",
+  "بني عسلي": "شاتان فاتح",
+};
 
 function fixExtensionShadeName(name: string): string {
-  return LEGACY_EXTENSION_SHADES.has(name.trim()) ? FIXED_EXTENSION_SHADE : name;
+  return EXTENSION_SHADE_ALIASES[name.trim()] ?? name;
 }
 
 function normalizeServerCatalogProducts(productsList: Record<string, unknown>[]): Record<string, unknown>[] {

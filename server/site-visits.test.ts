@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  buildMultiMetricChartSummary,
   buildVisitDashboardSummary,
   getAlgiersDateKey,
   shiftDateKey,
@@ -179,5 +180,76 @@ describe("site visits tracking & analytics aggregation", () => {
     expect(prodVsProdSummary.productRows[0]?.productKey).toBe("p-007");
     expect(prodVsProdSummary.productRows[0]?.orders).toBe(1);
     expect(prodVsProdSummary.productRows[0]?.conversionRate).toBe(25);
+  });
+
+  it("builds multi-metric 4-mode chart summary (views, delivered, transferred, global)", async () => {
+    const tToday = new Date("2026-11-23T14:20:00.000Z"); // 15:20 Algiers
+    const tYesterday = new Date("2026-11-22T10:15:00.000Z"); // 11:15 Algiers
+
+    await recordSiteVisit({
+      productId: "p-007",
+      productName: "Abaya Royal Emerald",
+      path: "/abaya",
+      visitorId: "v-1",
+      userAgent: "Mozilla/5.0",
+      at: tYesterday,
+    });
+    await recordSiteVisit({
+      productId: "p-007",
+      productName: "Abaya Royal Emerald",
+      path: "/abaya",
+      visitorId: "v-2",
+      userAgent: "Mozilla/5.0",
+      at: tToday,
+    });
+
+    const analytics = await getSiteVisitAnalytics();
+    const multiOrders = [
+      {
+        createdAt: "2026-11-23T14:10:00.000Z", // 15h Algiers
+        status: "transferee",
+        carrier: "ecotrack",
+        isDelivered: false,
+        total: 6500,
+      },
+      {
+        createdAt: "2026-11-22T09:00:00.000Z",
+        deliveredAt: "2026-11-23T14:30:00.000Z", // delivered at 15h Algiers today
+        status: "transferee",
+        carrier: "ecotrack",
+        isDelivered: true,
+        total: 8900,
+      },
+    ];
+
+    const todayMulti = buildMultiMetricChartSummary({
+      data: analytics,
+      orders: multiOrders,
+      dateFilter: "today",
+      now: new Date("2026-11-23T16:00:00.000Z"),
+    });
+    expect(todayMulti.hourlyMode).toBe(true);
+    expect(todayMulti.points).toHaveLength(24);
+    expect(todayMulti.totals.views).toBe(1);
+    expect(todayMulti.totals.transferred).toBe(1);
+    expect(todayMulti.totals.delivered).toBe(1);
+    expect(todayMulti.totals.transferredAmount).toBe(6500);
+    expect(todayMulti.totals.deliveredAmount).toBe(8900);
+    expect(todayMulti.points[15]?.views).toBe(1);
+    expect(todayMulti.points[15]?.transferred).toBe(1);
+    expect(todayMulti.points[15]?.delivered).toBe(1);
+
+    const rangeMulti = buildMultiMetricChartSummary({
+      data: analytics,
+      orders: multiOrders,
+      dateFilter: "7d",
+      now: new Date("2026-11-23T16:00:00.000Z"),
+    });
+    expect(rangeMulti.hourlyMode).toBe(false);
+    expect(rangeMulti.points).toHaveLength(7);
+    expect(rangeMulti.totals.views).toBe(2);
+    expect(rangeMulti.totals.transferred).toBe(2);
+    expect(rangeMulti.totals.delivered).toBe(1);
+    expect(rangeMulti.totals.deliveredAmount).toBe(8900);
   });
 });

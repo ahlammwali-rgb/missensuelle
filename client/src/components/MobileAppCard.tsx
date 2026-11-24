@@ -55,7 +55,8 @@ export function showPushNotification(
   title: string,
   body: string,
   tag: string,
-  type: NotificationType = "order"
+  type: NotificationType = "order",
+  extra?: { url?: string; orderId?: string; section?: string }
 ) {
   try {
     if (typeof window === "undefined" || !("Notification" in window)) return;
@@ -73,6 +74,15 @@ export function showPushNotification(
       vibratePattern = [80, 50, 120];
     }
 
+    const defaultSection = type === "delivered" ? "transferred" : type === "abandoned" ? "abandoned" : "dashboard";
+    const section = extra?.section || defaultSection;
+    const orderId = extra?.orderId || undefined;
+    const targetUrl =
+      extra?.url ||
+      (orderId
+        ? `/admin?section=${encodeURIComponent(section)}&orderId=${encodeURIComponent(orderId)}`
+        : `/admin?section=${encodeURIComponent(section)}`);
+
     if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.ready
         .then((reg) => {
@@ -82,9 +92,9 @@ export function showPushNotification(
             badge: "/icons/icon-192x192.png",
             vibrate: vibratePattern,
             tag,
-            renotify: true,
+            renotify: type !== "delivered",
             requireInteraction,
-            data: { url: "/admin" },
+            data: { url: targetUrl, section, orderId, type },
           } as NotificationOptions & { vibrate?: number[]; requireInteraction?: boolean });
         })
         .catch(() => {

@@ -242,6 +242,7 @@ export type CheckoutOrder = {
   confirmedAt?: string;
   isDelivered?: boolean;
   deliveredAt?: string;
+  deliveredNotified?: boolean;
   initialQuantity?: number;
   upsellById?: string;
   upsellByName?: string;

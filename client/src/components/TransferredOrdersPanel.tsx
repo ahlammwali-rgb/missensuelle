@@ -22,11 +22,15 @@ import {
   Package,
   PhoneMissed,
   SlidersHorizontal,
+  MessageCircle,
+  Hash,
 } from "lucide-react";
 import type { CheckoutOrder } from "@shared/checkout";
 import { classifyCarrierTracking, isCarrierTrackingDelivered } from "@shared/carrierStatus";
 import {
+  buildTransferredCardStatusBadge,
   computeTransferredHistoryAnalytics,
+  getLatestCarrierHistoryStep,
   inspectOrderCarrierHistory,
   matchesTransferredFilter,
   parseCarrierTimestamp,
@@ -34,8 +38,16 @@ import {
   type OrderHistoryInspection,
   type TransferredFilterKey,
 } from "@shared/carrierHistory";
-import { formatDZD, type OrderStatus } from "@/lib/store-data";
+import { formatDZD, getCatalogProducts, type OrderStatus } from "@/lib/store-data";
 import { trpc } from "@/lib/trpc";
+
+function getCustomerInitials(name?: string | null): string {
+  const clean = String(name || "").trim();
+  if (!clean) return "CL";
+  const parts = clean.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return clean.slice(0, 2).toUpperCase();
+}
 
 function findTrackingData(
   map: Record<string, TrackingData>,
@@ -72,6 +84,8 @@ interface TransferredOrdersPanelProps {
   notify: (msg: string) => void;
   onUpdateStatus: (id: string, status: OrderStatus) => void;
   onRefreshOrders?: () => void;
+  focusedOrderId?: string | null;
+  onClearFocusedOrder?: () => void;
 }
 
 type TimelineItem = {
@@ -98,6 +112,8 @@ export function TransferredOrdersPanel({
   notify,
   onUpdateStatus,
   onRefreshOrders,
+  focusedOrderId,
+  onClearFocusedOrder,
 }: TransferredOrdersPanelProps) {
   const [search, setSearch] = useState("");
   const [filterSituation, setFilterSituation] = useState<TransferredFilterKey>("all");
@@ -111,6 +127,34 @@ export function TransferredOrdersPanel({
     order: CheckoutOrder;
     tracking?: TrackingData;
   } | null>(null);
+
+  const productThumbMap = useMemo(() => {
+    const map = new Map<string, string>();
+    try {
+      for (const p of getCatalogProducts()) {
+        if (p.id && p.image) map.set(p.id.toLowerCase(), p.image);
+        if (p.name && p.image) map.set(p.name.toLowerCase().trim(), p.image);
+      }
+    } catch {
+      // ignore catalog errors
+    }
+    return map;
+  }, []);
+
+  useEffect(() => {
+    if (!focusedOrderId) return;
+    setFilterSituation("all");
+    setFilterCarrier("all");
+    setSearch("");
+    const timer = window.setTimeout(() => {
+      const safeSelector = `[data-order-id="${CSS.escape(focusedOrderId)}"]`;
+      const el = document.querySelector(safeSelector);
+      if (el instanceof HTMLElement) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 90);
+    return () => window.clearTimeout(timer);
+  }, [focusedOrderId]);
 
   // E-com & EcoTrack status & live refresh mutations
   const utils = trpc.useUtils();
@@ -436,47 +480,30 @@ export function TransferredOrdersPanel({
     notify("Export CSV des commandes transférées téléchargé ✦");
   };
 
-  const getStatusBadge = (trk?: TrackingData | null) => {
-    const cat = classifyCarrierTracking(trk);
-    const situation = trk?.situation;
-    const etatLogistique = trk?.etat_logistique;
-    if (cat === "delivered") {
-      return {
-        label: "Livré",
-        cls: "trans-badge-livre",
-        icon: "🟢",
-        sub: etatLogistique || situation || "Colis remis au client",
-      };
+  const openWhatsApp = (order: CheckoutOrder, trackingCode?: string) => {
+    const clean = String(order.phone || "").replace(/\D/g, "");
+    const intl = clean.startsWith("0") ? `213${clean.slice(1)}` : clean.startsWith("213") ? clean : `213${clean}`;
+    const msg = `Bonjour ${order.customer || ""}, concernant votre commande ${order.id}${trackingCode ? ` (suivi ${trackingCode})` : ""} chez Miss Sensuelle…`;
+    window.open(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+  };
+
+  const resolveProductThumb = (productName?: string): string | null => {
+    const clean = String(productName || "").toLowerCase().trim();
+    if (!clean) return null;
+    if (productThumbMap.has(clean)) return productThumbMap.get(clean) || null;
+    for (const [k, url] of Array.from(productThumbMap.entries())) {
+      if (k.length >= 4 && clean.includes(k)) return url;
     }
-    if (cat === "no_answer") {
-      return {
-        label: "Ne Répond Pas (Livreur)",
-        cls: "trans-badge-norepond",
-        icon: "📞",
-        sub: etatLogistique || situation || "Tentative d'appel livreur",
-      };
-    }
-    if (cat === "postponed") {
-      return {
-        label: "Reporté",
-        cls: "trans-badge-reporte",
-        icon: "📅",
-        sub: etatLogistique || situation || "Reprogrammé avec le client",
-      };
-    }
-    if (cat === "returned") {
-      return {
-        label: "Retour / Refusé",
-        cls: "trans-badge-retour",
-        icon: "↩️",
-        sub: etatLogistique || situation || "En cours de retour",
-      };
-    }
+    return null;
+  };
+
+  const getStatusBadge = (trk?: TrackingData | null, order?: CheckoutOrder) => {
+    const badge = buildTransferredCardStatusBadge(trk, order);
     return {
-      label: "En Transit / Livraison",
-      cls: "trans-badge-encours",
-      icon: "🚚",
-      sub: etatLogistique || situation || "En Préparation / Expédié",
+      ...badge,
+      sub: badge.isFromHistory && badge.lastScan?.date
+        ? `${formatCarrierStepDate(badge.lastScan.date)}${badge.lastScan.ville ? ` · ${badge.lastScan.ville}` : ""}`
+        : badge.sub,
     };
   };
 
@@ -881,101 +908,204 @@ export function TransferredOrdersPanel({
               : (ecomShipments[order.id] || shipments[order.id]);
             const tracking = sh?.tracking?.trim();
             const trk = findTrackingData(trackingMap, tracking);
-            const badge = getStatusBadge(trk);
+            const badge = getStatusBadge(trk, order);
+            const latestScan = badge.lastScan || getLatestCarrierHistoryStep(trk);
+            const thumb = resolveProductThumb(order.product);
+            const isFocused = Boolean(focusedOrderId && focusedOrderId === order.id);
 
             return (
-              <div key={order.id} className="trans-order-card">
-                {/* Card Top */}
+              <div
+                key={order.id}
+                data-order-id={order.id}
+                className={`trans-order-card gcome-trans-card ${badge.cardClass}${isFocused ? " is-focused-order" : ""}`}
+              >
+                {isFocused && (
+                  <div className="trans-focus-banner">
+                    <span>📌 Commande ciblée · Statut actuel : {badge.label}</span>
+                    {onClearFocusedOrder && (
+                      <button
+                        type="button"
+                        onClick={onClearFocusedOrder}
+                        aria-label="Fermer la mise en avant"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Card Top: Carrier & Date on Left + Latest History Status Badge on Right */}
                 <div className="trans-card-header">
                   <div className="trans-card-ids">
-                    <span className="trans-order-id">{order.id}</span>
                     <span className={`trans-carrier-pill${isEcoTrack ? " is-ecotrack" : ""}`}>
                       <Truck size={12} />
                       {isEcoTrack ? ecoCarrierName : "E-com Delivery"}
                     </span>
-                    {tracking && (
-                      <button
-                        type="button"
-                        className="trans-tracking-pill"
-                        onClick={() => copyText(tracking, "N° de tracking", order.id)}
-                        title="Cliquer pour copier le N° de suivi"
-                      >
-                        <span>{tracking}</span>
-                        {copiedId === order.id ? <Check size={12} /> : <Copy size={12} />}
-                      </button>
+                    {order.createdAt && (
+                      <span className="aoc-date">
+                        <Clock size={12} />
+                        {formatCarrierStepDate(order.createdAt)}
+                      </span>
                     )}
                   </div>
 
-                  <div className={`trans-status-badge ${badge.cls}`}>
+                  <div
+                    className={`trans-status-badge ${badge.cls}`}
+                    title={
+                      badge.isFromHistory
+                        ? "Dernier statut de l'historique transporteur"
+                        : "Statut transporteur"
+                    }
+                  >
                     <span className="trans-badge-dot">{badge.icon}</span>
-                    <div>
+                    <div className="trans-badge-copy">
                       <span className="trans-badge-text">{badge.label}</span>
                       <span className="trans-badge-sub">{badge.sub}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Customer & Delivery details */}
-                <div className="trans-card-body">
-                  <div className="trans-info-row">
-                    <div className="trans-customer-box">
-                      <div className="trans-customer-name">{order.customer}</div>
-                      <div className="trans-customer-phone">
-                        <Phone size={13} />
-                        <span>{order.phone}</span>
+                {/* Full-Width Order Code & Copyable Tracking Strip (Dashboard Match) */}
+                <div className="gcome-id-bar trans-id-bar">
+                  <button
+                    type="button"
+                    className="aoc-id-btn"
+                    onClick={() =>
+                      copyText(
+                        tracking || order.id,
+                        tracking ? "N° de tracking" : "Code commande",
+                        order.id
+                      )
+                    }
+                    title={tracking ? "Cliquer pour copier le N° de tracking" : "Cliquer pour copier le code"}
+                  >
+                    <span className="aoc-id-left">
+                      <Hash size={13} className="aoc-id-hash" />
+                      <strong>{order.id}</strong>
+                      {tracking && (
+                        <span className="trans-id-tracking-chip">{tracking}</span>
+                      )}
+                    </span>
+                    <span className="trans-id-copy-state">
+                      {copiedId === order.id ? <Check size={13} /> : <Copy size={13} />}
+                    </span>
+                  </button>
+                </div>
+
+                {/* 2-Column Customer & Call/WhatsApp Split (Dashboard Match) */}
+                <div className="gcome-customer-box">
+                  <div className="gcome-cust-col">
+                    <div className="gcome-initials-avatar">
+                      {getCustomerInitials(order.customer)}
+                    </div>
+                    <div className="trans-cust-copy">
+                      <span className="gcome-cust-eyebrow">Client & Wilaya</span>
+                      <div className="aoc-name">{order.customer}</div>
+                      <div className="trans-destination-line">
+                        <MapPin size={12} className="aoc-pin-icon" />
+                        <span>
+                          {order.wilaya}
+                          {order.commune ? ` — ${order.commune}` : ""}
+                          {order.address ? ` (${order.address})` : ""}
+                        </span>
                       </div>
                     </div>
+                  </div>
 
-                    <div className="trans-price-box">
-                      <div className="trans-price-amount">{formatDZD(order.total)}</div>
-                      {trk?.encaisser ? (
-                        <span className="trans-paid-pill">
-                          <ShieldCheck size={11} /> Encaissé
-                        </span>
-                      ) : isCarrierTrackingDelivered(trk) ? (
-                        <span className="trans-paid-pill">
-                          <ShieldCheck size={11} /> Livré · Non encaissé
-                        </span>
-                      ) : (
-                        <span className="trans-unpaid-pill">
-                          À encaisser
+                  <div className="gcome-contact-col">
+                    <button
+                      type="button"
+                      className="gcome-call-col-btn"
+                      onClick={() => callPhone(order.phone)}
+                      title="Appeler le client"
+                    >
+                      <span className="gcome-call-ico">
+                        <Phone size={13} />
+                      </span>
+                      <span className="gcome-call-meta">
+                        <span className="gcome-deliv-label">Appeler</span>
+                        <span className="aoc-call-num">{order.phone}</span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="gcome-wa-pill"
+                      onClick={() => openWhatsApp(order, tracking)}
+                      title="Contacter sur WhatsApp"
+                    >
+                      <MessageCircle size={13} />
+                      <span>WhatsApp</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Product Box (Dashboard Match) */}
+                <div className="aoc-product-row gcome-product-row">
+                  {thumb ? (
+                    <img
+                      src={thumb}
+                      alt={order.product}
+                      className="gcome-prod-thumb"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="gcome-prod-thumb-fallback">
+                      <Package size={22} />
+                    </div>
+                  )}
+                  <div className="gcome-prod-content">
+                    <div className="aoc-prod-title">{order.product}</div>
+                    <div className="trans-prod-chips">
+                      {order.color && (
+                        <span className="aoc-chip aoc-chip-color">{order.color}</span>
+                      )}
+                      {order.size && (
+                        <span className="aoc-chip aoc-chip-qty">Taille {order.size}</span>
+                      )}
+                      {order.delivery && (
+                        <span className="aoc-chip aoc-chip-qty">
+                          {order.delivery === "office" ? "Stop Desk" : "Domicile"}
                         </span>
                       )}
                     </div>
                   </div>
-
-                  <div className="trans-product-info">
-                    <div className="trans-product-line">
-                      <strong>Produit :</strong> {order.product}
-                      {order.color && <span className="trans-chip-color">{order.color}</span>}
-                      {order.size && <span className="trans-chip-size">{order.size}</span>}
-                    </div>
-
-                    <div className="trans-destination-line">
-                      <MapPin size={13} />
-                      <span>
-                        {order.wilaya} {order.commune ? `— ${order.commune}` : ""}
-                        {order.address ? ` (${order.address})` : ""}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Carrier Latest Log Note if available */}
-                  {trk?.historique && trk.historique.length > 0 && (
-                    <div className="trans-carrier-last-event">
-                      <Clock size={12} />
-                      <span>
-                        Dernier scan : <strong>{trk.historique[trk.historique.length - 1].situation}</strong>
-                        {trk.historique[trk.historique.length - 1].commentaire
-                          ? ` — ${trk.historique[trk.historique.length - 1].commentaire}`
-                          : ""}
-                      </span>
-                    </div>
-                  )}
                 </div>
 
-                {/* Card Actions */}
-                <div className="trans-card-footer">
+                {/* Latest Scan Note if available */}
+                {latestScan && (
+                  <div className="trans-carrier-last-event">
+                    <Clock size={12} />
+                    <span>
+                      Dernier scan : <strong>{latestScan.situation}</strong>
+                      {latestScan.commentaire ? ` — ${latestScan.commentaire}` : ""}
+                    </span>
+                  </div>
+                )}
+
+                {/* Dedicated Total à Encaisser Bar (Dashboard Match) */}
+                <div className="gcome-total-bar trans-total-bar">
+                  <span className="gcome-total-label">
+                    <Banknote size={14} />
+                    TOTAL À ENCAISSER
+                  </span>
+                  <div className="trans-total-right">
+                    <span className="gcome-total-value">{formatDZD(order.total)}</span>
+                    {trk?.encaisser ? (
+                      <span className="trans-paid-pill">
+                        <ShieldCheck size={11} /> Encaissé
+                      </span>
+                    ) : isCarrierTrackingDelivered(trk) || order.isDelivered ? (
+                      <span className="trans-paid-pill is-uncollected">
+                        <ShieldCheck size={11} /> Livré · Non encaissé
+                      </span>
+                    ) : (
+                      <span className="trans-unpaid-pill">À encaisser</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Harmonized Card Actions */}
+                <div className="trans-card-footer gcome-trans-footer">
                   <button
                     type="button"
                     className="trans-act-btn trans-act-call"

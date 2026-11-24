@@ -215,4 +215,68 @@ describe("bidirectional carrier delivery reconciliation", () => {
     const afterCross = refreshed.find(o => o.id === oCrossCarrierAuto.orderNumber)!;
     expect(afterCross.isDelivered).toBe(true);
   });
+
+  it("locks deliveredNotified and prevents duplicate delivered history/reverts on ambiguous carrier payloads", async () => {
+    const created = await submitCheckoutOrder({
+      token: "880e8400-e29b-41d4-a716-446655440099",
+      payload: {
+        source: "abaya",
+        customer: "Nour Test Notif",
+        phone: "0550998877",
+        wilaya: "الجزائر",
+        commune: "باب الزوار",
+        address: "الجزائر",
+        note: "",
+        delivery: "home",
+        items: [{ productId: "p-007", quantity: 1, color: "Emerald", size: "M" }],
+      },
+    });
+
+    await updateMemoryOrderStatus(created.orderId, "transferee", {
+      actorId: "admin",
+      actorName: "Admin",
+    });
+
+    // Mark delivered via markOrderDelivered
+    await markOrderDelivered(created.orderId, true, {
+      actorId: "system",
+      actorName: "DHD / EcoTrack (Auto)",
+    });
+
+    // Toggle false then true, plus call updateMemoryOrderStatus("livre") — history & lock must never duplicate
+    await markOrderDelivered(created.orderId, false);
+    await markOrderDelivered(created.orderId, true, {
+      actorId: "system",
+      actorName: "DHD / EcoTrack (Auto)",
+    });
+    await updateMemoryOrderStatus(created.orderId, "livre", {
+      actorId: "admin",
+      actorName: "Admin",
+    });
+
+    // Ambiguous carrier response must NOT revert auto-delivered status back to false
+    const currentOrders = await listCheckoutOrders();
+    const target = currentOrders.filter(o => o.id === created.orderNumber);
+    const recon = await reconcileCarrierBatchOrders({
+      carrier: "ecotrack",
+      orders: target,
+      shipments: {
+        [created.orderNumber]: { tracking: "DHD_AMBIGUOUS_1" },
+      },
+      trackingMap: {
+        DHD_AMBIGUOUS_1: {
+          situation: "En suivi",
+          encaisser: false,
+          recouvert: false,
+        },
+      },
+      db: null,
+    });
+    expect(recon.revertedCount).toBe(0);
+
+    const after = (await listCheckoutOrders()).find(o => o.id === created.orderNumber)!;
+    expect(after.isDelivered).toBe(true);
+    expect(after.deliveredNotified).toBe(true);
+    expect((after.history ?? []).filter(h => h.type === "delivered")).toHaveLength(1);
+  });
 });

@@ -86,6 +86,10 @@ export async function reconcileCarrierBatchOrders(params: {
         syncedCount++;
       }
     } else if (!deliveredNow && order.isDelivered && wasOrderAutoDelivered(order, carrier)) {
+      const explicitSituation = `${trkData.situation || ""} ${trkData.etat_logistique || ""}`.trim();
+      if (!explicitSituation || /^en suivi$/i.test(explicitSituation)) {
+        continue;
+      }
       await markOrderDelivered(order.dbId, false, {
         actorId: "system",
         actorName: revertActorName,

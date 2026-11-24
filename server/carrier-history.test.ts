@@ -2,13 +2,16 @@ import { describe, expect, it } from "vitest";
 import type { CheckoutOrder } from "../shared/checkout";
 import { buildEcoTrackingItem } from "./ecotrackDelivery";
 import {
+  buildTransferredCardStatusBadge,
   classifyOrderHistoryStage,
   computeTransferredHistoryAnalytics,
+  getLatestCarrierHistoryStep,
   inspectOrderCarrierHistory,
   matchesTransferredFilter,
   parseCarrierTimestamp,
   type OrderHistoryInspection,
 } from "../shared/carrierHistory";
+import { normalizeExtensionShadeName } from "../client/src/lib/store-data";
 
 function makeOrder(id: string, total: number, createdAt = "2026-11-20T10:00:00.000Z"): CheckoutOrder {
   return {
@@ -220,5 +223,35 @@ describe("carrier history stages & indicators", () => {
     expect(built.historique?.[1]?.situation).toContain("injoignable");
     expect(built.situation).toBe("Ne répond pas");
     expect(classifyOrderHistoryStage(built)).toBe("no_answer");
+  });
+
+  it("extracts latest chronological historique scan for right-side card badge and normalizes extension shade rename", () => {
+    const trkReverseChrono = {
+      tracking: "DHD-REV-1",
+      situation: "En cours de traitement",
+      encaisser: true,
+      historique: [
+        { date: "2026-11-24 14:20", ville: "Alger Centre", situation: "Livré au client" },
+        { date: "2026-11-22 09:00", ville: "Hub Blida", situation: "Expédié vers Wilaya" },
+      ],
+    };
+
+    const latest = getLatestCarrierHistoryStep(trkReverseChrono);
+    expect(latest?.situation).toBe("Livré au client");
+    expect(latest?.ville).toBe("Alger Centre");
+
+    const badge = buildTransferredCardStatusBadge(trkReverseChrono, {
+      status: "transferee",
+      isDelivered: true,
+    });
+    expect(badge.isFromHistory).toBe(true);
+    expect(badge.label).toBe("Livré au client");
+    expect(badge.sub).toContain("Alger Centre");
+    expect(badge.cls).toBe("trans-badge-livre");
+    expect(badge.cardClass).toBe("trans-card-livre");
+
+    expect(normalizeExtensionShadeName("بني عسلي")).toBe("شاتان فاتح");
+    expect(normalizeExtensionShadeName("نور بليلح غري")).toBe("أسود بالياج رمادي");
+    expect(normalizeExtensionShadeName("أشقر فاتح")).toBe("أشقر فاتح");
   });
 });

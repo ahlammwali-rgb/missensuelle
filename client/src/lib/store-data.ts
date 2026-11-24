@@ -220,11 +220,11 @@ export const products: Product[] = [
     badge: "Offre 4 700 DA",
     description: "Extensions cheveux naturel 50%, longueur et volume instantanés, pose facile et tenue longue durée.",
     details: ["Cheveux naturels 60%", "Pose facile et rapide", "Volume et longueur immédiats", "Longue durée de vie"],
-    colors: ["أسود طبيعي", "بني غامق", "بني عسلي", "شاتين روكس", "أشقر فاتح", "أسود بالياج رمادي"],
+    colors: ["أسود طبيعي", "بني غامق", "شاتان فاتح", "شاتين روكس", "أشقر فاتح", "أسود بالياج رمادي"],
     variantImages: [
       { name: "أسود طبيعي", image: "/manus-storage/ext-vrait-2.jpg" },
       { name: "بني غامق", image: "/manus-storage/ext-vrait-3.jpg" },
-      { name: "بني عسلي", image: "/manus-storage/ext-vrait-4.jpg" },
+      { name: "شاتان فاتح", image: "/manus-storage/ext-vrait-4.jpg" },
       { name: "شاتين روكس", image: "/manus-storage/ext-vrait-5.jpg" },
       { name: "أشقر فاتح", image: "/manus-storage/ext-vrait-6.jpg" },
       { name: "أسود بالياج رمادي", image: "/manus-storage/ext-vrait-7.jpg" },
@@ -472,11 +472,14 @@ export const getProduct = (slug: string) => {
 
 export const CATALOG_STORAGE_KEY = "miss-sensuelle-catalog";
 
-const LEGACY_EXTENSION_SHADES = new Set(["نور بليلح غري", "نور بليلج غري"]);
-const FIXED_EXTENSION_SHADE = "أسود بالياج رمادي";
+const EXTENSION_SHADE_ALIASES: Record<string, string> = {
+  "نور بليلح غري": "أسود بالياج رمادي",
+  "نور بليلج غري": "أسود بالياج رمادي",
+  "بني عسلي": "شاتان فاتح",
+};
 
 export function normalizeExtensionShadeName(name: string): string {
-  return LEGACY_EXTENSION_SHADES.has(name.trim()) ? FIXED_EXTENSION_SHADE : name;
+  return EXTENSION_SHADE_ALIASES[name.trim()] ?? name;
 }
 
 function migrateExtensionShadeInProduct(product: Product): { product: Product; changed: boolean } {
@@ -633,7 +636,7 @@ export function getProductVariantOptions(product: Product | undefined): ProductV
     return [
       { name: "أسود طبيعي", image: "/manus-storage/ext-m2-v1.jpg" },
       { name: "بني غامق", image: "/manus-storage/ext-m2-v2.jpg" },
-      { name: "بني عسلي", image: "/manus-storage/ext-m2-v3.jpg" },
+      { name: "شاتان فاتح", image: "/manus-storage/ext-m2-v3.jpg" },
       { name: "شاتين روكس", image: "/manus-storage/ext-m2-v4.jpg" },
       { name: "أشقر فاتح", image: "/manus-storage/ext-m2-v5.jpg" },
       { name: "أسود بالياج رمادي", image: "/manus-storage/ext-m2-v6.jpg" },

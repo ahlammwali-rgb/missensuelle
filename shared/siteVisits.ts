@@ -487,3 +487,233 @@ export function buildVisitDashboardSummary(params: {
     rangeLabel,
   };
 }
+
+export type ChartViewMode = "views" | "delivered" | "transferred" | "global";
+
+export interface OrderLikeForMultiChart {
+  createdAt: string;
+  status?: string;
+  carrier?: string | null;
+  isDelivered?: boolean;
+  deliveredAt?: string | null;
+  total?: number;
+}
+
+export interface MultiMetricChartPoint {
+  key: string;
+  label: string;
+  shortLabel: string;
+  views: number;
+  delivered: number;
+  transferred: number;
+  deliveredAmount: number;
+  transferredAmount: number;
+}
+
+export interface MultiMetricChartSummary {
+  points: MultiMetricChartPoint[];
+  hourlyMode: boolean;
+  rangeLabel: string;
+  totals: {
+    views: number;
+    delivered: number;
+    transferred: number;
+    deliveredAmount: number;
+    transferredAmount: number;
+  };
+  deltas: {
+    views: number | null;
+    delivered: number | null;
+    transferred: number | null;
+  };
+}
+
+function calcDeltaPct(current: number, previous: number): number | null {
+  if (previous <= 0) return null;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+}
+
+function formatCompactBucketLabel(dateKey: string): string {
+  const parts = dateKey.split("-");
+  if (parts.length !== 3) return dateKey;
+  return `${parts[2]}/${parts[1]}`;
+}
+
+export function buildMultiMetricChartSummary(params: {
+  data: VisitAnalyticsData | undefined;
+  orders: OrderLikeForMultiChart[];
+  dateFilter: VisitDateFilterKey;
+  selectedProductKey?: string;
+  customFrom?: string;
+  customTo?: string;
+  now?: Date;
+}): MultiMetricChartSummary {
+  const {
+    data,
+    orders,
+    dateFilter,
+    selectedProductKey = "all",
+    customFrom,
+    customTo,
+    now,
+  } = params;
+
+  const daysMap = new Map<string, DailyVisitBucket>();
+  for (const d of data?.days ?? []) {
+    if (d?.date) daysMap.set(d.date, d);
+  }
+  const availableDates = Array.from(daysMap.keys());
+  const todayKey = getAlgiersDateKey(now ?? new Date());
+  const { currentKeys, previousKeys, hourlyMode } = resolveDateRangeKeys({
+    dateFilter,
+    todayKey,
+    availableDates,
+    customFrom,
+    customTo,
+  });
+
+  const currentSet = new Set(currentKeys);
+  const previousSet = new Set(previousKeys);
+
+  // Pre-aggregate transferred & delivered orders by dateKey and hour
+  const transferredByDateHour = new Map<string, { count: number; amount: number }>();
+  const deliveredByDateHour = new Map<string, { count: number; amount: number }>();
+  const transferredByDate = new Map<string, { count: number; amount: number }>();
+  const deliveredByDate = new Map<string, { count: number; amount: number }>();
+
+  for (const order of orders) {
+    const amount = Number(order.total || 0);
+    const isCancelled = order.status === "annulee";
+    const isTransferred =
+      order.status === "transferee" ||
+      (Boolean(order.carrier) && !isCancelled) ||
+      Boolean(order.isDelivered);
+
+    if (isTransferred) {
+      const parsedCreated = parseOrderAlgiersDateAndHour(order.createdAt);
+      if (parsedCreated) {
+        const dAcc = transferredByDate.get(parsedCreated.dateKey) ?? { count: 0, amount: 0 };
+        dAcc.count += 1;
+        dAcc.amount += amount;
+        transferredByDate.set(parsedCreated.dateKey, dAcc);
+
+        const dhKey = `${parsedCreated.dateKey}#${parsedCreated.hour}`;
+        const hAcc = transferredByDateHour.get(dhKey) ?? { count: 0, amount: 0 };
+        hAcc.count += 1;
+        hAcc.amount += amount;
+        transferredByDateHour.set(dhKey, hAcc);
+      }
+    }
+
+    if (order.isDelivered) {
+      const parsedDelivered = parseOrderAlgiersDateAndHour(order.deliveredAt || order.createdAt);
+      if (parsedDelivered) {
+        const dAcc = deliveredByDate.get(parsedDelivered.dateKey) ?? { count: 0, amount: 0 };
+        dAcc.count += 1;
+        dAcc.amount += amount;
+        deliveredByDate.set(parsedDelivered.dateKey, dAcc);
+
+        const dhKey = `${parsedDelivered.dateKey}#${parsedDelivered.hour}`;
+        const hAcc = deliveredByDateHour.get(dhKey) ?? { count: 0, amount: 0 };
+        hAcc.count += 1;
+        hAcc.amount += amount;
+        deliveredByDateHour.set(dhKey, hAcc);
+      }
+    }
+  }
+
+  const points: MultiMetricChartPoint[] = [];
+
+  if (hourlyMode) {
+    const targetDay = currentKeys[0] || todayKey;
+    const dayBucket = daysMap.get(targetDay);
+    for (let hour = 0; hour < 24; hour++) {
+      const hh = String(hour).padStart(2, "0");
+      const dhKey = `${targetDay}#${hour}`;
+      const tr = transferredByDateHour.get(dhKey) ?? { count: 0, amount: 0 };
+      const dl = deliveredByDateHour.get(dhKey) ?? { count: 0, amount: 0 };
+      points.push({
+        key: `${targetDay}T${hh}`,
+        label: `${hh}h00`,
+        shortLabel: hour % 6 === 0 || hour === 23 ? `${hour}h` : "",
+        views: getBucketHourlyForProduct(dayBucket, selectedProductKey, hour),
+        delivered: dl.count,
+        transferred: tr.count,
+        deliveredAmount: dl.amount,
+        transferredAmount: tr.amount,
+      });
+    }
+  } else {
+    const totalLen = currentKeys.length;
+    const step = totalLen <= 8 ? 1 : totalLen <= 16 ? 2 : Math.max(2, Math.ceil(totalLen / 6));
+    currentKeys.forEach((dateKey, idx) => {
+      const dayBucket = daysMap.get(dateKey);
+      const tr = transferredByDate.get(dateKey) ?? { count: 0, amount: 0 };
+      const dl = deliveredByDate.get(dateKey) ?? { count: 0, amount: 0 };
+      const showShort = idx === 0 || idx === totalLen - 1 || idx % step === 0;
+      points.push({
+        key: dateKey,
+        label: formatShortFrDate(dateKey),
+        shortLabel: showShort ? formatCompactBucketLabel(dateKey) : "",
+        views: getBucketViewsForProduct(dayBucket, selectedProductKey),
+        delivered: dl.count,
+        transferred: tr.count,
+        deliveredAmount: dl.amount,
+        transferredAmount: tr.amount,
+      });
+    });
+  }
+
+  let totalViews = 0;
+  let totalDelivered = 0;
+  let totalTransferred = 0;
+  let totalDeliveredAmount = 0;
+  let totalTransferredAmount = 0;
+
+  for (const key of currentKeys) {
+    totalViews += getBucketViewsForProduct(daysMap.get(key), selectedProductKey);
+    const dl = deliveredByDate.get(key);
+    if (dl) {
+      totalDelivered += dl.count;
+      totalDeliveredAmount += dl.amount;
+    }
+    const tr = transferredByDate.get(key);
+    if (tr) {
+      totalTransferred += tr.count;
+      totalTransferredAmount += tr.amount;
+    }
+  }
+
+  let prevViews = 0;
+  let prevDelivered = 0;
+  let prevTransferred = 0;
+  for (const key of previousKeys) {
+    if (currentSet.has(key) && !previousSet.has(key)) continue;
+    prevViews += getBucketViewsForProduct(daysMap.get(key), selectedProductKey);
+    prevDelivered += deliveredByDate.get(key)?.count ?? 0;
+    prevTransferred += transferredByDate.get(key)?.count ?? 0;
+  }
+
+  const rangeLabel =
+    currentKeys.length === 1
+      ? formatShortFrDate(currentKeys[0])
+      : `${formatShortFrDate(currentKeys[0])} → ${formatShortFrDate(currentKeys[currentKeys.length - 1])}`;
+
+  return {
+    points,
+    hourlyMode,
+    rangeLabel,
+    totals: {
+      views: totalViews,
+      delivered: totalDelivered,
+      transferred: totalTransferred,
+      deliveredAmount: totalDeliveredAmount,
+      transferredAmount: totalTransferredAmount,
+    },
+    deltas: {
+      views: calcDeltaPct(totalViews, prevViews),
+      delivered: calcDeltaPct(totalDelivered, prevDelivered),
+      transferred: calcDeltaPct(totalTransferred, prevTransferred),
+    },
+  };
+}

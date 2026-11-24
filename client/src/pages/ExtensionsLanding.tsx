@@ -44,7 +44,7 @@ const DEFAULT_VARIANTS: VariantDef[] = [
     swatchImg: "/manus-storage/ext-vrait-16.jpg",
   },
   {
-    name: "بني عسلي",
+    name: "شاتان فاتح",
     slideImg: "/manus-storage/ext-vrait-4.jpg",
     swatchImg: "/manus-storage/ext-vrait-17.jpg",
   },
