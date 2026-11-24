@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   Bell,
@@ -316,23 +317,13 @@ export function AdminNotificationCenter({
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
-      if (target.closest(".gcome-notif-bell") || target.closest(".gcome-mobile-bell-btn")) return;
-      if (panelRef.current && !panelRef.current.contains(target)) {
-        onClose();
-      }
-    };
     window.addEventListener("keydown", handleKey);
-    document.addEventListener("mousedown", handleClickOutside);
     return () => {
       window.removeEventListener("keydown", handleKey);
-      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const visibleItems = filterMode === "unread" ? items.filter(isUnread) : items;
 
@@ -344,13 +335,20 @@ export function AdminNotificationCenter({
     return <Clock size={16} />;
   };
 
-  return (
-    <div className="gcome-notif-backdrop" role="presentation">
+  return createPortal(
+    <div
+      className="gcome-notif-backdrop"
+      role="presentation"
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div
         ref={panelRef}
         className="gcome-notif-popover"
         role="dialog"
         aria-label="Centre de notifications"
+        onClick={e => e.stopPropagation()}
       >
         <div className="gcome-notif-head">
           <div className="gcome-notif-head-title">
@@ -455,6 +453,7 @@ export function AdminNotificationCenter({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

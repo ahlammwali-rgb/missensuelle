@@ -102,10 +102,29 @@ export async function reconcileCarrierBatchOrders(params: {
   return { syncedCount, revertedCount };
 }
 
+let carrierSyncInFlight: Promise<{ syncedCount: number; revertedCount: number }> | null = null;
+
 /**
  * Full bidirectional reconciliation across E-com Delivery and DHD/EcoTrack.
  */
 export async function syncAllCarrierDeliveries(options?: {
+  includeEcom?: boolean;
+  includeEcoTrack?: boolean;
+  forceRefresh?: boolean;
+}): Promise<{ syncedCount: number; revertedCount: number }> {
+  if (carrierSyncInFlight) {
+    return carrierSyncInFlight;
+  }
+  const task = runSyncAllCarrierDeliveries(options).finally(() => {
+    if (carrierSyncInFlight === task) {
+      carrierSyncInFlight = null;
+    }
+  });
+  carrierSyncInFlight = task;
+  return task;
+}
+
+async function runSyncAllCarrierDeliveries(options?: {
   includeEcom?: boolean;
   includeEcoTrack?: boolean;
   forceRefresh?: boolean;

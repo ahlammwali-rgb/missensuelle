@@ -82,12 +82,37 @@ type PersistedState = {
   staffActivityLogs?: StaffActivityLog[];
   catalogProducts?: Record<string, unknown>[];
   pixelConfig?: PublicPixelConfig;
+  sentVictoryTags?: string[];
 };
 
 const memoryStaffMembers = new Map<string, StaffMember>();
 let memoryStaffActivityLogs: StaffActivityLog[] = [];
 let memoryCatalogProducts: Record<string, unknown>[] = [];
 let memoryPixelConfig: PublicPixelConfig | null = null;
+const memorySentVictoryTags = new Set<string>();
+const MAX_SENT_VICTORY_TAGS = 1500;
+
+export function hasSentVictoryTag(tag: string): boolean {
+  const clean = tag.trim();
+  return clean ? memorySentVictoryTags.has(clean) : false;
+}
+
+export function markSentVictoryTag(tag: string): void {
+  const clean = tag.trim();
+  if (!clean) return;
+  memorySentVictoryTags.add(clean);
+  if (memorySentVictoryTags.size > MAX_SENT_VICTORY_TAGS) {
+    const oldest = Array.from(memorySentVictoryTags).slice(
+      0,
+      memorySentVictoryTags.size - MAX_SENT_VICTORY_TAGS
+    );
+    for (const item of oldest) memorySentVictoryTags.delete(item);
+  }
+}
+
+export function getSentVictoryTags(): string[] {
+  return Array.from(memorySentVictoryTags);
+}
 
 export function getServerPixelConfig(): PublicPixelConfig {
   return memoryPixelConfig ? { ...memoryPixelConfig } : { ...sitePixelConfig };
@@ -427,93 +452,127 @@ let cloudLoadSucceeded = false;
 
 async function pushCloudState(state: PersistedState): Promise<void> {
   if (isTestEnv()) return;
-  try {
-    const existing = await fetchCloudState();
-    // Safety guard: never overwrite an existing non-empty cloud store if initial boot failed to load cloud state,
-    // or if an old/stale container with <50% orders or 0 staff tries to wipe out orders/staff
-    if (
-      existing.state &&
-      ((!cloudLoadSucceeded &&
-        ((existing.state.orders?.length ?? 0) > 0 || (existing.state.staffMembers?.length ?? 0) > 0)) ||
-        ((existing.state.orders?.length ?? 0) >= 50 && state.orders.length < existing.state.orders.length * 0.5) ||
-        ((existing.state.staffMembers?.length ?? 0) > 0 && (state.staffMembers?.length ?? 0) === 0))
-    ) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const existing = await fetchCloudState();
+      // Safety guard: never overwrite an existing non-empty cloud store if initial boot failed to load cloud state,
+      // or if an old/stale container with <50% orders or 0 staff tries to wipe out orders/staff
+      if (
+        existing.state &&
+        ((!cloudLoadSucceeded &&
+          ((existing.state.orders?.length ?? 0) > 0 || (existing.state.staffMembers?.length ?? 0) > 0)) ||
+          ((existing.state.orders?.length ?? 0) >= 50 && state.orders.length < existing.state.orders.length * 0.5) ||
+          ((existing.state.staffMembers?.length ?? 0) > 0 && (state.staffMembers?.length ?? 0) === 0))
+      ) {
+        return;
+      }
+      // In-memory state is authoritative for orders; do not resurrect orders that were deleted
+      const finalOrders = [...state.orders].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+
+      // In-memory state is authoritative for sessions; do not resurrect sessions that were deleted or discarded
+      const finalSessions = state.sessions.filter(
+        s => s && s.tokenHash && s.state !== "discarded" && s.state !== "purged",
+      );
+
+      const mergedSubs = new Map<string, PushSubscriptionRecord>();
+      for (const sub of existing.state?.pushSubscriptions ?? []) {
+        if (sub && sub.endpoint) mergedSubs.set(sub.endpoint, sub);
+      }
+      for (const sub of state.pushSubscriptions ?? []) {
+        if (sub && sub.endpoint) mergedSubs.set(sub.endpoint, sub);
+      }
+      const finalPushSubscriptions = Array.from(mergedSubs.values());
+
+      // Union-merge sentVictoryTags across cloud and memory so a restart/deploy never clears victory locks
+      const mergedVictoryTags = new Set<string>(existing.state?.sentVictoryTags ?? []);
+      for (const tag of state.sentVictoryTags ?? []) {
+        if (tag) mergedVictoryTags.add(tag);
+      }
+      for (const tag of memorySentVictoryTags) {
+        if (tag) mergedVictoryTags.add(tag);
+      }
+      for (const ord of finalOrders) {
+        if (ord?.id && (ord.deliveredNotified || ord.isDelivered || (ord.history ?? []).some(h => h.type === "delivered"))) {
+          mergedVictoryTags.add(`victory-${ord.id}`);
+          ord.deliveredNotified = true;
+        }
+      }
+      const finalSentVictoryTags = Array.from(mergedVictoryTags).slice(-MAX_SENT_VICTORY_TAGS);
+
+      const finalState: PersistedState = {
+        updatedAt: new Date().toISOString(),
+        nextMemoryOrderId: Math.max(
+          state.nextMemoryOrderId,
+          existing.state?.nextMemoryOrderId ?? 1,
+          finalOrders.reduce((max, o) => Math.max(max, (o.dbId ?? 0) + 1), 1),
+        ),
+        nextMemorySessionId: Math.max(
+          state.nextMemorySessionId,
+          existing.state?.nextMemorySessionId ?? 1,
+          finalSessions.reduce((max, s) => Math.max(max, (s.id ?? 0) + 1), 1),
+        ),
+        orders: finalOrders,
+        sessions: finalSessions,
+        pushSubscriptions: finalPushSubscriptions,
+        notificationPreferences:
+          state.notificationPreferences ??
+          existing.state?.notificationPreferences ??
+          memoryNotificationPreferences,
+        staffMembers: state.staffMembers ?? existing.state?.staffMembers ?? getStaffMembers(),
+        staffActivityLogs:
+          state.staffActivityLogs ?? existing.state?.staffActivityLogs ?? memoryStaffActivityLogs,
+        catalogProducts:
+          state.catalogProducts && state.catalogProducts.length > 0
+            ? state.catalogProducts
+            : existing.state?.catalogProducts ?? memoryCatalogProducts,
+        sentVictoryTags: finalSentVictoryTags,
+      };
+
+      writeLocalState(finalState);
+
+      const contentBase64 = Buffer.from(JSON.stringify(finalState, null, 2), "utf8").toString("base64");
+      const body: Record<string, unknown> = {
+        message: `Sync store state (${finalState.orders.length} orders, ${finalState.sessions.length} sessions)`,
+        content: contentBase64,
+      };
+      if (existing.sha) body.sha = existing.sha;
+
+      const putRes = await fetch(CLOUD_API_URL, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${getCloudToken()}`,
+          "User-Agent": "missensuelle-store",
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (putRes.ok) {
+        return;
+      }
+
+      if ((putRes.status === 409 || putRes.status === 422 || putRes.status >= 500) && attempt < 3) {
+        await new Promise(r => setTimeout(r, 700 * attempt));
+        continue;
+      }
+      console.warn(`[PersistentStore] Cloud PUT returned ${putRes.status}`);
       return;
+    } catch {
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 700 * attempt));
+        continue;
+      }
     }
-    // In-memory state is authoritative for orders; do not resurrect orders that were deleted
-    const finalOrders = [...state.orders].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-
-    // In-memory state is authoritative for sessions; do not resurrect sessions that were deleted or discarded
-    // Omit purged or discarded sessions to keep storage clean and lightweight
-    const finalSessions = state.sessions.filter(
-      s => s && s.tokenHash && s.state !== "discarded" && s.state !== "purged",
-    );
-
-    const mergedSubs = new Map<string, PushSubscriptionRecord>();
-    for (const sub of existing.state?.pushSubscriptions ?? []) {
-      if (sub && sub.endpoint) mergedSubs.set(sub.endpoint, sub);
-    }
-    for (const sub of state.pushSubscriptions ?? []) {
-      if (sub && sub.endpoint) mergedSubs.set(sub.endpoint, sub);
-    }
-    const finalPushSubscriptions = Array.from(mergedSubs.values());
-
-    const finalState: PersistedState = {
-      updatedAt: new Date().toISOString(),
-      nextMemoryOrderId: Math.max(
-        state.nextMemoryOrderId,
-        existing.state?.nextMemoryOrderId ?? 1,
-        finalOrders.reduce((max, o) => Math.max(max, (o.dbId ?? 0) + 1), 1),
-      ),
-      nextMemorySessionId: Math.max(
-        state.nextMemorySessionId,
-        existing.state?.nextMemorySessionId ?? 1,
-        finalSessions.reduce((max, s) => Math.max(max, (s.id ?? 0) + 1), 1),
-      ),
-      orders: finalOrders,
-      sessions: finalSessions,
-      pushSubscriptions: finalPushSubscriptions,
-      notificationPreferences:
-        state.notificationPreferences ??
-        existing.state?.notificationPreferences ??
-        memoryNotificationPreferences,
-      staffMembers: state.staffMembers ?? existing.state?.staffMembers ?? getStaffMembers(),
-      staffActivityLogs:
-        state.staffActivityLogs ?? existing.state?.staffActivityLogs ?? memoryStaffActivityLogs,
-      catalogProducts:
-        state.catalogProducts && state.catalogProducts.length > 0
-          ? state.catalogProducts
-          : existing.state?.catalogProducts ?? memoryCatalogProducts,
-    };
-
-    writeLocalState(finalState);
-
-    const contentBase64 = Buffer.from(JSON.stringify(finalState, null, 2), "utf8").toString("base64");
-    const body: Record<string, unknown> = {
-      message: `Sync store state (${finalState.orders.length} orders, ${finalState.sessions.length} sessions)`,
-      content: contentBase64,
-    };
-    if (existing.sha) body.sha = existing.sha;
-
-    await fetch(CLOUD_API_URL, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${getCloudToken()}`,
-        "User-Agent": "missensuelle-store",
-        Accept: "application/vnd.github+json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    // Ignore network error; local state is already written
   }
 }
 
 let loadPromise: Promise<void> | null = null;
-let saveQueue: Promise<void> = Promise.resolve();
+let cloudSaveInFlight: Promise<void> | null = null;
+let pendingCloudSnapshot: PersistedState | null = null;
 
 function mergeStateIntoMemory(
   source: PersistedState,
@@ -524,10 +583,23 @@ function mergeStateIntoMemory(
 ) {
   const existingById = new Map(memoryOrders.map(o => [o.id, o]));
   for (const order of source.orders ?? []) {
-    if (order && order.id && !existingById.has(order.id)) {
-      memoryOrders.push(order);
-      existingById.set(order.id, order);
+    if (order && order.id) {
+      if (
+        order.deliveredNotified ||
+        order.isDelivered ||
+        (order.history ?? []).some(h => h.type === "delivered")
+      ) {
+        markSentVictoryTag(`victory-${order.id}`);
+        order.deliveredNotified = true;
+      }
+      if (!existingById.has(order.id)) {
+        memoryOrders.push(order);
+        existingById.set(order.id, order);
+      }
     }
+  }
+  for (const tag of source.sentVictoryTags ?? []) {
+    if (typeof tag === "string") markSentVictoryTag(tag);
   }
   memoryOrders.sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -634,6 +706,7 @@ export async function ensurePersistentStoreLoaded(
           staffActivityLogs: memoryStaffActivityLogs,
           catalogProducts: memoryCatalogProducts,
           pixelConfig: memoryPixelConfig ?? undefined,
+          sentVictoryTags: getSentVictoryTags(),
         });
       }
     })();
@@ -660,9 +733,26 @@ export function schedulePersistentStoreSave(
     staffActivityLogs: memoryStaffActivityLogs,
     catalogProducts: memoryCatalogProducts,
     pixelConfig: memoryPixelConfig ?? undefined,
+    sentVictoryTags: getSentVictoryTags(),
   };
   writeLocalState(snapshot);
-  saveQueue = saveQueue
-    .then(() => pushCloudState(snapshot))
-    .catch(() => {});
+
+  pendingCloudSnapshot = snapshot;
+  if (cloudSaveInFlight) return;
+
+  const flushCloudQueue = async () => {
+    while (pendingCloudSnapshot) {
+      const next = pendingCloudSnapshot;
+      pendingCloudSnapshot = null;
+      await pushCloudState(next).catch(() => {});
+    }
+  };
+  cloudSaveInFlight = flushCloudQueue().finally(() => {
+    cloudSaveInFlight = null;
+    if (pendingCloudSnapshot) {
+      cloudSaveInFlight = flushCloudQueue().finally(() => {
+        cloudSaveInFlight = null;
+      });
+    }
+  });
 }

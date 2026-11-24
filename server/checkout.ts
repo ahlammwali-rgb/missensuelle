@@ -42,6 +42,8 @@ import {
   schedulePersistentStoreSave,
   getNotificationPreferences,
   getServerCatalogProducts,
+  hasSentVictoryTag,
+  markSentVictoryTag,
   setServerCatalogProducts,
 } from "./persistentStore";
 import { sendAdminPushNotification } from "./webPush";
@@ -426,9 +428,16 @@ export function updateMemoryOrderStatus(
             type: "urgent_alert",
           },
         });
-      } else if ((statusKey === "livre" || statusKey === "livree") && prefs.notifyLivre && !found.deliveredNotified && !deliveredVictoryLockIds.has(found.id)) {
+      } else if (
+        (statusKey === "livre" || statusKey === "livree") &&
+        prefs.notifyLivre &&
+        !found.deliveredNotified &&
+        !deliveredVictoryLockIds.has(found.id) &&
+        !hasSentVictoryTag(`victory-${found.id}`)
+      ) {
         found.deliveredNotified = true;
         deliveredVictoryLockIds.add(found.id);
+        markSentVictoryTag(`victory-${found.id}`);
         saveStore();
         void sendAdminPushNotification({
           title: "🎉 COLIS LIVRÉ : Succès !",
@@ -535,12 +544,15 @@ export async function markOrderDelivered(
   if (isDelivered && !wasDelivered) {
     found.deliveredAt = new Date().toISOString();
     const hasDeliveredHistory = (found.history ?? []).some(h => h.type === "delivered");
+    const victoryTag = `victory-${found.id}`;
     const alreadyNotified =
       Boolean(found.deliveredNotified) ||
       deliveredVictoryLockIds.has(found.id) ||
+      hasSentVictoryTag(victoryTag) ||
       hasDeliveredHistory;
     found.deliveredNotified = true;
     deliveredVictoryLockIds.add(found.id);
+    markSentVictoryTag(victoryTag);
     if (!hasDeliveredHistory) {
       appendOrderHistory(found, {
         type: "delivered",
@@ -1404,9 +1416,11 @@ export async function listCheckoutOrders(): Promise<CheckoutOrder[]> {
       if (parsed.success) sessionByOrder.set(s.orderId, parsed.data);
     }
   }
+  const memByOrderId = new Map(memoryOrders.map(m => [m.id, m]));
   return orders.map(order => {
     const orderItems = byOrder.get(order.id) ?? [];
     const payload = sessionByOrder.get(order.id);
+    const mem = memByOrderId.get(order.orderNumber);
     return {
       dbId: order.id,
       id: order.orderNumber,
@@ -1425,6 +1439,11 @@ export async function listCheckoutOrders(): Promise<CheckoutOrder[]> {
       address: order.address,
       note: order.note ?? "",
       status: order.status,
+      isDelivered: mem?.isDelivered,
+      deliveredAt: mem?.deliveredAt,
+      deliveredNotified: mem?.deliveredNotified,
+      carrier: mem?.carrier,
+      history: mem?.history,
     };
   });
 }

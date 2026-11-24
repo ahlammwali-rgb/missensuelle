@@ -23,7 +23,6 @@ import {
   PhoneMissed,
   SlidersHorizontal,
   MessageCircle,
-  Hash,
 } from "lucide-react";
 import type { CheckoutOrder } from "@shared/checkout";
 import { classifyCarrierTracking, isCarrierTrackingDelivered } from "@shared/carrierStatus";
@@ -40,14 +39,6 @@ import {
 } from "@shared/carrierHistory";
 import { formatDZD, getCatalogProducts, type OrderStatus } from "@/lib/store-data";
 import { trpc } from "@/lib/trpc";
-
-function getCustomerInitials(name?: string | null): string {
-  const clean = String(name || "").trim();
-  if (!clean) return "CL";
-  const parts = clean.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  return clean.slice(0, 2).toUpperCase();
-}
 
 function findTrackingData(
   map: Record<string, TrackingData>,
@@ -921,31 +912,39 @@ export function TransferredOrdersPanel({
               >
                 {isFocused && (
                   <div className="trans-focus-banner">
-                    <span>📌 Commande ciblée · Statut actuel : {badge.label}</span>
+                    <span>📌 Commande ciblée · Statut : {badge.label}</span>
                     {onClearFocusedOrder && (
                       <button
                         type="button"
                         onClick={onClearFocusedOrder}
                         aria-label="Fermer la mise en avant"
                       >
-                        <X size={13} />
+                        <X size={12} />
                       </button>
                     )}
                   </div>
                 )}
 
-                {/* Card Top: Carrier & Date on Left + Latest History Status Badge on Right */}
+                {/* Ligne 1 : ID + Transporteur + Tracking à gauche | Dernier Statut Historique à droite */}
                 <div className="trans-card-header">
                   <div className="trans-card-ids">
-                    <span className={`trans-carrier-pill${isEcoTrack ? " is-ecotrack" : ""}`}>
-                      <Truck size={12} />
-                      {isEcoTrack ? ecoCarrierName : "E-com Delivery"}
-                    </span>
-                    {order.createdAt && (
-                      <span className="aoc-date">
-                        <Clock size={12} />
-                        {formatCarrierStepDate(order.createdAt)}
+                    <div className="trans-compact-id-line">
+                      <span className="trans-order-id">{order.id}</span>
+                      <span className={`trans-carrier-pill${isEcoTrack ? " is-ecotrack" : ""}`}>
+                        <Truck size={11} />
+                        {isEcoTrack ? ecoCarrierName : "E-com Delivery"}
                       </span>
+                    </div>
+                    {tracking && (
+                      <button
+                        type="button"
+                        className="trans-tracking-pill"
+                        onClick={() => copyText(tracking, "N° de tracking", order.id)}
+                        title="Cliquer pour copier le N° de suivi"
+                      >
+                        <span>{tracking}</span>
+                        {copiedId === order.id ? <Check size={11} /> : <Copy size={11} />}
+                      </button>
                     )}
                   </div>
 
@@ -965,44 +964,76 @@ export function TransferredOrdersPanel({
                   </div>
                 </div>
 
-                {/* Full-Width Order Code & Copyable Tracking Strip (Dashboard Match) */}
-                <div className="gcome-id-bar trans-id-bar">
-                  <button
-                    type="button"
-                    className="aoc-id-btn"
-                    onClick={() =>
-                      copyText(
-                        tracking || order.id,
-                        tracking ? "N° de tracking" : "Code commande",
-                        order.id
-                      )
-                    }
-                    title={tracking ? "Cliquer pour copier le N° de tracking" : "Cliquer pour copier le code"}
-                  >
-                    <span className="aoc-id-left">
-                      <Hash size={13} className="aoc-id-hash" />
-                      <strong>{order.id}</strong>
-                      {tracking && (
-                        <span className="trans-id-tracking-chip">{tracking}</span>
-                      )}
-                    </span>
-                    <span className="trans-id-copy-state">
-                      {copiedId === order.id ? <Check size={13} /> : <Copy size={13} />}
-                    </span>
-                  </button>
-                </div>
-
-                {/* 2-Column Customer & Call/WhatsApp Split (Dashboard Match) */}
-                <div className="gcome-customer-box">
-                  <div className="gcome-cust-col">
-                    <div className="gcome-initials-avatar">
-                      {getCustomerInitials(order.customer)}
+                {/* Ligne 2 : Client + Tel/WhatsApp à gauche | Montant + Encaissé à droite */}
+                <div className="trans-card-body">
+                  <div className="trans-info-row">
+                    <div className="trans-customer-box">
+                      <div className="trans-customer-name">{order.customer}</div>
+                      <div className="trans-phone-row">
+                        <button
+                          type="button"
+                          className="trans-customer-phone"
+                          onClick={() => callPhone(order.phone)}
+                          title="Appeler le client"
+                        >
+                          <Phone size={12} />
+                          <span>{order.phone}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="trans-mini-wa-btn"
+                          onClick={() => openWhatsApp(order, tracking)}
+                          title="Envoyer un message WhatsApp"
+                          aria-label="WhatsApp"
+                        >
+                          <MessageCircle size={12} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="trans-cust-copy">
-                      <span className="gcome-cust-eyebrow">Client & Wilaya</span>
-                      <div className="aoc-name">{order.customer}</div>
+
+                    <div className="trans-price-box">
+                      <div className="trans-price-amount">{formatDZD(order.total)}</div>
+                      {trk?.encaisser ? (
+                        <span className="trans-paid-pill">
+                          <ShieldCheck size={10} /> Encaissé
+                        </span>
+                      ) : isCarrierTrackingDelivered(trk) || order.isDelivered ? (
+                        <span className="trans-paid-pill is-uncollected">
+                          <ShieldCheck size={10} /> Livré · Non encaissé
+                        </span>
+                      ) : (
+                        <span className="trans-unpaid-pill">À encaisser</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Ligne 3 : Produit compact avec miniature discrète + Destination */}
+                  <div className="trans-compact-product-box">
+                    {thumb ? (
+                      <img
+                        src={thumb}
+                        alt={order.product}
+                        className="trans-compact-thumb"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="trans-compact-thumb-fallback">
+                        <Package size={16} />
+                      </div>
+                    )}
+                    <div className="trans-compact-prod-meta">
+                      <div className="trans-compact-prod-line">
+                        <strong>{order.product}</strong>
+                        {order.color && <span className="trans-chip-color">{order.color}</span>}
+                        {order.size && <span className="trans-chip-size">{order.size}</span>}
+                        {order.delivery && (
+                          <span className="trans-chip-size">
+                            {order.delivery === "office" ? "Stop Desk" : "Domicile"}
+                          </span>
+                        )}
+                      </div>
                       <div className="trans-destination-line">
-                        <MapPin size={12} className="aoc-pin-icon" />
+                        <MapPin size={11} />
                         <span>
                           {order.wilaya}
                           {order.commune ? ` — ${order.commune}` : ""}
@@ -1012,99 +1043,19 @@ export function TransferredOrdersPanel({
                     </div>
                   </div>
 
-                  <div className="gcome-contact-col">
-                    <button
-                      type="button"
-                      className="gcome-call-col-btn"
-                      onClick={() => callPhone(order.phone)}
-                      title="Appeler le client"
-                    >
-                      <span className="gcome-call-ico">
-                        <Phone size={13} />
+                  {/* Note Dernier Scan */}
+                  {latestScan && (
+                    <div className="trans-carrier-last-event">
+                      <Clock size={11} />
+                      <span>
+                        Dernier scan : <strong>{latestScan.situation}</strong>
+                        {latestScan.commentaire ? ` — ${latestScan.commentaire}` : ""}
                       </span>
-                      <span className="gcome-call-meta">
-                        <span className="gcome-deliv-label">Appeler</span>
-                        <span className="aoc-call-num">{order.phone}</span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className="gcome-wa-pill"
-                      onClick={() => openWhatsApp(order, tracking)}
-                      title="Contacter sur WhatsApp"
-                    >
-                      <MessageCircle size={13} />
-                      <span>WhatsApp</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Product Box (Dashboard Match) */}
-                <div className="aoc-product-row gcome-product-row">
-                  {thumb ? (
-                    <img
-                      src={thumb}
-                      alt={order.product}
-                      className="gcome-prod-thumb"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="gcome-prod-thumb-fallback">
-                      <Package size={22} />
                     </div>
                   )}
-                  <div className="gcome-prod-content">
-                    <div className="aoc-prod-title">{order.product}</div>
-                    <div className="trans-prod-chips">
-                      {order.color && (
-                        <span className="aoc-chip aoc-chip-color">{order.color}</span>
-                      )}
-                      {order.size && (
-                        <span className="aoc-chip aoc-chip-qty">Taille {order.size}</span>
-                      )}
-                      {order.delivery && (
-                        <span className="aoc-chip aoc-chip-qty">
-                          {order.delivery === "office" ? "Stop Desk" : "Domicile"}
-                        </span>
-                      )}
-                    </div>
-                  </div>
                 </div>
 
-                {/* Latest Scan Note if available */}
-                {latestScan && (
-                  <div className="trans-carrier-last-event">
-                    <Clock size={12} />
-                    <span>
-                      Dernier scan : <strong>{latestScan.situation}</strong>
-                      {latestScan.commentaire ? ` — ${latestScan.commentaire}` : ""}
-                    </span>
-                  </div>
-                )}
-
-                {/* Dedicated Total à Encaisser Bar (Dashboard Match) */}
-                <div className="gcome-total-bar trans-total-bar">
-                  <span className="gcome-total-label">
-                    <Banknote size={14} />
-                    TOTAL À ENCAISSER
-                  </span>
-                  <div className="trans-total-right">
-                    <span className="gcome-total-value">{formatDZD(order.total)}</span>
-                    {trk?.encaisser ? (
-                      <span className="trans-paid-pill">
-                        <ShieldCheck size={11} /> Encaissé
-                      </span>
-                    ) : isCarrierTrackingDelivered(trk) || order.isDelivered ? (
-                      <span className="trans-paid-pill is-uncollected">
-                        <ShieldCheck size={11} /> Livré · Non encaissé
-                      </span>
-                    ) : (
-                      <span className="trans-unpaid-pill">À encaisser</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Harmonized Card Actions */}
+                {/* Ligne 4 : Actions sur 1 seule rangée compacte */}
                 <div className="trans-card-footer gcome-trans-footer">
                   <button
                     type="button"
@@ -1112,7 +1063,7 @@ export function TransferredOrdersPanel({
                     onClick={() => callPhone(order.phone)}
                     title="Appeler le client"
                   >
-                    <Phone size={14} />
+                    <Phone size={13} />
                     <span>Appeler</span>
                   </button>
 
@@ -1122,7 +1073,7 @@ export function TransferredOrdersPanel({
                     onClick={() => copyParcelSlip(order, tracking, isEcoTrack)}
                     title="Copier les détails du bordereau"
                   >
-                    <Copy size={14} />
+                    <Copy size={13} />
                     <span>Bordereau</span>
                   </button>
 
@@ -1133,7 +1084,7 @@ export function TransferredOrdersPanel({
                       onClick={() => setSelectedTimelineOrder({ order, tracking: trk })}
                       title="Voir l'historique complet des scans du transporteur"
                     >
-                      <Eye size={14} />
+                      <Eye size={13} />
                       <span>Historique ({trk.historique.length})</span>
                     </button>
                   )}
@@ -1153,7 +1104,7 @@ export function TransferredOrdersPanel({
                     }}
                     title="Rapatrier vers le Dashboard actif"
                   >
-                    <ArrowLeftRight size={14} />
+                    <ArrowLeftRight size={13} />
                     <span>Rapatrier</span>
                   </button>
                 </div>

@@ -10,6 +10,8 @@ import {
 import { reconcileCarrierBatchOrders, wasOrderAutoDelivered } from "./carrierSync";
 import { markOrderDelivered, submitCheckoutOrder, updateMemoryOrderStatus, listCheckoutOrders } from "./checkout";
 import { buildEcoTrackingItem } from "./ecotrackDelivery";
+import { hasSentVictoryTag, markSentVictoryTag } from "./persistentStore";
+import { sendAdminPushNotification } from "./webPush";
 
 describe("strict carrier status detection", () => {
   it("recognizes genuine delivered / collected DHD & E-com statuses", () => {
@@ -277,6 +279,35 @@ describe("bidirectional carrier delivery reconciliation", () => {
     const after = (await listCheckoutOrders()).find(o => o.id === created.orderNumber)!;
     expect(after.isDelivered).toBe(true);
     expect(after.deliveredNotified).toBe(true);
+    expect(hasSentVictoryTag(`victory-${created.orderNumber}`)).toBe(true);
     expect((after.history ?? []).filter(h => h.type === "delivered")).toHaveLength(1);
+
+    const dupPush = await sendAdminPushNotification({
+      title: "🎉 COLIS LIVRÉ",
+      body: `Test doublon ${created.orderNumber}`,
+      tag: `victory-${created.orderNumber}`,
+      type: "victory",
+    });
+    expect(dupPush.skippedDuplicate).toBe(true);
+
+    const customTag = `victory-IMAN-LOOP-${Date.now()}`;
+    expect(hasSentVictoryTag(customTag)).toBe(false);
+    const first = await sendAdminPushNotification({
+      title: "🎉 COLIS LIVRÉ : إيمان",
+      body: "Test première notification",
+      tag: customTag,
+      type: "victory",
+    });
+    expect(first.skippedDuplicate).toBeUndefined();
+    expect(hasSentVictoryTag(customTag)).toBe(true);
+
+    const second = await sendAdminPushNotification({
+      title: "🎉 COLIS LIVRÉ : إيمان",
+      body: "Test boucle",
+      tag: customTag,
+      type: "victory",
+    });
+    expect(second.skippedDuplicate).toBe(true);
+    markSentVictoryTag(customTag);
   });
 });
