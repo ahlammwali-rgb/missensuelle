@@ -37,7 +37,7 @@ import {
   type OrderHistoryInspection,
   type TransferredFilterKey,
 } from "@shared/carrierHistory";
-import { formatDZD, getCatalogProducts, type OrderStatus } from "@/lib/store-data";
+import { formatDZD, type OrderStatus } from "@/lib/store-data";
 import { trpc } from "@/lib/trpc";
 
 function findTrackingData(
@@ -119,32 +119,31 @@ export function TransferredOrdersPanel({
     tracking?: TrackingData;
   } | null>(null);
 
-  const productThumbMap = useMemo(() => {
-    const map = new Map<string, string>();
-    try {
-      for (const p of getCatalogProducts()) {
-        if (p.id && p.image) map.set(p.id.toLowerCase(), p.image);
-        if (p.name && p.image) map.set(p.name.toLowerCase().trim(), p.image);
-      }
-    } catch {
-      // ignore catalog errors
-    }
-    return map;
-  }, []);
-
   useEffect(() => {
     if (!focusedOrderId) return;
     setFilterSituation("all");
     setFilterCarrier("all");
     setSearch("");
-    const timer = window.setTimeout(() => {
-      const safeSelector = `[data-order-id="${CSS.escape(focusedOrderId)}"]`;
+    const safeSelector = `[data-order-id="${CSS.escape(focusedOrderId)}"]`;
+    const scrollToTarget = () => {
       const el = document.querySelector(safeSelector);
       if (el instanceof HTMLElement) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
+        return true;
       }
-    }, 90);
-    return () => window.clearTimeout(timer);
+      return false;
+    };
+    const timers: number[] = [];
+    for (const delay of [80, 260, 620]) {
+      timers.push(
+        window.setTimeout(() => {
+          scrollToTarget();
+        }, delay)
+      );
+    }
+    return () => {
+      timers.forEach(t => window.clearTimeout(t));
+    };
   }, [focusedOrderId]);
 
   // E-com & EcoTrack status & live refresh mutations
@@ -394,9 +393,9 @@ export function TransferredOrdersPanel({
     [transferredOrders, inspectionMap]
   );
 
-  // Filtered by search, carrier, history stage & diagnostic alerts
+  // Filtered by search, carrier, history stage & diagnostic alerts, sorted by latest activity desc
   const filteredOrders = useMemo(() => {
-    return transferredOrders.filter(o => {
+    const matching = transferredOrders.filter(o => {
       if (filterCarrier !== "all" && getOrderCarrier(o) !== filterCarrier) {
         return false;
       }
@@ -408,14 +407,31 @@ export function TransferredOrdersPanel({
 
       if (!search.trim()) return true;
       const sh = ecoShipments[o.id] || ecomShipments[o.id] || shipments[o.id];
-      const q = search.toLowerCase();
+      const q = search.trim().toLowerCase();
       const matchTrk = sh?.tracking?.toLowerCase().includes(q);
       const matchOrder = `${o.id} ${o.customer} ${o.phone} ${o.wilaya} ${o.commune} ${o.product}`
         .toLowerCase()
         .includes(q);
       return matchOrder || matchTrk;
     });
-  }, [transferredOrders, shipments, ecoShipments, ecomShipments, inspectionMap, search, filterSituation, filterCarrier]);
+
+    const activityTs = (o: CheckoutOrder): number => {
+      const isEco = Boolean(ecoShipments[o.id]) || o.carrier === "ecotrack";
+      const sh = isEco ? (ecoShipments[o.id] || shipments[o.id]) : (ecomShipments[o.id] || shipments[o.id]);
+      const trk = findTrackingData(trackingMap, sh?.tracking);
+      const latest = getLatestCarrierHistoryStep(trk);
+      const scanMs = latest?.date ? parseCarrierTimestamp(latest.date) : null;
+      if (scanMs) return scanMs;
+      const shippedMs = sh?.at ? parseCarrierTimestamp(sh.at) : null;
+      if (shippedMs) return shippedMs;
+      const deliveredMs = o.deliveredAt ? Date.parse(o.deliveredAt) : NaN;
+      if (Number.isFinite(deliveredMs)) return deliveredMs;
+      const createdMs = Date.parse(o.createdAt);
+      return Number.isFinite(createdMs) ? createdMs : 0;
+    };
+
+    return [...matching].sort((a, b) => activityTs(b) - activityTs(a));
+  }, [transferredOrders, shipments, ecoShipments, ecomShipments, trackingMap, inspectionMap, search, filterSituation, filterCarrier]);
 
   const exportCSV = () => {
     const header = [
@@ -476,16 +492,6 @@ export function TransferredOrdersPanel({
     const intl = clean.startsWith("0") ? `213${clean.slice(1)}` : clean.startsWith("213") ? clean : `213${clean}`;
     const msg = `Bonjour ${order.customer || ""}, concernant votre commande ${order.id}${trackingCode ? ` (suivi ${trackingCode})` : ""} chez Miss Sensuelle…`;
     window.open(`https://wa.me/${intl}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
-  };
-
-  const resolveProductThumb = (productName?: string): string | null => {
-    const clean = String(productName || "").toLowerCase().trim();
-    if (!clean) return null;
-    if (productThumbMap.has(clean)) return productThumbMap.get(clean) || null;
-    for (const [k, url] of Array.from(productThumbMap.entries())) {
-      if (k.length >= 4 && clean.includes(k)) return url;
-    }
-    return null;
   };
 
   const getStatusBadge = (trk?: TrackingData | null, order?: CheckoutOrder) => {
@@ -743,8 +749,12 @@ export function TransferredOrdersPanel({
         <div className="trp-signals-row" role="group" aria-label="Files agent de réclamation">
           <button
             type="button"
-            className={`trp-signal-chip${filterSituation === "all" ? " is-active" : ""}`}
-            onClick={() => setFilterSituation("all")}
+            className={`trp-signal-chip${!hasActiveFilters ? " is-active" : ""}`}
+            onClick={() => {
+              setFilterSituation("all");
+              setFilterCarrier("all");
+              setSearch("");
+            }}
           >
             <span>Tout <strong>({analytics.totalCount})</strong></span>
           </button>
@@ -816,7 +826,12 @@ export function TransferredOrdersPanel({
           <div className="trans-search-box trp-search-compact">
             <Search size={15} className="trans-search-icon" />
             <input
-              type="text"
+              type="search"
+              name="transferred-order-search"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
               placeholder="Rechercher client, tél, wilaya, n° commande, tracking…"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -879,6 +894,28 @@ export function TransferredOrdersPanel({
         </div>
       </div>
 
+      {/* Live visible count & quick reset bar */}
+      <div className="trp-results-bar">
+        <span className="trp-results-count">
+          Affichées : <strong>{filteredOrders.length}</strong> / {transferredOrders.length} commande
+          {transferredOrders.length > 1 ? "s" : ""}
+        </span>
+        {hasActiveFilters && (
+          <button
+            type="button"
+            className="trp-results-reset-btn"
+            onClick={() => {
+              setFilterSituation("all");
+              setFilterCarrier("all");
+              setSearch("");
+            }}
+          >
+            <X size={12} />
+            <span>Tout afficher ({transferredOrders.length})</span>
+          </button>
+        )}
+      </div>
+
       {/* Orders List / Empty State */}
       {filteredOrders.length === 0 ? (
         <div className="transferred-empty">
@@ -889,6 +926,19 @@ export function TransferredOrdersPanel({
               ? "Aucun résultat pour vos filtres de recherche."
               : "Dès que vous validez une commande et cliquez sur Transférer, elle apparaîtra ici avec son suivi direct."}
           </p>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="trp-results-reset-btn is-large"
+              onClick={() => {
+                setFilterSituation("all");
+                setFilterCarrier("all");
+                setSearch("");
+              }}
+            >
+              Tout afficher ({transferredOrders.length})
+            </button>
+          )}
         </div>
       ) : (
         <div className="transferred-cards-grid">
@@ -901,8 +951,8 @@ export function TransferredOrdersPanel({
             const trk = findTrackingData(trackingMap, tracking);
             const badge = getStatusBadge(trk, order);
             const latestScan = badge.lastScan || getLatestCarrierHistoryStep(trk);
-            const thumb = resolveProductThumb(order.product);
             const isFocused = Boolean(focusedOrderId && focusedOrderId === order.id);
+            const fullDest = `${order.wilaya}${order.commune ? ` — ${order.commune}` : ""}${order.address ? ` (${order.address})` : ""}`;
 
             return (
               <div
@@ -931,21 +981,21 @@ export function TransferredOrdersPanel({
                     <div className="trans-compact-id-line">
                       <span className="trans-order-id">{order.id}</span>
                       <span className={`trans-carrier-pill${isEcoTrack ? " is-ecotrack" : ""}`}>
-                        <Truck size={11} />
-                        {isEcoTrack ? ecoCarrierName : "E-com Delivery"}
+                        <Truck size={10} />
+                        {isEcoTrack ? ecoCarrierName : "E-com"}
                       </span>
+                      {tracking && (
+                        <button
+                          type="button"
+                          className="trans-tracking-pill"
+                          onClick={() => copyText(tracking, "N° de tracking", order.id)}
+                          title="Cliquer pour copier le N° de suivi"
+                        >
+                          <span>{tracking}</span>
+                          {copiedId === order.id ? <Check size={10} /> : <Copy size={10} />}
+                        </button>
+                      )}
                     </div>
-                    {tracking && (
-                      <button
-                        type="button"
-                        className="trans-tracking-pill"
-                        onClick={() => copyText(tracking, "N° de tracking", order.id)}
-                        title="Cliquer pour copier le N° de suivi"
-                      >
-                        <span>{tracking}</span>
-                        {copiedId === order.id ? <Check size={11} /> : <Copy size={11} />}
-                      </button>
-                    )}
                   </div>
 
                   <div
@@ -968,7 +1018,9 @@ export function TransferredOrdersPanel({
                 <div className="trans-card-body">
                   <div className="trans-info-row">
                     <div className="trans-customer-box">
-                      <div className="trans-customer-name">{order.customer}</div>
+                      <div className="trans-customer-name" title={order.customer}>
+                        {order.customer}
+                      </div>
                       <div className="trans-phone-row">
                         <button
                           type="button"
@@ -976,7 +1028,7 @@ export function TransferredOrdersPanel({
                           onClick={() => callPhone(order.phone)}
                           title="Appeler le client"
                         >
-                          <Phone size={12} />
+                          <Phone size={11} />
                           <span>{order.phone}</span>
                         </button>
                         <button
@@ -986,7 +1038,7 @@ export function TransferredOrdersPanel({
                           title="Envoyer un message WhatsApp"
                           aria-label="WhatsApp"
                         >
-                          <MessageCircle size={12} />
+                          <MessageCircle size={11} />
                         </button>
                       </div>
                     </div>
@@ -999,7 +1051,7 @@ export function TransferredOrdersPanel({
                         </span>
                       ) : isCarrierTrackingDelivered(trk) || order.isDelivered ? (
                         <span className="trans-paid-pill is-uncollected">
-                          <ShieldCheck size={10} /> Livré · Non encaissé
+                          <ShieldCheck size={10} /> Non encaissé
                         </span>
                       ) : (
                         <span className="trans-unpaid-pill">À encaisser</span>
@@ -1007,48 +1059,33 @@ export function TransferredOrdersPanel({
                     </div>
                   </div>
 
-                  {/* Ligne 3 : Produit compact avec miniature discrète + Destination */}
+                  {/* Ligne 3 : Résumé produit sans photo + Destination compacte */}
                   <div className="trans-compact-product-box">
-                    {thumb ? (
-                      <img
-                        src={thumb}
-                        alt={order.product}
-                        className="trans-compact-thumb"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="trans-compact-thumb-fallback">
-                        <Package size={16} />
-                      </div>
-                    )}
-                    <div className="trans-compact-prod-meta">
-                      <div className="trans-compact-prod-line">
-                        <strong>{order.product}</strong>
-                        {order.color && <span className="trans-chip-color">{order.color}</span>}
-                        {order.size && <span className="trans-chip-size">{order.size}</span>}
-                        {order.delivery && (
-                          <span className="trans-chip-size">
-                            {order.delivery === "office" ? "Stop Desk" : "Domicile"}
-                          </span>
-                        )}
-                      </div>
-                      <div className="trans-destination-line">
-                        <MapPin size={11} />
-                        <span>
-                          {order.wilaya}
-                          {order.commune ? ` — ${order.commune}` : ""}
-                          {order.address ? ` (${order.address})` : ""}
+                    <div className="trans-compact-prod-line" title={order.product}>
+                      <strong className="trans-compact-prod-title">{order.product}</strong>
+                      {order.color && <span className="trans-chip-color">{order.color}</span>}
+                      {order.size && <span className="trans-chip-size">{order.size}</span>}
+                      {order.delivery && (
+                        <span className="trans-chip-size">
+                          {order.delivery === "office" ? "Stop Desk" : "Domicile"}
                         </span>
-                      </div>
+                      )}
+                    </div>
+                    <div className="trans-destination-line" title={fullDest}>
+                      <MapPin size={10} />
+                      <span>{fullDest}</span>
                     </div>
                   </div>
 
-                  {/* Note Dernier Scan */}
+                  {/* Ligne 4 : Note Dernier Scan (1 ligne compacte) */}
                   {latestScan && (
-                    <div className="trans-carrier-last-event">
-                      <Clock size={11} />
+                    <div
+                      className="trans-carrier-last-event"
+                      title={`${latestScan.situation}${latestScan.commentaire ? ` — ${latestScan.commentaire}` : ""}`}
+                    >
+                      <Clock size={10} />
                       <span>
-                        Dernier scan : <strong>{latestScan.situation}</strong>
+                        <strong>{latestScan.situation}</strong>
                         {latestScan.commentaire ? ` — ${latestScan.commentaire}` : ""}
                       </span>
                     </div>

@@ -167,7 +167,8 @@ export function buildAdminNotifications(
   for (const log of activityLogs) {
     const tsMs = parseTimestampMs(log.at);
     if (!tsMs || tsMs < minRelevantMs) continue;
-    const summaryLower = log.summary.toLowerCase();
+    const summaryText = String(log.summary || "");
+    const summaryLower = summaryText.toLowerCase();
     const isDeliveredAction = summaryLower.includes("livré");
     const isCreatedAction = summaryLower.includes("créée") || summaryLower.includes("nouvelle");
     const oid = log.orderId || "";
@@ -206,7 +207,7 @@ export function buildAdminNotifications(
         id,
         kind,
         title: `${matchedOrder?.isDelivered ? "Livré · " : ""}${oid || log.actorName || "Activité"}`,
-        body: log.summary,
+        body: summaryText || "Mise à jour enregistrée",
         timestamp: log.at,
         tsMs,
         orderId: oid || undefined,

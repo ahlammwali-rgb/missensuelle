@@ -1292,20 +1292,31 @@ export async function getEcoTrackTrackingBatch(
   }
 
   // If the account has > 8 pages and some requested trackings are still missing,
-  // scan the newest tail pages (some EcoTrack panels sort page 1 oldest-first).
+  // scan the newest tail pages first (some EcoTrack panels sort page 1 oldest-first),
+  // then bridge any remaining middle pages so active orders at any page offset are found.
   if (lastPageDetected > 8 && toFetch.some(t => !result[t])) {
     const tailStop = Math.max(9, lastPageDetected - 6);
     for (let page = lastPageDetected; page >= tailStop; page--) {
       if (toFetch.every(t => Boolean(result[t]))) break;
       await fetchOrdersPage(page);
     }
+
+    if (tailStop > 9 && toFetch.some(t => !result[t])) {
+      const midEnd = Math.min(tailStop - 1, 32);
+      for (let page = 9; page <= midEnd; page += 3) {
+        if (toFetch.every(t => Boolean(result[t]))) break;
+        const pageBatch: number[] = [];
+        for (let p = page; p < page + 3 && p <= midEnd; p++) pageBatch.push(p);
+        const results = await Promise.all(pageBatch.map(p => fetchOrdersPage(p)));
+        if (results.some(hasMore => !hasMore)) break;
+      }
+    }
   }
 
   // 2) Enrich missing trackings OR active/recent parcels with empty historique via /api/v1/get/tracking/info
   const missingFromOrders = toFetch.filter(t => !result[t]);
   const emptyHistoryPriority = toFetch
-    .filter(t => result[t] && (!result[t].historique || result[t].historique!.length === 0))
-    .slice(0, 60);
+    .filter(t => result[t] && (!result[t].historique || result[t].historique!.length === 0));
   const toEnrich = Array.from(new Set([...missingFromOrders, ...emptyHistoryPriority]));
 
   for (let i = 0; i < toEnrich.length; i += 6) {

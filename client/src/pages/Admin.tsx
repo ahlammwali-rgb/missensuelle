@@ -290,7 +290,7 @@ function AdminPageContent() {
   const backupSignatureRef = useRef("");
   const syncSheetMutation = trpc.googleSheet.syncOrders.useMutation({
     onSuccess: (data) => {
-      if (data.added > 0) {
+      if (data && data.added > 0) {
         notify("Nouvelle(s) commande(s) TikTok synchronisée(s) !");
         void utils.admin.orders.invalidate();
       }
@@ -305,12 +305,69 @@ function AdminPageContent() {
   const serverOrders = ordersQuery.data ?? [];
   const orderById = useMemo(() => new Map(serverOrders.map(order => [order.id, order])), [serverOrders]);
 
+  // Background-prefetch TransferredOrdersPanel so notification deep-links switch without suspense lag
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void import("@/components/TransferredOrdersPanel");
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   // Listen to background Web Push notifications received by the Service Worker
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
     const handleSwMessage = (event: MessageEvent) => {
       if (event.data?.type === "PUSH_NOTIFICATION_RECEIVED") {
         const payload = event.data.payload;
+        if (payload && (payload.title || payload.body)) {
+          let parsedOrderId: string | undefined = payload.orderId ? String(payload.orderId).trim() : undefined;
+          let parsedSection: "dashboard" | "transferred" | "abandoned" = payload.type === "victory" ? "transferred" : "dashboard";
+          if (typeof payload.url === "string") {
+            try {
+              const u = new URL(payload.url, window.location.origin);
+              const qOid = u.searchParams.get("orderId")?.trim();
+              const qSec = u.searchParams.get("section")?.trim();
+              if (!parsedOrderId && qOid) parsedOrderId = qOid;
+              if (qSec === "transferred" || qSec === "abandoned" || qSec === "dashboard") {
+                parsedSection = qSec;
+              }
+            } catch {}
+          }
+          const pushKind: AdminNotificationItem["kind"] =
+            payload.type === "victory"
+              ? "victory"
+              : payload.type === "new_order"
+                ? "new_order"
+                : payload.type === "urgent_alert"
+                  ? "urgent"
+                  : parsedSection === "transferred"
+                    ? "transferred"
+                    : "activity";
+          const pushId = String(payload.tag || `push:${parsedOrderId || ""}:${String(payload.title || "").slice(0, 40)}`).trim();
+          const pushItem: AdminNotificationItem = {
+            id: pushId,
+            kind: pushKind,
+            title: String(payload.title || "Notification"),
+            body: String(payload.body || ""),
+            timestamp: new Date().toISOString(),
+            tsMs: Date.now(),
+            orderId: parsedOrderId,
+            targetSection: parsedSection,
+            statusLabel:
+              pushKind === "victory"
+                ? "Livré"
+                : pushKind === "new_order"
+                  ? "Nouvelle"
+                  : pushKind === "urgent"
+                    ? "Alerte"
+                    : "Suivi",
+          };
+          setLivePushNotifs(prev => {
+            const deduped = prev.filter(item => item.id !== pushId);
+            return [pushItem, ...deduped].slice(0, 30);
+          });
+        }
+
         const soundUrgentEnabled = localStorage.getItem("ms_sound_urgent_enabled") !== "false";
         const soundVictoryEnabled = localStorage.getItem("ms_sound_victory_enabled") !== "false";
         const soundOrderEnabled = localStorage.getItem("ms_sound_order_enabled") !== "false";
@@ -319,8 +376,8 @@ function AdminPageContent() {
         const notifDelayEnabled = localStorage.getItem("ms_notif_delay_enabled") !== "false";
 
         if (payload?.type === "urgent_alert" && soundUrgentEnabled) {
-          const body = (payload?.body || "").toLowerCase();
-          const title = (payload?.title || "").toLowerCase();
+          const body = String(payload?.body || "").toLowerCase();
+          const title = String(payload?.title || "").toLowerCase();
           const text = body + " " + title;
           if (text.includes("repond") && !notifNrpEnabled) return;
           if ((text.includes("annul") || text.includes("refus") || text.includes("retour")) && !notifCancelEnabled) return;
@@ -997,10 +1054,14 @@ function AdminPageContent() {
     setIsMoreMenuOpen(false);
     setIsSearchOpen(false);
     setIsNotifOpen(false);
+    setHistoryOrderId(null);
+    setPostponeOrderId(null);
+    setCancelOrderId(null);
     go(targetSection);
 
     if (targetSection === "transferred") {
       setSelected(null);
+      void import("@/components/TransferredOrdersPanel");
       const focusTarget = matched?.id || cleanId;
       if (focusTarget) {
         setFocusedOrderId(null);
@@ -1013,11 +1074,25 @@ function AdminPageContent() {
       setActiveStatus("all");
       setPeriod("all");
       setQuery("");
+      window.scrollTo({ top: 0, behavior: "auto" });
       if (matched) {
         setFocusedOrderId(matched.id);
         setSelected(matched);
       }
     }
+  };
+
+  const toggleNotifPanel = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    setIsMoreMenuOpen(false);
+    setIsSearchOpen(false);
+    setIsNotifOpen(prev => {
+      const next = !prev;
+      if (next) {
+        void import("@/components/TransferredOrdersPanel");
+      }
+      return next;
+    });
   };
 
   const deepLinkHandlerRef = useRef(handleNotificationDeepLink);
@@ -1128,7 +1203,7 @@ function AdminPageContent() {
     </div>
   );
 
-  return <div className="admin-shell gcome-shell"><aside className="admin-sidebar"><div className="admin-brand-mobile-row"><Link href="/" className="wordmark admin-wordmark gcome-logo-link"><img src="/gcome-dash-brand.png" alt="Gcome — Vendez · Gérez · Suivez" className="gcome-dash-brand-img" /><span className="gcome-dash-brand-dark-fallback"><GcomeBrand compact crownAbove hideBag /></span></Link><div className="admin-mobile-quick-top"><button type="button" className="neo-darkmode-btn mobile-top-theme-btn" onClick={toggleTheme} title={theme === "dark" ? "Passer en Mode Clair" : "Passer en Mode Sombre"} aria-label="Basculer Mode Clair / Sombre">{theme === "dark" ? (<><Sun size={13} className="neo-sun-glow" /><span>Clair</span></>) : (<><Moon size={13} className="neo-moon-glow" /><span>Dark</span></>)}</button><button type="button" className={`neo-darkmode-btn gcome-mobile-bell-btn ${isNotifOpen ? "is-open" : ""}`} onClick={e => { e.stopPropagation(); setIsNotifOpen(prev => !prev); }} title="Centre de notifications" aria-label="Notifications"><Bell size={14} />{notifUnreadCount > 0 && <span className="gcome-mobile-bell-badge">{notifUnreadCount > 99 ? "99+" : notifUnreadCount}</span>}</button><button type="button" onClick={() => setIsProfileModalOpen(true)} title="Mon profil, salaire & commissions" aria-label="Mon profil et commissions" className="gcome-profile-pill"><span>{currentActorName.slice(0, 2).toUpperCase()}</span>{activeNewCount > 0 && <span className="gcome-avatar-count">{activeNewCount}</span>}</button></div></div><button type="button" className="admin-user gcome-sidebar-shop-card" onClick={() => setIsProfileModalOpen(true)} title="Voir mon salaire, évolution & commissions"><div className="admin-avatar">{currentActorName.slice(0, 2).toUpperCase()}</div><div><strong>{currentActorName}</strong><span>{isOwner ? "Boutique Active • Voir profil" : "Confirmateur • Voir salaire"}</span></div></button><nav className="admin-nav"><span className="admin-nav-label">Espace Boutique</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{activeNewCount}</b></button><button className={section === "staff" ? "active" : ""} onClick={() => go("staff")}><Users size={18} />Confirmateurs & Salaires</button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com & DHD <b>{confirmedCount}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue & Studio IA <b>{catalogCount}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button onClick={() => go("staff")}><BarChart3 size={18} />Rapports & Performances</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "staff" ? "Confirmateurs, Salaires & Journal d'Activité" : section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Studio Produits & Landing Pages" : section === "ecom" ? "E-com Delivery & DHD (EcoTrack)" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : `Bonjour, ${currentActorName} 👑`}</h1></div><div className="admin-top-actions">
+  return <div className="admin-shell gcome-shell"><aside className="admin-sidebar"><div className="admin-brand-mobile-row"><Link href="/" className="wordmark admin-wordmark gcome-logo-link"><img src="/gcome-dash-brand.png" alt="Gcome — Vendez · Gérez · Suivez" className="gcome-dash-brand-img" /><span className="gcome-dash-brand-dark-fallback"><GcomeBrand compact crownAbove hideBag /></span></Link><div className="admin-mobile-quick-top"><button type="button" className="neo-darkmode-btn mobile-top-theme-btn" onClick={toggleTheme} title={theme === "dark" ? "Passer en Mode Clair" : "Passer en Mode Sombre"} aria-label="Basculer Mode Clair / Sombre">{theme === "dark" ? (<><Sun size={13} className="neo-sun-glow" /><span>Clair</span></>) : (<><Moon size={13} className="neo-moon-glow" /><span>Dark</span></>)}</button><button type="button" className={`neo-darkmode-btn gcome-mobile-bell-btn ${isNotifOpen ? "is-open" : ""}`} onClick={toggleNotifPanel} aria-expanded={isNotifOpen} title="Centre de notifications" aria-label="Notifications"><Bell size={14} />{notifUnreadCount > 0 && <span className="gcome-mobile-bell-badge">{notifUnreadCount > 99 ? "99+" : notifUnreadCount}</span>}</button><button type="button" onClick={() => setIsProfileModalOpen(true)} title="Mon profil, salaire & commissions" aria-label="Mon profil et commissions" className="gcome-profile-pill"><span>{currentActorName.slice(0, 2).toUpperCase()}</span>{activeNewCount > 0 && <span className="gcome-avatar-count">{activeNewCount}</span>}</button></div></div><button type="button" className="admin-user gcome-sidebar-shop-card" onClick={() => setIsProfileModalOpen(true)} title="Voir mon salaire, évolution & commissions"><div className="admin-avatar">{currentActorName.slice(0, 2).toUpperCase()}</div><div><strong>{currentActorName}</strong><span>{isOwner ? "Boutique Active • Voir profil" : "Confirmateur • Voir salaire"}</span></div></button><nav className="admin-nav"><span className="admin-nav-label">Espace Boutique</span><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><LayoutDashboard size={18} />Vue d'ensemble</button><button className={section === "dashboard" ? "active" : ""} onClick={() => go("dashboard")}><ClipboardList size={18} />Commandes Actives <b>{activeNewCount}</b></button><button className={section === "staff" ? "active" : ""} onClick={() => go("staff")}><Users size={18} />Confirmateurs & Salaires</button><button className={section === "transferred" ? "active" : ""} onClick={() => go("transferred")}><Truck size={18} />Transférées <b className="nav-badge-purple">{transferredCount}</b></button><button className={section === "abandoned" ? "active" : ""} onClick={() => go("abandoned")}><ClipboardList size={18} />Commandes abandonnées <b>{abandonedCount === undefined ? "—" : abandonedCount}</b></button><button className={section === "sheet" ? "active" : ""} onClick={() => go("sheet")}><FileSpreadsheet size={18} />Google Sheets</button><button className={section === "ecom" ? "active" : ""} onClick={() => go("ecom")}><Truck size={18} />E-com & DHD <b>{confirmedCount}</b></button><button className={section === "returns" ? "active" : ""} onClick={() => go("returns")}><RotateCcw size={18} />Retours & Stocks</button><button className={section === "catalogue" ? "active" : ""} onClick={() => go("catalogue")}><Package size={18} />Catalogue & Studio IA <b>{catalogCount}</b></button><button onClick={() => go("catalogue")}><Users size={18} />Stocks</button><span className="admin-nav-label">Réglages</span><button onClick={() => go("staff")}><BarChart3 size={18} />Rapports & Performances</button><button className={section === "settings" ? "active" : ""} onClick={() => go("settings")}><Settings2 size={18} />Pixels & paramètres</button></nav><Link href="/" className="back-store">← Retour à la boutique</Link></aside><main className="admin-main"><header className="admin-topbar"><div><span className="eyebrow">{new Intl.DateTimeFormat("fr-DZ", { timeZone: "Africa/Algiers", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}</span><h1>{section === "staff" ? "Confirmateurs, Salaires & Journal d'Activité" : section === "transferred" ? "Commandes Transférées & Suivi" : section === "returns" ? "Gestion des Retours & Stocks" : section === "catalogue" ? "Studio Produits & Landing Pages" : section === "ecom" ? "E-com Delivery & DHD (EcoTrack)" : section === "sheet" ? "Google Sheets" : section === "settings" ? "Pixels & paramètres" : section === "abandoned" ? "Commandes abandonnées" : `Bonjour, ${currentActorName} 👑`}</h1></div><div className="admin-top-actions">
   <button type="button" className="neo-darkmode-btn" onClick={toggleTheme} title={theme === "dark" ? "Mode Clair" : "Mode Sombre"} aria-label="Basculer Mode Sombre">
   {theme === "dark" ? (
     <>
@@ -1172,7 +1247,7 @@ function AdminPageContent() {
     <Smartphone size={14} className="topbar-pill-icon" />
     <span className="neo-btn-label" style={{ fontWeight: 700 }}>App Mobile</span>
   </button>
-  <div className="gcome-notif-wrap"><button type="button" className={`icon-button gcome-notif-bell ${isNotifOpen ? "is-open" : ""}`} onClick={e => { e.stopPropagation(); setIsNotifOpen(prev => !prev); }} aria-label="Notifications" title="Centre de notifications"><Bell size={19} />{notifUnreadCount > 0 && <span className="gcome-bell-badge">{notifUnreadCount > 99 ? "99+" : notifUnreadCount}</span>}</button></div><button type="button" className="admin-profile" onClick={() => setIsProfileModalOpen(true)} title="Voir mon profil, salaire & commissions" style={{ background: "transparent", border: 0, cursor: "pointer" }}><div className="admin-avatar small gcome-avatar-badge">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></button></div></header><div className="admin-content"><Suspense fallback={<section className="admin-data-state" role="status"><span className="eyebrow">Administration</span><h2>Chargement du module…</h2></section>}>{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} focusedOrderId={focusedOrderId} onClearFocusedOrder={() => setFocusedOrderId(null)} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} allOrders={serverOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onSetCarrier={handleSetCarrier} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} visitAnalytics={visitsQuery.data} visitAnalyticsLoading={visitsQuery.isLoading} visitAnalyticsFetching={visitsQuery.isFetching} onRefreshVisits={() => void visitsQuery.refetch()} stockPanel={<>{gcomeHeroBanner}<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} /></>} />}</Suspense></div></main><AdminNotificationCenter open={isNotifOpen} onClose={() => setIsNotifOpen(false)} items={notifItems} unreadCount={notifUnreadCount} isUnread={isNotifUnread} onMarkAsRead={markNotifRead} onMarkAllAsRead={markAllNotifsRead} onSelectNotification={item => handleNotificationDeepLink(item.orderId, item.targetSection)} /><GcomeBottomWaveBar /><nav className="admin-mobile-nav gcome-bottom-dock" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={18} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={18} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge gcome-red-badge">{transferredCount}</span>}</button><button type="button" className={section === "catalogue" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => { go("catalogue"); setIsMoreMenuOpen(false); }}><Package size={18} /><span>Produits</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={18} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><Menu size={18} /><span>Menu</span></button></nav>{isSearchOpen && (
+  <div className="gcome-notif-wrap"><button type="button" className={`icon-button gcome-notif-bell ${isNotifOpen ? "is-open" : ""}`} onClick={toggleNotifPanel} aria-expanded={isNotifOpen} aria-label="Notifications" title="Centre de notifications"><Bell size={19} />{notifUnreadCount > 0 && <span className="gcome-bell-badge">{notifUnreadCount > 99 ? "99+" : notifUnreadCount}</span>}</button></div><button type="button" className="admin-profile" onClick={() => setIsProfileModalOpen(true)} title="Voir mon profil, salaire & commissions" style={{ background: "transparent", border: 0, cursor: "pointer" }}><div className="admin-avatar small gcome-avatar-badge">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></button></div></header><div className="admin-content"><Suspense fallback={<section className="admin-data-state" role="status"><span className="eyebrow">Administration</span><h2>Chargement du module…</h2></section>}>{section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} focusedOrderId={focusedOrderId} onClearFocusedOrder={() => setFocusedOrderId(null)} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} allOrders={serverOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onSetCarrier={handleSetCarrier} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} visitAnalytics={visitsQuery.data} visitAnalyticsLoading={visitsQuery.isLoading} visitAnalyticsFetching={visitsQuery.isFetching} onRefreshVisits={() => void visitsQuery.refetch()} stockPanel={<>{gcomeHeroBanner}<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} /></>} />}</Suspense></div></main><AdminNotificationCenter open={isNotifOpen} onClose={() => setIsNotifOpen(false)} items={notifItems} unreadCount={notifUnreadCount} isUnread={isNotifUnread} onMarkAsRead={markNotifRead} onMarkAllAsRead={markAllNotifsRead} onSelectNotification={item => handleNotificationDeepLink(item.orderId, item.targetSection)} /><GcomeBottomWaveBar /><nav className="admin-mobile-nav gcome-bottom-dock" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={18} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={18} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge gcome-red-badge">{transferredCount}</span>}</button><button type="button" className={section === "catalogue" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => { go("catalogue"); setIsMoreMenuOpen(false); }}><Package size={18} /><span>Produits</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={18} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><Menu size={18} /><span>Menu</span></button></nav>{isSearchOpen && (
   <div className="admin-search-modal-overlay" onClick={() => setIsSearchOpen(false)}>
     <div className="admin-search-modal" onClick={e => e.stopPropagation()}>
       <div className="admin-search-modal-head">

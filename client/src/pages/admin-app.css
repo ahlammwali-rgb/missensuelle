@@ -1258,7 +1258,7 @@ html.dark .aoc-chip-color,
 @media (max-width: 768px) {
   .admin-shell, .admin-main, .admin-content, .admin-app-dashboard, .app-main-grid, .app-orders-container, .app-orders-stream {
     max-width: 100vw !important;
-    overflow-x: hidden !important;
+    overflow-x: clip !important;
     box-sizing: border-box !important;
   }
   .app-order-card {
@@ -1543,8 +1543,8 @@ html.dark .aoc-chip-color,
 .transferred-panel {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding-bottom: 40px;
+  gap: 14px;
+  padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
 }
 
 .transferred-header {
@@ -6345,10 +6345,23 @@ html.dark .gcome-shell .badge-status-nouvelle,
     box-sizing: border-box !important;
     overflow-x: clip !important;
   }
+  .admin-shell.gcome-shell {
+    display: block !important;
+  }
+  .admin-shell.gcome-shell .admin-main {
+    margin-left: 0 !important;
+  }
+  .admin-shell.gcome-shell .admin-user,
+  .admin-shell.gcome-shell .admin-nav,
+  .admin-shell.gcome-shell .back-store {
+    display: none !important;
+  }
   .admin-shell.gcome-shell .admin-sidebar {
-    position: relative !important;
-    top: auto !important;
-    z-index: 2 !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 40 !important;
+    overflow: visible !important;
+    max-height: none !important;
     backdrop-filter: none !important;
     background: transparent !important;
     padding: 0 !important;
@@ -6388,9 +6401,10 @@ html.dark .gcome-shell .badge-status-nouvelle,
     box-shadow: 0 8px 30px -6px rgba(168, 85, 247, 0.46) !important;
   }
   .admin-shell.gcome-shell .gcome-logo-link {
-    min-width: 138px !important;
+    min-width: 0 !important;
     min-height: 46px !important;
     flex: 1 1 auto !important;
+    overflow: hidden;
     display: inline-flex !important;
     align-items: center !important;
   }
@@ -9382,11 +9396,57 @@ html.dark .gcome-notif-bell.is-open,
   color: #e9d5ff !important;
 }
 
+.admin-shell.gcome-shell > .admin-main {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: clip;
+}
+
+@media (min-width: 769px) and (max-width: 1120px) {
+  .admin-shell.gcome-shell > .admin-main {
+    width: calc(100% - 210px) !important;
+    max-width: calc(100% - 210px) !important;
+    margin-left: 210px !important;
+  }
+  .admin-shell.gcome-shell .admin-topbar {
+    flex-wrap: wrap !important;
+    gap: 10px 14px !important;
+    padding: 14px 18px !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  .admin-shell.gcome-shell .admin-topbar > div:first-child {
+    min-width: 0 !important;
+    flex: 1 1 200px !important;
+  }
+  .admin-shell.gcome-shell .admin-topbar h1 {
+    font-size: 20px !important;
+  }
+  .admin-shell.gcome-shell .admin-top-actions {
+    flex-wrap: wrap !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  .admin-shell.gcome-shell .admin-top-actions .neo-darkmode-btn {
+    padding: 6px 9px !important;
+    font-size: 11px !important;
+    min-height: 32px !important;
+  }
+}
+
+.gcome-notif-bell svg,
+.gcome-bell-badge {
+  pointer-events: none;
+}
+
 .admin-shell.gcome-shell .admin-mobile-quick-top .gcome-mobile-bell-btn {
   position: relative;
-  width: 34px !important;
-  min-width: 34px !important;
-  height: 30px !important;
+  z-index: 5;
+  width: 38px !important;
+  min-width: 38px !important;
+  height: 36px !important;
   padding: 0 !important;
   justify-content: center !important;
   border-radius: 999px !important;
@@ -9395,10 +9455,14 @@ html.dark .gcome-notif-bell.is-open,
   color: #6d28d9 !important;
   box-shadow: 0 4px 10px rgba(109, 40, 217, 0.14) !important;
   overflow: visible !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .admin-shell.gcome-shell .admin-mobile-quick-top .gcome-mobile-bell-btn svg {
   color: #6d28d9 !important;
+  pointer-events: none;
 }
 
 .admin-shell.gcome-shell .admin-mobile-quick-top .gcome-mobile-bell-btn.is-open {
@@ -9439,6 +9503,7 @@ html.dark .admin-shell.gcome-shell .admin-mobile-quick-top .gcome-mobile-bell-bt
   text-align: center;
   box-shadow: 0 2px 6px rgba(225, 29, 72, 0.45);
   border: 1.5px solid #ffffff;
+  pointer-events: none;
 }
 
 html.dark .gcome-mobile-bell-badge,
@@ -9450,7 +9515,7 @@ html.dark .gcome-mobile-bell-badge,
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.14);
-  z-index: 2100;
+  z-index: 2200;
 }
 
 .gcome-notif-popover {
@@ -9496,7 +9561,7 @@ html.dark .gcome-notif-popover,
     inset: 0;
     background: rgba(15, 23, 42, 0.36);
     backdrop-filter: blur(3px);
-    z-index: 2100;
+    z-index: 2200;
   }
   .gcome-notif-popover {
     top: 62px;
@@ -9505,6 +9570,7 @@ html.dark .gcome-notif-popover,
     width: auto;
     max-height: 76dvh;
     border-radius: 18px;
+    z-index: 2201;
   }
 }
 
@@ -9811,26 +9877,92 @@ html.dark .gcome-notif-item-meta strong,
 }
 
 /* =========================================================
-   Page Transférées — Fiches Compactes & Design Modernisé
+   Page Transférées — Fiches Ultra-Compactes Sans Photo
    ========================================================= */
+.trp-results-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.86);
+  border: 1px solid rgba(124, 58, 237, 0.14);
+}
+
+html.dark .trp-results-bar,
+.dark .trp-results-bar {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(168, 85, 247, 0.24);
+}
+
+.trp-results-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--app-text-muted, #475569);
+}
+
+.trp-results-count strong {
+  color: #6d28d9;
+  font-weight: 900;
+}
+
+html.dark .trp-results-count,
+.dark .trp-results-count {
+  color: #cbd5e1;
+}
+
+html.dark .trp-results-count strong,
+.dark .trp-results-count strong {
+  color: #e9d5ff;
+}
+
+.trp-results-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(124, 58, 237, 0.28);
+  background: rgba(124, 58, 237, 0.1);
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.trp-results-reset-btn.is-large {
+  margin-top: 10px;
+  padding: 7px 14px;
+  font-size: 12px;
+}
+
+html.dark .trp-results-reset-btn,
+.dark .trp-results-reset-btn {
+  background: rgba(168, 85, 247, 0.2);
+  color: #f3e8ff;
+  border-color: rgba(192, 132, 252, 0.38);
+}
+
 .gcome-shell .trans-order-card.gcome-trans-card {
-  border-radius: 18px !important;
+  border-radius: 15px !important;
   border: 1px solid rgba(124, 58, 237, 0.14) !important;
-  border-left: 5px solid #8b5cf6 !important;
-  padding: 12px 13px !important;
+  border-left: 4px solid #8b5cf6 !important;
+  padding: 8px 11px !important;
   background: var(--app-surface, #ffffff) !important;
-  box-shadow: 0 8px 22px -8px rgba(76, 29, 149, 0.12) !important;
+  box-shadow: 0 4px 14px -6px rgba(76, 29, 149, 0.12) !important;
   display: flex;
   flex-direction: column;
-  gap: 8px !important;
-  transition: transform 0.16s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  gap: 5px !important;
+  transition: transform 0.14s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 html.dark .gcome-shell .trans-order-card.gcome-trans-card,
 .dark .gcome-shell .trans-order-card.gcome-trans-card {
   background: rgba(15, 23, 42, 0.9) !important;
   border-color: rgba(148, 163, 184, 0.16) !important;
-  box-shadow: 0 10px 26px -10px rgba(0, 0, 0, 0.55) !important;
+  box-shadow: 0 8px 20px -10px rgba(0, 0, 0, 0.55) !important;
 }
 
 .gcome-shell .trans-order-card.gcome-trans-card.trans-card-livre {
@@ -9872,11 +10004,11 @@ html.dark .gcome-shell .trans-order-card.gcome-trans-card,
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 5px 9px;
-  border-radius: 10px;
+  padding: 4px 8px;
+  border-radius: 9px;
   background: linear-gradient(135deg, rgba(124, 58, 237, 0.14), rgba(16, 185, 129, 0.14));
   border: 1px solid rgba(124, 58, 237, 0.32);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 800;
   color: #5b21b6;
 }
@@ -9901,10 +10033,10 @@ html.dark .trans-focus-banner,
 
 .gcome-trans-card .trans-card-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding-bottom: 8px !important;
+  gap: 6px;
+  padding-bottom: 5px !important;
   border-bottom: 1px dashed rgba(148, 163, 184, 0.22) !important;
 }
 
@@ -9912,7 +10044,6 @@ html.dark .trans-focus-banner,
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
   min-width: 0;
   flex: 1 1 auto;
 }
@@ -9921,42 +10052,61 @@ html.dark .trans-focus-banner,
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
+}
+
+.gcome-trans-card .trans-order-id {
+  font-size: 12.5px !important;
+  font-weight: 900 !important;
+}
+
+.gcome-trans-card .trans-carrier-pill,
+.gcome-trans-card .trans-tracking-pill {
+  padding: 2px 6px !important;
+  font-size: 10px !important;
+  border-radius: 7px !important;
 }
 
 .gcome-trans-card .trans-status-badge {
-  max-width: 56%;
+  max-width: 52%;
   margin-left: auto;
-  padding: 5px 9px !important;
-  border-radius: 11px !important;
-  gap: 6px !important;
+  padding: 3px 8px !important;
+  border-radius: 9px !important;
+  gap: 5px !important;
   text-align: left !important;
+  flex-shrink: 0;
 }
 
 .gcome-trans-card .trans-badge-copy {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
 }
 
 .gcome-trans-card .trans-badge-text {
-  font-size: 11.5px;
+  font-size: 10.8px;
   font-weight: 900;
   line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .gcome-trans-card .trans-badge-sub {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 600;
-  opacity: 0.85;
+  opacity: 0.84;
   line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .gcome-trans-card .trans-card-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .gcome-trans-card .trans-info-row {
@@ -9969,13 +10119,16 @@ html.dark .trans-focus-banner,
 .gcome-trans-card .trans-customer-box {
   min-width: 0;
   flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .gcome-trans-card .trans-customer-name {
-  font-size: 13.8px;
+  font-size: 13px;
   font-weight: 900;
   color: var(--app-text, #0f172a);
-  line-height: 1.2;
+  line-height: 1.18;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -9989,19 +10142,18 @@ html.dark .gcome-trans-card .trans-customer-name,
 .gcome-trans-card .trans-phone-row {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 2px;
+  gap: 5px;
 }
 
 .gcome-trans-card .trans-customer-phone {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   padding: 0;
   border: 0;
   background: transparent;
   color: #6d28d9;
-  font-size: 12.2px;
+  font-size: 11.5px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -10012,8 +10164,8 @@ html.dark .gcome-trans-card .trans-customer-phone,
 }
 
 .trans-mini-wa-btn {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   border: 1px solid rgba(34, 197, 94, 0.45);
   background: rgba(34, 197, 94, 0.14);
@@ -10036,11 +10188,11 @@ html.dark .trans-mini-wa-btn,
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
+  gap: 1px;
 }
 
 .gcome-trans-card .trans-price-amount {
-  font-size: 15.5px;
+  font-size: 14px;
   font-weight: 900;
   color: #16a34a;
   line-height: 1.15;
@@ -10049,6 +10201,12 @@ html.dark .trans-mini-wa-btn,
 html.dark .gcome-trans-card .trans-price-amount,
 .dark .gcome-trans-card .trans-price-amount {
   color: #4ade80;
+}
+
+.gcome-trans-card .trans-paid-pill,
+.gcome-trans-card .trans-unpaid-pill {
+  padding: 1px 6px !important;
+  font-size: 9.5px !important;
 }
 
 .gcome-trans-card .trans-paid-pill.is-uncollected {
@@ -10064,12 +10222,13 @@ html.dark .gcome-trans-card .trans-paid-pill.is-uncollected,
 
 .trans-compact-product-box {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 12px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 8px;
+  border-radius: 10px;
   background: rgba(248, 250, 252, 0.9);
   border: 1px solid rgba(139, 92, 246, 0.12);
+  min-width: 0;
 }
 
 html.dark .trans-compact-product-box,
@@ -10078,39 +10237,30 @@ html.dark .trans-compact-product-box,
   border-color: rgba(168, 85, 247, 0.22);
 }
 
-.trans-compact-thumb,
-.trans-compact-thumb-fallback {
-  width: 38px;
-  height: 38px;
-  border-radius: 9px;
-  object-fit: cover;
-  flex-shrink: 0;
-  border: 1px solid rgba(139, 92, 246, 0.18);
-  background: rgba(139, 92, 246, 0.08);
-  color: #7c3aed;
-  display: grid;
-  place-items: center;
-}
-
-.trans-compact-prod-meta {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
 .trans-compact-prod-line {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
   gap: 4px;
-  font-size: 12px;
+  font-size: 11.2px;
   color: var(--app-text, #0f172a);
 }
 
-.trans-compact-prod-line strong {
+.trans-compact-prod-title {
   font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.trans-compact-prod-line .trans-chip-color,
+.trans-compact-prod-line .trans-chip-size {
+  flex-shrink: 0;
+  padding: 1px 5px !important;
+  font-size: 9.5px !important;
 }
 
 html.dark .trans-compact-prod-line,
@@ -10119,18 +10269,44 @@ html.dark .trans-compact-prod-line,
 }
 
 .gcome-trans-card .trans-destination-line {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
-  line-height: 1.25;
+  font-size: 10.5px;
+  line-height: 1.2;
   color: var(--app-text-muted, #64748b);
+  min-width: 0;
+}
+
+.gcome-trans-card .trans-destination-line span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.gcome-trans-card .trans-carrier-last-event {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px !important;
+  border-radius: 8px !important;
+  font-size: 10.5px !important;
+  line-height: 1.2 !important;
+  min-width: 0;
+}
+
+.gcome-trans-card .trans-carrier-last-event span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .gcome-shell .trans-card-footer.gcome-trans-footer {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 5px;
+  gap: 4px;
   padding-top: 2px;
 }
 
@@ -10141,28 +10317,28 @@ html.dark .trans-compact-prod-line,
 .gcome-shell .trans-card-footer.gcome-trans-footer .trans-act-btn {
   width: 100%;
   justify-content: center;
-  height: 32px;
-  padding: 0 5px;
-  border-radius: 10px;
-  font-size: 11px;
+  height: 29px;
+  padding: 0 4px;
+  border-radius: 9px;
+  font-size: 10.5px;
   font-weight: 800;
-  gap: 4px;
+  gap: 3px;
   white-space: nowrap;
 }
 
 @media (max-width: 480px) {
   .gcome-shell .trans-order-card.gcome-trans-card {
-    padding: 10px 11px !important;
-    border-radius: 16px !important;
+    padding: 8px 9px !important;
+    border-radius: 14px !important;
   }
   .gcome-trans-card .trans-status-badge {
-    max-width: 54%;
-    padding: 4px 8px !important;
+    max-width: 52%;
+    padding: 3px 7px !important;
   }
   .gcome-shell .trans-card-footer.gcome-trans-footer .trans-act-btn {
-    font-size: 10.2px;
+    font-size: 10px;
     padding: 0 3px;
-    height: 30px;
+    height: 28px;
   }
 }
 

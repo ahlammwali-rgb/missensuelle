@@ -9,7 +9,7 @@ import {
 } from "../shared/carrierStatus";
 import { reconcileCarrierBatchOrders, wasOrderAutoDelivered } from "./carrierSync";
 import { markOrderDelivered, submitCheckoutOrder, updateMemoryOrderStatus, listCheckoutOrders } from "./checkout";
-import { buildEcoTrackingItem } from "./ecotrackDelivery";
+import { buildEcoTrackingItem, getEcoTrackTrackingBatch } from "./ecotrackDelivery";
 import { hasSentVictoryTag, markSentVictoryTag } from "./persistentStore";
 import { sendAdminPushNotification } from "./webPush";
 
@@ -309,5 +309,73 @@ describe("bidirectional carrier delivery reconciliation", () => {
     });
     expect(second.skippedDuplicate).toBe(true);
     markSentVictoryTag(customTag);
+  });
+
+  it("scans intermediate EcoTrack pages and enriches >60 empty-history parcels without truncation", async () => {
+    const prevUrl = process.env.ECOTRACK_BASE_URL;
+    const prevTok = process.env.ECOTRACK_API_TOKEN;
+    const prevFetch = globalThis.fetch;
+
+    const allTrackings = Array.from({ length: 65 }, (_, i) => `DHD-BATCH-${i + 1}`);
+    const page10Target = "DHD-BATCH-65";
+    const trackingInfoCalls = new Set<string>();
+
+    process.env.ECOTRACK_BASE_URL = "https://mock.dhd-dz.example";
+    process.env.ECOTRACK_API_TOKEN = "test-token";
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/api/v1/get/orders") {
+        const page = Number(url.searchParams.get("page") || "1");
+        let data: Array<Record<string, unknown>> = [];
+        if (page === 1) {
+          data = allTrackings.slice(0, 64).map(trk => ({
+            tracking: trk,
+            status: "en_livraison",
+            livreur: "Ali",
+          }));
+        } else if (page === 10) {
+          data = [{ tracking: page10Target, status: "livré_non_encaissé", livreur: "Karim" }];
+        } else {
+          data = [{ tracking: `DHD-OTHER-P${page}`, status: "en_preparation" }];
+        }
+        return new Response(
+          JSON.stringify({
+            current_page: page,
+            last_page: 20,
+            next_page_url: page < 20 ? `https://mock.dhd-dz.example/api/v1/get/orders?page=${page + 1}` : null,
+            data,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.pathname === "/api/v1/get/tracking/info") {
+        const trk = String(url.searchParams.get("tracking") || "");
+        trackingInfoCalls.add(trk);
+        return new Response(
+          JSON.stringify({
+            tracking: trk,
+            status: trk === page10Target ? "livré_non_encaissé" : "en_livraison",
+            activity: [{ date: "2026-11-24 10:00", status: "Sortir en livraison", wilaya: "Alger" }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    try {
+      const res = await getEcoTrackTrackingBatch(allTrackings, { forceRefresh: true });
+      expect(res[page10Target]).toBeDefined();
+      expect(isCarrierTrackingDelivered(res[page10Target])).toBe(true);
+      expect(Object.keys(res)).toHaveLength(65);
+      expect(trackingInfoCalls.size).toBe(65);
+    } finally {
+      globalThis.fetch = prevFetch;
+      if (prevUrl === undefined) delete process.env.ECOTRACK_BASE_URL;
+      else process.env.ECOTRACK_BASE_URL = prevUrl;
+      if (prevTok === undefined) delete process.env.ECOTRACK_API_TOKEN;
+      else process.env.ECOTRACK_API_TOKEN = prevTok;
+    }
   });
 });
