@@ -3,6 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
+import { registerAdOAuthRoutes } from "../adOAuth";
 import { publicPlatformScript } from "./publicConfig";
 import { appRouter } from "../routers";
 import {
@@ -40,6 +41,7 @@ async function startServer() {
   app.get("/api/tracking/bootstrap.js", sendLiveBootstrap);
   app.get(/^\/tracking\/bootstrap\.[a-f0-9]{16}\.js$/, sendLiveBootstrap);
   registerOAuthRoutes(app);
+  registerAdOAuthRoutes(app);
   registerCheckoutHttpRoutes(app);
   app.post("/api/analytics/visit", async (req, res) => {
     try {

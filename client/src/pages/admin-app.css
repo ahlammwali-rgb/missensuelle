@@ -11795,6 +11795,358 @@ html.dark .fin-modal-sheet,
   cursor: pointer;
 }
 
+/* Ad OAuth 1-Click Connection UI */
+.fin-oauth-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 13px;
+  border-radius: 13px;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.fin-oauth-banner.is-ok {
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #047857;
+}
+
+.fin-oauth-banner.is-err {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #dc2626;
+}
+
+html.dark .fin-oauth-banner.is-ok {
+  color: #6ee7b7;
+}
+
+html.dark .fin-oauth-banner.is-err {
+  color: #fca5a5;
+}
+
+.fin-oauth-banner button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.fin-oauth-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.fin-oauth-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.fin-oauth-logo.is-meta {
+  background: linear-gradient(135deg, #1877f2, #0d5bd9);
+}
+
+.fin-oauth-logo.is-tiktok {
+  background: linear-gradient(135deg, #0f172a, #ec4899);
+}
+
+.fin-oauth-cta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fin-oauth-btn {
+  flex: 1 1 200px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 0;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 6px 16px -6px rgba(15, 23, 42, 0.35);
+  transition: transform 0.14s ease, filter 0.14s ease;
+}
+
+.fin-oauth-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+
+.fin-oauth-btn.is-meta {
+  background: linear-gradient(135deg, #1877f2, #2563eb);
+}
+
+.fin-oauth-btn.is-tiktok {
+  background: linear-gradient(135deg, #111827, #334155 60%, #db2777);
+}
+
+.fin-tt-note {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.fin-oauth-expiry {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+}
+
+.fin-oauth-expiry.is-soon {
+  background: rgba(245, 158, 11, 0.18);
+  color: #b45309;
+}
+
+html.dark .fin-oauth-expiry {
+  color: #6ee7b7;
+}
+
+html.dark .fin-oauth-expiry.is-soon {
+  color: #fcd34d;
+}
+
+.fin-oauth-setup-callout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px dashed rgba(124, 58, 237, 0.28);
+}
+
+.fin-oauth-setup-callout p {
+  margin: 0;
+  font-size: 11.8px;
+  line-height: 1.45;
+  color: var(--app-text-muted, #475569);
+}
+
+html.dark .fin-oauth-setup-callout p {
+  color: #cbd5e1;
+}
+
+.fin-accounts-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.fin-accounts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.fin-link-btn {
+  border: 0;
+  background: transparent;
+  color: #7c3aed;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0;
+}
+
+html.dark .fin-link-btn {
+  color: #c4b5fd;
+}
+
+.fin-accounts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 165px;
+  overflow-y: auto;
+}
+
+.fin-account-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+}
+
+html.dark .fin-account-item {
+  background: rgba(30, 41, 59, 0.72);
+}
+
+.fin-account-item.is-active {
+  border-color: rgba(124, 58, 237, 0.45);
+  background: rgba(124, 58, 237, 0.08);
+}
+
+.fin-account-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fin-account-meta strong {
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fin-account-meta small {
+  font-size: 10.5px;
+  color: var(--app-text-muted, #64748b);
+}
+
+.fin-account-cur {
+  font-size: 10.5px;
+  font-weight: 900;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+}
+
+html.dark .fin-account-cur {
+  background: rgba(248, 250, 252, 0.14);
+}
+
+.fin-oauth-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fin-oauth-foot small {
+  font-size: 11px;
+  color: var(--app-text-muted, #64748b);
+}
+
+.fin-oauth-drawer {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.fin-oauth-drawer-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  background: rgba(148, 163, 184, 0.08);
+  color: inherit;
+  font-size: 11.8px;
+  font-weight: 800;
+  cursor: pointer;
+  text-align: left;
+}
+
+.fin-setup-chip {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
+
+.fin-setup-chip.is-ok {
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+}
+
+html.dark .fin-setup-chip.is-ok {
+  color: #6ee7b7;
+}
+
+.fin-oauth-drawer-body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.fin-setup-hint {
+  margin: 0;
+  font-size: 11.2px;
+  line-height: 1.45;
+  color: var(--app-text-muted, #475569);
+}
+
+.fin-setup-hint a {
+  color: #7c3aed;
+  font-weight: 800;
+}
+
+html.dark .fin-setup-hint {
+  color: #cbd5e1;
+}
+
+.fin-callback-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+html.dark .fin-callback-box {
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.fin-callback-box code {
+  font-size: 10.5px;
+  word-break: break-all;
+  flex: 1;
+}
+
+.fin-advanced-details {
+  font-size: 11.5px;
+  color: var(--app-text-muted, #64748b);
+}
+
+.fin-advanced-details summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
 
 
 

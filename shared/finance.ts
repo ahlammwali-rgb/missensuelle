@@ -180,16 +180,49 @@ export type FinanceOrderCostOverride = {
   updatedAt: string;
 };
 
+export type FinanceAdDiscoveredAccount = {
+  id: string;
+  name: string;
+  currency: FinanceAdCurrency;
+  status?: string;
+};
+
+export type FinanceAdOAuthStatusFields = {
+  authMode?: "oauth" | "manual";
+  oauthAppConfigured?: boolean;
+  oauthAppId?: string;
+  oauthAppSecretPreview?: string;
+  oauthFromEnv?: boolean;
+  userName?: string;
+  tokenExpiresAt?: string;
+  discoveredAccounts?: FinanceAdDiscoveredAccount[];
+  selectedAccountIds?: string[];
+};
+
 export type FinanceAdPlatformCreds = {
   meta?: {
     adAccountId: string;
     accessToken: string;
+    authMode?: "oauth" | "manual";
+    userName?: string;
+    tokenExpiresAt?: string;
+    discoveredAccounts?: FinanceAdDiscoveredAccount[];
+    selectedAccountIds?: string[];
+    oauthAppId?: string;
+    oauthAppSecret?: string;
     lastSyncAt?: string;
     lastError?: string;
   };
   tiktok?: {
     advertiserId: string;
     accessToken: string;
+    authMode?: "oauth" | "manual";
+    userName?: string;
+    tokenExpiresAt?: string;
+    discoveredAccounts?: FinanceAdDiscoveredAccount[];
+    selectedAccountIds?: string[];
+    oauthAppId?: string;
+    oauthAppSecret?: string;
     lastSyncAt?: string;
     lastError?: string;
   };
@@ -202,14 +235,14 @@ export type FinanceAdConnectionStatus = {
     tokenPreview: string;
     lastSyncAt?: string;
     lastError?: string;
-  };
+  } & FinanceAdOAuthStatusFields;
   tiktok: {
     configured: boolean;
     advertiserId: string;
     tokenPreview: string;
     lastSyncAt?: string;
     lastError?: string;
-  };
+  } & FinanceAdOAuthStatusFields;
 };
 
 export type PersistedFinanceState = {

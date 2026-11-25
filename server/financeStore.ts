@@ -8,6 +8,8 @@ import {
   financeSettingsPatchSchema,
   type FinanceAdConnectionStatus,
   type FinanceAdCurrency,
+  type FinanceAdDiscoveredAccount,
+  type FinanceAdOAuthStatusFields,
   type FinanceAdPlatform,
   type FinanceAdPlatformCreds,
   type FinanceAdSpendEntry,
@@ -99,6 +101,65 @@ export async function getFinanceStateSnapshot(): Promise<PersistedFinanceState> 
   return getServerFinanceState();
 }
 
+function normalizePlatformAccountId(platform: FinanceAdPlatform, rawId: string): string {
+  const clean = rawId.trim();
+  if (!clean) return "";
+  if (platform === "meta") {
+    return clean.startsWith("act_") ? clean : `act_${clean}`;
+  }
+  return clean;
+}
+
+export function getEffectiveAdOAuthAppConfig(platform: FinanceAdPlatform): {
+  appId: string;
+  appSecret: string;
+  configured: boolean;
+  fromEnv: boolean;
+} {
+  const state = getServerFinanceState();
+  const saved = platform === "meta" ? state.adCredentials?.meta : state.adCredentials?.tiktok;
+  const savedAppId = String(saved?.oauthAppId || "").trim();
+  const savedSecret = String(saved?.oauthAppSecret || "").trim();
+
+  const envAppId = String(
+    platform === "meta" ? process.env.META_APP_ID || "" : process.env.TIKTOK_APP_ID || ""
+  ).trim();
+  const envSecret = String(
+    platform === "meta" ? process.env.META_APP_SECRET || "" : process.env.TIKTOK_APP_SECRET || ""
+  ).trim();
+
+  if (savedAppId && savedSecret) {
+    return { appId: savedAppId, appSecret: savedSecret, configured: true, fromEnv: false };
+  }
+  if (envAppId && envSecret) {
+    return { appId: envAppId, appSecret: envSecret, configured: true, fromEnv: true };
+  }
+  return {
+    appId: savedAppId || envAppId,
+    appSecret: savedSecret || envSecret,
+    configured: false,
+    fromEnv: Boolean(!savedSecret && envSecret),
+  };
+}
+
+export function getActiveAccountIdsForPlatform(
+  platform: FinanceAdPlatform,
+  creds: FinanceAdPlatformCreds = getFinanceAdCredentialsServerOnly()
+): string[] {
+  const entry = platform === "meta" ? creds.meta : creds.tiktok;
+  if (!entry?.accessToken) return [];
+  const selected = Array.isArray(entry.selectedAccountIds)
+    ? entry.selectedAccountIds.map(id => normalizePlatformAccountId(platform, id)).filter(Boolean)
+    : [];
+  if (selected.length > 0) return Array.from(new Set(selected));
+
+  const primary = normalizePlatformAccountId(
+    platform,
+    platform === "meta" ? creds.meta?.adAccountId || "" : creds.tiktok?.advertiserId || ""
+  );
+  return primary ? [primary] : [];
+}
+
 export function getFinanceAdCredentialsServerOnly(): FinanceAdPlatformCreds {
   const state = getServerFinanceState();
   const envMetaAccount = (process.env.META_AD_ACCOUNT_ID || "").trim();
@@ -111,10 +172,11 @@ export function getFinanceAdCredentialsServerOnly(): FinanceAdPlatformCreds {
 
   return {
     meta:
-      savedMeta?.accessToken && savedMeta?.adAccountId
+      savedMeta?.accessToken && (savedMeta?.adAccountId || (savedMeta?.selectedAccountIds?.length ?? 0) > 0 || (savedMeta?.discoveredAccounts?.length ?? 0) > 0)
         ? savedMeta
         : envMetaToken && envMetaAccount
           ? {
+              ...(savedMeta || {}),
               adAccountId: envMetaAccount,
               accessToken: envMetaToken,
               lastSyncAt: savedMeta?.lastSyncAt,
@@ -122,10 +184,11 @@ export function getFinanceAdCredentialsServerOnly(): FinanceAdPlatformCreds {
             }
           : savedMeta,
     tiktok:
-      savedTt?.accessToken && savedTt?.advertiserId
+      savedTt?.accessToken && (savedTt?.advertiserId || (savedTt?.selectedAccountIds?.length ?? 0) > 0 || (savedTt?.discoveredAccounts?.length ?? 0) > 0)
         ? savedTt
         : envTtToken && envTtAdvertiser
           ? {
+              ...(savedTt || {}),
               advertiserId: envTtAdvertiser,
               accessToken: envTtToken,
               lastSyncAt: savedTt?.lastSyncAt,
@@ -135,22 +198,47 @@ export function getFinanceAdCredentialsServerOnly(): FinanceAdPlatformCreds {
   };
 }
 
+function buildOAuthFields(
+  platform: FinanceAdPlatform,
+  entry:
+    | FinanceAdPlatformCreds["meta"]
+    | FinanceAdPlatformCreds["tiktok"]
+    | undefined
+): FinanceAdOAuthStatusFields {
+  const oauthCfg = getEffectiveAdOAuthAppConfig(platform);
+  return {
+    authMode: entry?.authMode || (entry?.accessToken ? "manual" : undefined),
+    oauthAppConfigured: oauthCfg.configured,
+    oauthAppId: oauthCfg.appId || undefined,
+    oauthAppSecretPreview: maskSecret(oauthCfg.appSecret) || undefined,
+    oauthFromEnv: oauthCfg.fromEnv,
+    userName: entry?.userName || undefined,
+    tokenExpiresAt: entry?.tokenExpiresAt || undefined,
+    discoveredAccounts: entry?.discoveredAccounts ? [...entry.discoveredAccounts] : undefined,
+    selectedAccountIds: entry?.selectedAccountIds ? [...entry.selectedAccountIds] : undefined,
+  };
+}
+
 export function buildPublicAdConnectionStatus(): FinanceAdConnectionStatus {
   const creds = getFinanceAdCredentialsServerOnly();
+  const metaPrimary = getActiveAccountIdsForPlatform("meta", creds)[0] || creds.meta?.adAccountId || "";
+  const ttPrimary = getActiveAccountIdsForPlatform("tiktok", creds)[0] || creds.tiktok?.advertiserId || "";
   return {
     meta: {
-      configured: Boolean(creds.meta?.adAccountId && creds.meta?.accessToken),
-      adAccountId: creds.meta?.adAccountId || "",
+      configured: Boolean(creds.meta?.accessToken && (metaPrimary || (creds.meta?.discoveredAccounts?.length ?? 0) > 0)),
+      adAccountId: metaPrimary,
       tokenPreview: maskSecret(creds.meta?.accessToken),
       lastSyncAt: creds.meta?.lastSyncAt,
       lastError: creds.meta?.lastError,
+      ...buildOAuthFields("meta", creds.meta),
     },
     tiktok: {
-      configured: Boolean(creds.tiktok?.advertiserId && creds.tiktok?.accessToken),
-      advertiserId: creds.tiktok?.advertiserId || "",
+      configured: Boolean(creds.tiktok?.accessToken && (ttPrimary || (creds.tiktok?.discoveredAccounts?.length ?? 0) > 0)),
+      advertiserId: ttPrimary,
       tokenPreview: maskSecret(creds.tiktok?.accessToken),
       lastSyncAt: creds.tiktok?.lastSyncAt,
       lastError: creds.tiktok?.lastError,
+      ...buildOAuthFields("tiktok", creds.tiktok),
     },
   };
 }
@@ -425,35 +513,177 @@ export async function saveFinanceAdCredentials(input: {
   const token = String(input.accessToken || "").trim();
   mutateFinanceState(state => {
     if (input.platform === "meta") {
-      const normalizedAccount = accountId
-        ? accountId.startsWith("act_")
-          ? accountId
-          : `act_${accountId}`
-        : "";
-      const prevToken = state.adCredentials?.meta?.accessToken || "";
-      const finalToken = token || prevToken;
+      const prev = state.adCredentials?.meta;
+      const normalizedAccount = normalizePlatformAccountId("meta", accountId);
+      const finalToken = token || prev?.accessToken || "";
       if (!normalizedAccount || !finalToken) {
         throw new Error("Ad Account ID Meta et Access Token requis.");
       }
       state.adCredentials.meta = {
+        oauthAppId: prev?.oauthAppId,
+        oauthAppSecret: prev?.oauthAppSecret,
         adAccountId: normalizedAccount,
         accessToken: finalToken,
-        lastSyncAt: state.adCredentials?.meta?.lastSyncAt,
+        authMode: "manual",
+        selectedAccountIds: [normalizedAccount],
+        lastSyncAt: prev?.lastSyncAt,
         lastError: undefined,
       };
     } else {
-      const prevToken = state.adCredentials?.tiktok?.accessToken || "";
-      const finalToken = token || prevToken;
-      if (!accountId || !finalToken) {
+      const prev = state.adCredentials?.tiktok;
+      const normalizedAccount = normalizePlatformAccountId("tiktok", accountId);
+      const finalToken = token || prev?.accessToken || "";
+      if (!normalizedAccount || !finalToken) {
         throw new Error("Advertiser ID TikTok et Access Token requis.");
       }
       state.adCredentials.tiktok = {
-        advertiserId: accountId,
+        oauthAppId: prev?.oauthAppId,
+        oauthAppSecret: prev?.oauthAppSecret,
+        advertiserId: normalizedAccount,
         accessToken: finalToken,
-        lastSyncAt: state.adCredentials?.tiktok?.lastSyncAt,
+        authMode: "manual",
+        selectedAccountIds: [normalizedAccount],
+        lastSyncAt: prev?.lastSyncAt,
         lastError: undefined,
       };
     }
+  });
+  return buildPublicAdConnectionStatus();
+}
+
+export async function saveFinanceAdOAuthAppConfig(input: {
+  platform: FinanceAdPlatform;
+  appId: string;
+  appSecret?: string;
+}): Promise<FinanceAdConnectionStatus> {
+  await ensureCheckoutStoreReady();
+  const appId = input.appId.trim();
+  const appSecret = String(input.appSecret || "").trim();
+  mutateFinanceState(state => {
+    if (input.platform === "meta") {
+      const prev = state.adCredentials?.meta;
+      const finalSecret = appSecret || prev?.oauthAppSecret || "";
+      if (!appId || !finalSecret) {
+        throw new Error("App ID et App Secret Meta requis.");
+      }
+      state.adCredentials.meta = {
+        ...(prev || {}),
+        adAccountId: prev?.adAccountId || "",
+        accessToken: prev?.accessToken || "",
+        oauthAppId: appId,
+        oauthAppSecret: finalSecret,
+      };
+    } else {
+      const prev = state.adCredentials?.tiktok;
+      const finalSecret = appSecret || prev?.oauthAppSecret || "";
+      if (!appId || !finalSecret) {
+        throw new Error("App ID et App Secret TikTok requis.");
+      }
+      state.adCredentials.tiktok = {
+        ...(prev || {}),
+        advertiserId: prev?.advertiserId || "",
+        accessToken: prev?.accessToken || "",
+        oauthAppId: appId,
+        oauthAppSecret: finalSecret,
+      };
+    }
+  });
+  return buildPublicAdConnectionStatus();
+}
+
+export async function clearFinanceAdOAuthAppConfig(
+  platform: FinanceAdPlatform
+): Promise<FinanceAdConnectionStatus> {
+  await ensureCheckoutStoreReady();
+  mutateFinanceState(state => {
+    const prev = platform === "meta" ? state.adCredentials?.meta : state.adCredentials?.tiktok;
+    if (!prev) return;
+    delete prev.oauthAppId;
+    delete prev.oauthAppSecret;
+  });
+  return buildPublicAdConnectionStatus();
+}
+
+export async function saveFinanceAdOAuthConnection(input: {
+  platform: FinanceAdPlatform;
+  accessToken: string;
+  userName?: string;
+  tokenExpiresAt?: string;
+  discoveredAccounts: FinanceAdDiscoveredAccount[];
+}): Promise<FinanceAdConnectionStatus> {
+  await ensureCheckoutStoreReady();
+  const token = input.accessToken.trim();
+  if (!token) {
+    throw new Error("Token OAuth vide reçu.");
+  }
+  const normalizedAccounts = input.discoveredAccounts
+    .map(acc => ({
+      ...acc,
+      id: normalizePlatformAccountId(input.platform, acc.id),
+    }))
+    .filter(acc => Boolean(acc.id));
+
+  mutateFinanceState(state => {
+    const prev = input.platform === "meta" ? state.adCredentials?.meta : state.adCredentials?.tiktok;
+    const availableSet = new Set(normalizedAccounts.map(a => a.id));
+    const prevSelected = (prev?.selectedAccountIds || []).filter(id => availableSet.has(id));
+    const defaultSelected =
+      prevSelected.length > 0 ? prevSelected : normalizedAccounts.map(a => a.id);
+    const primaryId = defaultSelected[0] || "";
+
+    if (input.platform === "meta") {
+      state.adCredentials.meta = {
+        oauthAppId: prev?.oauthAppId,
+        oauthAppSecret: prev?.oauthAppSecret,
+        lastSyncAt: prev?.lastSyncAt,
+        adAccountId: primaryId,
+        accessToken: token,
+        authMode: "oauth",
+        userName: input.userName?.trim() || undefined,
+        tokenExpiresAt: input.tokenExpiresAt || undefined,
+        discoveredAccounts: normalizedAccounts,
+        selectedAccountIds: defaultSelected,
+        lastError: undefined,
+      };
+    } else {
+      state.adCredentials.tiktok = {
+        oauthAppId: prev?.oauthAppId,
+        oauthAppSecret: prev?.oauthAppSecret,
+        lastSyncAt: prev?.lastSyncAt,
+        advertiserId: primaryId,
+        accessToken: token,
+        authMode: "oauth",
+        userName: input.userName?.trim() || undefined,
+        tokenExpiresAt: input.tokenExpiresAt || undefined,
+        discoveredAccounts: normalizedAccounts,
+        selectedAccountIds: defaultSelected,
+        lastError: undefined,
+      };
+    }
+  });
+  return buildPublicAdConnectionStatus();
+}
+
+export async function setFinanceAdSelectedAccounts(input: {
+  platform: FinanceAdPlatform;
+  accountIds: string[];
+}): Promise<FinanceAdConnectionStatus> {
+  await ensureCheckoutStoreReady();
+  const uniqueIds = Array.from(
+    new Set(input.accountIds.map(id => normalizePlatformAccountId(input.platform, id)).filter(Boolean))
+  );
+  mutateFinanceState(state => {
+    const entry = input.platform === "meta" ? state.adCredentials?.meta : state.adCredentials?.tiktok;
+    if (!entry || !entry.accessToken) {
+      throw new Error(`Connecte d’abord ${input.platform === "meta" ? "Meta Ads" : "TikTok Ads"}.`);
+    }
+    entry.selectedAccountIds = uniqueIds;
+    if (input.platform === "meta") {
+      state.adCredentials.meta!.adAccountId = uniqueIds[0] || "";
+    } else {
+      state.adCredentials.tiktok!.advertiserId = uniqueIds[0] || "";
+    }
+    entry.lastError = undefined;
   });
   return buildPublicAdConnectionStatus();
 }
@@ -463,8 +693,28 @@ export async function clearFinanceAdCredentials(
 ): Promise<FinanceAdConnectionStatus> {
   await ensureCheckoutStoreReady();
   mutateFinanceState(state => {
-    if (platform === "meta") delete state.adCredentials.meta;
-    else delete state.adCredentials.tiktok;
+    const prev = platform === "meta" ? state.adCredentials?.meta : state.adCredentials?.tiktok;
+    if (prev?.oauthAppId && prev?.oauthAppSecret) {
+      // Preserve one-time OAuth App setup so user can reconnect in 1 click.
+      if (platform === "meta") {
+        state.adCredentials.meta = {
+          adAccountId: "",
+          accessToken: "",
+          oauthAppId: prev.oauthAppId,
+          oauthAppSecret: prev.oauthAppSecret,
+        };
+      } else {
+        state.adCredentials.tiktok = {
+          advertiserId: "",
+          accessToken: "",
+          oauthAppId: prev.oauthAppId,
+          oauthAppSecret: prev.oauthAppSecret,
+        };
+      }
+    } else {
+      if (platform === "meta") delete state.adCredentials.meta;
+      else delete state.adCredentials.tiktok;
+    }
   });
   return buildPublicAdConnectionStatus();
 }

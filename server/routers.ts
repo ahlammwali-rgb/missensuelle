@@ -113,6 +113,7 @@ import {
 import { buildFinanceOverviewForRequest } from "./financeOverviewService";
 import {
   clearFinanceAdCredentials,
+  clearFinanceAdOAuthAppConfig,
   deleteFinanceAdSpend,
   deleteFinanceExchangeRate,
   deleteFinanceExpense,
@@ -120,7 +121,9 @@ import {
   getFinanceStateSnapshot,
   getMergedCatalogRefs,
   saveFinanceAdCredentials,
+  saveFinanceAdOAuthAppConfig,
   saveFinanceCampaignMapping,
+  setFinanceAdSelectedAccounts,
   setOrderFinanceOverride,
   updateFinanceSettings,
   upsertFinanceAdSpendManual,
@@ -914,6 +917,32 @@ export const appRouter = router({
       .input(z.object({ platform: z.enum(["meta", "tiktok"]) }))
       .mutation(async ({ input }) => {
         return await clearFinanceAdCredentials(input.platform);
+      }),
+    saveAdOAuthAppConfig: ownerFinanceProcedure
+      .input(
+        z.object({
+          platform: z.enum(["meta", "tiktok"]),
+          appId: z.string().trim().min(1).max(120),
+          appSecret: z.string().trim().max(300).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await saveFinanceAdOAuthAppConfig(input);
+      }),
+    clearAdOAuthAppConfig: ownerFinanceProcedure
+      .input(z.object({ platform: z.enum(["meta", "tiktok"]) }))
+      .mutation(async ({ input }) => {
+        return await clearFinanceAdOAuthAppConfig(input.platform);
+      }),
+    setAdSelectedAccounts: ownerFinanceProcedure
+      .input(
+        z.object({
+          platform: z.enum(["meta", "tiktok"]),
+          accountIds: z.array(z.string().trim().min(1).max(120)).max(50),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await setFinanceAdSelectedAccounts(input);
       }),
     syncAdsNow: ownerFinanceProcedure
       .input(

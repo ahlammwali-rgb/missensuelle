@@ -5,6 +5,7 @@ import {
 } from "../shared/finance";
 import {
   bulkUpsertAdSpendEntries,
+  getActiveAccountIdsForPlatform,
   getFinanceAdCredentialsServerOnly,
   recordFinanceAdSyncResult,
 } from "./financeStore";
@@ -56,90 +57,101 @@ function extractMetaPurchases(
 }
 
 /**
- * Pulls daily campaign insights from Meta Marketing API (Facebook / Instagram Ads).
+ * Pulls daily campaign insights from Meta Marketing API (Facebook / Instagram Ads) across all active accounts.
  */
 export async function syncMetaAdInsights(options?: {
   startDate?: string;
   endDate?: string;
 }): Promise<{ ok: boolean; synced: number; error?: string }> {
   const creds = getFinanceAdCredentialsServerOnly().meta;
-  if (!creds?.adAccountId || !creds?.accessToken) {
+  const accountIds = getActiveAccountIdsForPlatform("meta");
+  if (!creds?.accessToken || accountIds.length === 0) {
     return { ok: false, synced: 0, error: "Compte Meta Ads non configuré" };
   }
 
   const def = defaultDateRange(30);
   const since = options?.startDate || def.startDate;
   const until = options?.endDate || def.endDate;
-  const actId = creds.adAccountId.startsWith("act_") ? creds.adAccountId : `act_${creds.adAccountId}`;
-
-  const url = new URL(`https://graph.facebook.com/v21.0/${encodeURIComponent(actId)}/insights`);
-  url.searchParams.set("access_token", creds.accessToken);
-  url.searchParams.set("level", "campaign");
-  url.searchParams.set("time_increment", "1");
-  url.searchParams.set("time_range", JSON.stringify({ since, until }));
-  url.searchParams.set("limit", "200");
-  url.searchParams.set(
-    "fields",
-    "campaign_id,campaign_name,spend,impressions,clicks,actions,account_currency,date_start"
-  );
 
   const collected: ParsedSpendRow[] = [];
-  let nextUrl: string | null = url.toString();
-  let pageGuard = 0;
+  const accountErrors: string[] = [];
 
   try {
-    while (nextUrl && pageGuard < 15) {
-      pageGuard++;
-      const res = await fetch(nextUrl, {
-        method: "GET",
-        signal: AbortSignal.timeout(15000),
-      });
-      const json = (await res.json()) as {
-        data?: Array<{
-          campaign_id?: string;
-          campaign_name?: string;
-          spend?: string | number;
-          impressions?: string | number;
-          clicks?: string | number;
-          actions?: Array<{ action_type?: string; value?: string | number }>;
-          account_currency?: string;
-          date_start?: string;
-        }>;
-        paging?: { next?: string };
-        error?: { message?: string };
-      };
+    for (const rawId of accountIds) {
+      const actId = rawId.startsWith("act_") ? rawId : `act_${rawId}`;
+      const url = new URL(`https://graph.facebook.com/v21.0/${encodeURIComponent(actId)}/insights`);
+      url.searchParams.set("access_token", creds.accessToken);
+      url.searchParams.set("level", "campaign");
+      url.searchParams.set("time_increment", "1");
+      url.searchParams.set("time_range", JSON.stringify({ since, until }));
+      url.searchParams.set("limit", "200");
+      url.searchParams.set(
+        "fields",
+        "campaign_id,campaign_name,spend,impressions,clicks,actions,account_currency,date_start"
+      );
 
-      if (!res.ok || json.error) {
-        const msg = json.error?.message || `Meta Graph HTTP ${res.status}`;
-        await recordFinanceAdSyncResult("meta", { ok: false, error: msg });
-        return { ok: false, synced: 0, error: msg };
-      }
+      let nextUrl: string | null = url.toString();
+      let pageGuard = 0;
 
-      for (const row of json.data || []) {
-        const date = String(row.date_start || "").slice(0, 10);
-        const cid = String(row.campaign_id || "").trim();
-        const spend = Number(row.spend || 0);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !cid || !Number.isFinite(spend)) continue;
-        collected.push({
-          date,
-          platform: "meta",
-          campaignId: cid,
-          campaignName: String(row.campaign_name || `Meta ${cid}`).trim(),
-          spendAmount: spend,
-          currency: normalizeCurrency(row.account_currency),
-          impressions: Math.max(0, Math.round(Number(row.impressions || 0))),
-          clicks: Math.max(0, Math.round(Number(row.clicks || 0))),
-          conversions: extractMetaPurchases(row.actions),
-          source: "meta_api",
+      while (nextUrl && pageGuard < 15) {
+        pageGuard++;
+        const res = await fetch(nextUrl, {
+          method: "GET",
+          signal: AbortSignal.timeout(15000),
         });
-      }
+        const json = (await res.json()) as {
+          data?: Array<{
+            campaign_id?: string;
+            campaign_name?: string;
+            spend?: string | number;
+            impressions?: string | number;
+            clicks?: string | number;
+            actions?: Array<{ action_type?: string; value?: string | number }>;
+            account_currency?: string;
+            date_start?: string;
+          }>;
+          paging?: { next?: string };
+          error?: { message?: string };
+        };
 
-      nextUrl = json.paging?.next || null;
+        if (!res.ok || json.error) {
+          accountErrors.push(`${actId}: ${json.error?.message || `Meta Graph HTTP ${res.status}`}`);
+          break;
+        }
+
+        for (const row of json.data || []) {
+          const date = String(row.date_start || "").slice(0, 10);
+          const cid = String(row.campaign_id || "").trim();
+          const spend = Number(row.spend || 0);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !cid || !Number.isFinite(spend)) continue;
+          collected.push({
+            date,
+            platform: "meta",
+            campaignId: cid,
+            campaignName: String(row.campaign_name || `Meta ${cid}`).trim(),
+            spendAmount: spend,
+            currency: normalizeCurrency(row.account_currency),
+            impressions: Math.max(0, Math.round(Number(row.impressions || 0))),
+            clicks: Math.max(0, Math.round(Number(row.clicks || 0))),
+            conversions: extractMetaPurchases(row.actions),
+            source: "meta_api",
+          });
+        }
+
+        nextUrl = json.paging?.next || null;
+      }
+    }
+
+    if (collected.length === 0 && accountErrors.length > 0) {
+      const msg = accountErrors.join(" · ");
+      await recordFinanceAdSyncResult("meta", { ok: false, error: msg });
+      return { ok: false, synced: 0, error: msg };
     }
 
     const { upserted } = await bulkUpsertAdSpendEntries(collected);
-    await recordFinanceAdSyncResult("meta", { ok: true });
-    return { ok: true, synced: upserted };
+    const partialErr = accountErrors.length > 0 ? accountErrors.join(" · ") : undefined;
+    await recordFinanceAdSyncResult("meta", { ok: !partialErr, error: partialErr });
+    return { ok: true, synced: upserted, error: partialErr };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur réseau Meta API";
     await recordFinanceAdSyncResult("meta", { ok: false, error: msg });
@@ -148,14 +160,15 @@ export async function syncMetaAdInsights(options?: {
 }
 
 /**
- * Pulls daily campaign insights from TikTok Marketing API (Business API v1.3).
+ * Pulls daily campaign insights from TikTok Marketing API (Business API v1.3) across all active accounts.
  */
 export async function syncTikTokAdInsights(options?: {
   startDate?: string;
   endDate?: string;
 }): Promise<{ ok: boolean; synced: number; error?: string }> {
   const creds = getFinanceAdCredentialsServerOnly().tiktok;
-  if (!creds?.advertiserId || !creds?.accessToken) {
+  const advertiserIds = getActiveAccountIdsForPlatform("tiktok");
+  if (!creds?.accessToken || advertiserIds.length === 0) {
     return { ok: false, synced: 0, error: "Compte TikTok Ads non configuré" };
   }
 
@@ -163,104 +176,115 @@ export async function syncTikTokAdInsights(options?: {
   const startDate = options?.startDate || def.startDate;
   const endDate = options?.endDate || def.endDate;
 
-  let currency: FinanceAdCurrency = "USD";
-  try {
-    const infoUrl = new URL("https://business-api.tiktok.com/open_api/v1.3/advertiser/info/");
-    infoUrl.searchParams.set("advertiser_ids", JSON.stringify([creds.advertiserId]));
-    const infoRes = await fetch(infoUrl.toString(), {
-      method: "GET",
-      headers: { "Access-Token": creds.accessToken },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (infoRes.ok) {
-      const infoJson = (await infoRes.json()) as {
-        data?: { list?: Array<{ currency?: string }> };
-      };
-      const curRaw = infoJson.data?.list?.[0]?.currency;
-      if (curRaw) currency = normalizeCurrency(curRaw);
-    }
-  } catch {
-    // Default cleanly to USD
-  }
-
   const collected: ParsedSpendRow[] = [];
-  let page = 1;
-  let totalPage = 1;
+  const accountErrors: string[] = [];
 
   try {
-    while (page <= totalPage && page <= 15) {
-      const url = new URL("https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/");
-      url.searchParams.set("advertiser_id", creds.advertiserId);
-      url.searchParams.set("report_type", "BASIC");
-      url.searchParams.set("service_type", "AUCTION");
-      url.searchParams.set("data_level", "AUCTION_CAMPAIGN");
-      url.searchParams.set("dimensions", JSON.stringify(["campaign_id", "stat_time_day"]));
-      url.searchParams.set(
-        "metrics",
-        JSON.stringify(["campaign_name", "spend", "impressions", "clicks", "conversion"])
-      );
-      url.searchParams.set("start_date", startDate);
-      url.searchParams.set("end_date", endDate);
-      url.searchParams.set("page", String(page));
-      url.searchParams.set("page_size", "200");
-
-      const res = await fetch(url.toString(), {
-        method: "GET",
-        headers: { "Access-Token": creds.accessToken },
-        signal: AbortSignal.timeout(15000),
-      });
-
-      const json = (await res.json()) as {
-        code?: number;
-        message?: string;
-        data?: {
-          page_info?: { total_page?: number };
-          list?: Array<{
-            dimensions?: { campaign_id?: string; stat_time_day?: string };
-            metrics?: {
-              campaign_name?: string;
-              spend?: string | number;
-              impressions?: string | number;
-              clicks?: string | number;
-              conversion?: string | number;
-            };
-          }>;
-        };
-      };
-
-      if (!res.ok || (typeof json.code === "number" && json.code !== 0)) {
-        const msg = json.message || `TikTok API HTTP ${res.status}`;
-        await recordFinanceAdSyncResult("tiktok", { ok: false, error: msg });
-        return { ok: false, synced: 0, error: msg };
-      }
-
-      totalPage = Math.max(1, Number(json.data?.page_info?.total_page || 1));
-
-      for (const row of json.data?.list || []) {
-        const cid = String(row.dimensions?.campaign_id || "").trim();
-        const date = String(row.dimensions?.stat_time_day || "").slice(0, 10);
-        const spend = Number(row.metrics?.spend || 0);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !cid || !Number.isFinite(spend)) continue;
-        collected.push({
-          date,
-          platform: "tiktok",
-          campaignId: cid,
-          campaignName: String(row.metrics?.campaign_name || `TikTok ${cid}`).trim(),
-          spendAmount: spend,
-          currency,
-          impressions: Math.max(0, Math.round(Number(row.metrics?.impressions || 0))),
-          clicks: Math.max(0, Math.round(Number(row.metrics?.clicks || 0))),
-          conversions: Math.max(0, Math.round(Number(row.metrics?.conversion || 0))),
-          source: "tiktok_api",
+    for (const advertiserId of advertiserIds) {
+      let currency: FinanceAdCurrency =
+        creds.discoveredAccounts?.find(a => a.id === advertiserId)?.currency || "USD";
+      try {
+        const infoUrl = new URL("https://business-api.tiktok.com/open_api/v1.3/advertiser/info/");
+        infoUrl.searchParams.set("advertiser_ids", JSON.stringify([advertiserId]));
+        const infoRes = await fetch(infoUrl.toString(), {
+          method: "GET",
+          headers: { "Access-Token": creds.accessToken },
+          signal: AbortSignal.timeout(10000),
         });
+        if (infoRes.ok) {
+          const infoJson = (await infoRes.json()) as {
+            data?: { list?: Array<{ currency?: string }> };
+          };
+          const curRaw = infoJson.data?.list?.[0]?.currency;
+          if (curRaw) currency = normalizeCurrency(curRaw);
+        }
+      } catch {
+        // Default cleanly to discovered currency or USD
       }
 
-      page++;
+      let page = 1;
+      let totalPage = 1;
+
+      while (page <= totalPage && page <= 15) {
+        const url = new URL("https://business-api.tiktok.com/open_api/v1.3/report/integrated/get/");
+        url.searchParams.set("advertiser_id", advertiserId);
+        url.searchParams.set("report_type", "BASIC");
+        url.searchParams.set("service_type", "AUCTION");
+        url.searchParams.set("data_level", "AUCTION_CAMPAIGN");
+        url.searchParams.set("dimensions", JSON.stringify(["campaign_id", "stat_time_day"]));
+        url.searchParams.set(
+          "metrics",
+          JSON.stringify(["campaign_name", "spend", "impressions", "clicks", "conversion"])
+        );
+        url.searchParams.set("start_date", startDate);
+        url.searchParams.set("end_date", endDate);
+        url.searchParams.set("page", String(page));
+        url.searchParams.set("page_size", "200");
+
+        const res = await fetch(url.toString(), {
+          method: "GET",
+          headers: { "Access-Token": creds.accessToken },
+          signal: AbortSignal.timeout(15000),
+        });
+
+        const json = (await res.json()) as {
+          code?: number;
+          message?: string;
+          data?: {
+            page_info?: { total_page?: number };
+            list?: Array<{
+              dimensions?: { campaign_id?: string; stat_time_day?: string };
+              metrics?: {
+                campaign_name?: string;
+                spend?: string | number;
+                impressions?: string | number;
+                clicks?: string | number;
+                conversion?: string | number;
+              };
+            }>;
+          };
+        };
+
+        if (!res.ok || (typeof json.code === "number" && json.code !== 0)) {
+          accountErrors.push(`${advertiserId}: ${json.message || `TikTok API HTTP ${res.status}`}`);
+          break;
+        }
+
+        totalPage = Math.max(1, Number(json.data?.page_info?.total_page || 1));
+
+        for (const row of json.data?.list || []) {
+          const cid = String(row.dimensions?.campaign_id || "").trim();
+          const date = String(row.dimensions?.stat_time_day || "").slice(0, 10);
+          const spend = Number(row.metrics?.spend || 0);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !cid || !Number.isFinite(spend)) continue;
+          collected.push({
+            date,
+            platform: "tiktok",
+            campaignId: cid,
+            campaignName: String(row.metrics?.campaign_name || `TikTok ${cid}`).trim(),
+            spendAmount: spend,
+            currency,
+            impressions: Math.max(0, Math.round(Number(row.metrics?.impressions || 0))),
+            clicks: Math.max(0, Math.round(Number(row.metrics?.clicks || 0))),
+            conversions: Math.max(0, Math.round(Number(row.metrics?.conversion || 0))),
+            source: "tiktok_api",
+          });
+        }
+
+        page++;
+      }
+    }
+
+    if (collected.length === 0 && accountErrors.length > 0) {
+      const msg = accountErrors.join(" · ");
+      await recordFinanceAdSyncResult("tiktok", { ok: false, error: msg });
+      return { ok: false, synced: 0, error: msg };
     }
 
     const { upserted } = await bulkUpsertAdSpendEntries(collected);
-    await recordFinanceAdSyncResult("tiktok", { ok: true });
-    return { ok: true, synced: upserted };
+    const partialErr = accountErrors.length > 0 ? accountErrors.join(" · ") : undefined;
+    await recordFinanceAdSyncResult("tiktok", { ok: !partialErr, error: partialErr });
+    return { ok: true, synced: upserted, error: partialErr };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Erreur réseau TikTok API";
     await recordFinanceAdSyncResult("tiktok", { ok: false, error: msg });

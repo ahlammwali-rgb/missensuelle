@@ -5,7 +5,11 @@ import {
   Bot,
   Calendar,
   CheckCircle2,
+  Copy,
   Edit3,
+  ExternalLink,
+  Facebook,
+  KeyRound,
   Layers,
   Link2,
   MessageSquare,
@@ -39,6 +43,7 @@ import {
   FINANCE_EXPENSE_CATEGORY_LABELS,
   algiersDateKey,
   type FinanceAdCurrency,
+  type FinanceAdDiscoveredAccount,
   type FinanceAdPlatform,
   type FinanceExpenseCategory,
   type FinancePurchaseLot,
@@ -88,7 +93,17 @@ export function FinancePanel({
 }) {
   const utils = trpc.useUtils();
 
-  const [tab, setTab] = useState<FinanceTab>("overview");
+  const [tab, setTab] = useState<FinanceTab>(() => {
+    const finTab = new URLSearchParams(window.location.search).get("finTab");
+    return finTab === "ads" || finTab === "products" || finTab === "lots" || finTab === "charges"
+      ? finTab
+      : "overview";
+  });
+  const [oauthBanner, setOauthBanner] = useState<{
+    kind: "success" | "error";
+    platform?: string;
+    message: string;
+  } | null>(null);
   const [preset, setPreset] = useState<DatePreset>("30d");
   const [viewMode, setViewMode] = useState<FinanceViewMode>("cohort");
   const [customStart, setCustomStart] = useState(() => computePresetRange("30d").startDate);
@@ -141,12 +156,7 @@ export function FinancePanel({
   const [expCurrency, setExpCurrency] = useState<FinanceAdCurrency>("DZD");
   const [expNote, setExpNote] = useState("");
 
-  // --- Ad credentials & Manual spend & FX rate state ---
-  const [metaAccountInput, setMetaAccountInput] = useState("");
-  const [metaTokenInput, setMetaTokenInput] = useState("");
-  const [ttAdvInput, setTtAdvInput] = useState("");
-  const [ttTokenInput, setTtTokenInput] = useState("");
-
+  // --- Manual spend & FX rate state ---
   const [adDate, setAdDate] = useState(() => algiersDateKey());
   const [adPlatform, setAdPlatform] = useState<FinanceAdPlatform>("tiktok");
   const [adCampaignName, setAdCampaignName] = useState("");
@@ -179,13 +189,42 @@ export function FinancePanel({
     if (overviewQuery.data?.settings) {
       setSettingsDraft(overviewQuery.data.settings);
     }
-    if (overviewQuery.data?.adConnections.meta.adAccountId && !metaAccountInput) {
-      setMetaAccountInput(overviewQuery.data.adConnections.meta.adAccountId);
-    }
-    if (overviewQuery.data?.adConnections.tiktok.advertiserId && !ttAdvInput) {
-      setTtAdvInput(overviewQuery.data.adConnections.tiktok.advertiserId);
-    }
   }, [overviewQuery.data]);
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const oauthStatus = sp.get("oauth");
+    if (oauthStatus !== "success" && oauthStatus !== "error") return;
+
+    const platformParam = sp.get("platform") || undefined;
+    const platName = platformParam === "meta" ? "Facebook / Meta Ads" : platformParam === "tiktok" ? "TikTok Ads" : "Pub";
+    if (oauthStatus === "success") {
+      const accounts = Number(sp.get("accounts") || 0);
+      const synced = Number(sp.get("synced") || 0);
+      const msg =
+        accounts > 0
+          ? `${platName} connecté en 1 clic (${accounts} compte${accounts > 1 ? "s" : ""} détecté${accounts > 1 ? "s" : ""}${synced > 0 ? `, ${synced} lignes importées` : ""}) ✓`
+          : `${platName} connecté, mais aucun compte pub trouvé sur ce profil.`;
+      setTab("ads");
+      setOauthBanner({ kind: accounts > 0 ? "success" : "error", platform: platformParam, message: msg });
+      notify(msg, accounts > 0 ? "victory" : "urgent");
+    } else {
+      const msg = sp.get("oauthMsg") || `Connexion ${platName} annulée ou refusée.`;
+      setTab("ads");
+      setOauthBanner({ kind: "error", platform: platformParam, message: msg });
+      notify(msg, "urgent");
+    }
+
+    sp.delete("oauth");
+    sp.delete("oauthMsg");
+    sp.delete("platform");
+    sp.delete("accounts");
+    sp.delete("synced");
+    sp.delete("finTab");
+    const nextSearch = sp.toString();
+    const cleanUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
+    window.history.replaceState(null, "", cleanUrl);
+  }, []);
 
   // --- AI CFO Briefing & Chat ---
   const [aiBriefing, setAiBriefing] = useState<{
@@ -255,8 +294,29 @@ export function FinancePanel({
   const saveAdCredsMutation = trpc.finance.saveAdCredentials.useMutation({
     onSuccess: async (_data, vars) => {
       notify(`API ${vars.platform === "meta" ? "Meta Ads" : "TikTok Ads"} connectée ✓`);
-      if (vars.platform === "meta") setMetaTokenInput("");
-      else setTtTokenInput("");
+      await invalidateFinance();
+    },
+    onError: e => notify(e.message, "urgent"),
+  });
+
+  const saveOAuthAppMutation = trpc.finance.saveAdOAuthAppConfig.useMutation({
+    onSuccess: async (_data, vars) => {
+      notify(`App OAuth ${vars.platform === "meta" ? "Meta" : "TikTok"} enregistrée ✓ Tu peux maintenant cliquer sur le bouton OAuth !`);
+      await invalidateFinance();
+    },
+    onError: e => notify(e.message, "urgent"),
+  });
+
+  const clearOAuthAppMutation = trpc.finance.clearAdOAuthAppConfig.useMutation({
+    onSuccess: async () => {
+      notify("Configuration App OAuth effacée");
+      await invalidateFinance();
+    },
+  });
+
+  const setSelectedAccountsMutation = trpc.finance.setAdSelectedAccounts.useMutation({
+    onSuccess: async () => {
+      notify("Comptes publicitaires mis à jour ✓");
       await invalidateFinance();
     },
     onError: e => notify(e.message, "urgent"),
@@ -1149,139 +1209,66 @@ export function FinancePanel({
                 transition={{ duration: 0.18 }}
                 className="fin-tab-content"
               >
-                {/* API Connections Meta + TikTok */}
-                <div className="fin-two-col">
-                  <div className="fin-panel-card">
-                    <div className="fin-panel-head">
-                      <div>
-                        <h3>Meta Marketing API (Facebook / IG)</h3>
-                        <small>
-                          {data.adConnections.meta.configured
-                            ? `Connecté (${data.adConnections.meta.adAccountId} · ${data.adConnections.meta.tokenPreview})`
-                            : "Non connecté"}
-                        </small>
-                      </div>
-                      <button
-                        type="button"
-                        className="fin-mini-btn"
-                        disabled={!data.adConnections.meta.configured || syncAdsMutation.isPending}
-                        onClick={() => syncAdsMutation.mutate({ platform: "meta" })}
-                      >
-                        <RefreshCw size={12} className={syncAdsMutation.isPending ? "animate-spin" : ""} /> Sync Meta
-                      </button>
-                    </div>
-                    <form
-                      className="fin-compact-form"
-                      onSubmit={e => {
-                        e.preventDefault();
-                        saveAdCredsMutation.mutate({
-                          platform: "meta",
-                          accountId: metaAccountInput,
-                          accessToken: metaTokenInput,
-                        });
-                      }}
-                    >
-                      <input
-                        type="text"
-                        placeholder="Ad Account ID (ex: act_123456789)"
-                        value={metaAccountInput}
-                        onChange={e => setMetaAccountInput(e.target.value)}
-                      />
-                      <input
-                        type="password"
-                        placeholder={
-                          data.adConnections.meta.configured
-                            ? "Laisser vide pour garder le token actuel"
-                            : "Token System User Meta Graph"
-                        }
-                        value={metaTokenInput}
-                        onChange={e => setMetaTokenInput(e.target.value)}
-                      />
-                      <div className="fin-form-row-actions">
-                        <button type="submit" className="fin-primary-btn" disabled={saveAdCredsMutation.isPending}>
-                          <Link2 size={13} /> Enregistrer Meta
-                        </button>
-                        {data.adConnections.meta.configured && (
-                          <button
-                            type="button"
-                            className="fin-danger-ghost"
-                            onClick={() => clearAdCredsMutation.mutate({ platform: "meta" })}
-                          >
-                            Déconnecter
-                          </button>
-                        )}
-                      </div>
-                    </form>
-                    {data.adConnections.meta.lastError && (
-                      <p className="fin-error-note">{data.adConnections.meta.lastError}</p>
-                    )}
+                {oauthBanner && (
+                  <div className={`fin-oauth-banner ${oauthBanner.kind === "success" ? "is-ok" : "is-err"}`}>
+                    <span>{oauthBanner.message}</span>
+                    <button type="button" onClick={() => setOauthBanner(null)} aria-label="Fermer">
+                      <X size={14} />
+                    </button>
                   </div>
+                )}
 
-                  <div className="fin-panel-card">
-                    <div className="fin-panel-head">
-                      <div>
-                        <h3>TikTok Marketing API</h3>
-                        <small>
-                          {data.adConnections.tiktok.configured
-                            ? `Connecté (${data.adConnections.tiktok.advertiserId} · ${data.adConnections.tiktok.tokenPreview})`
-                            : "Non connecté"}
-                        </small>
-                      </div>
-                      <button
-                        type="button"
-                        className="fin-mini-btn"
-                        disabled={!data.adConnections.tiktok.configured || syncAdsMutation.isPending}
-                        onClick={() => syncAdsMutation.mutate({ platform: "tiktok" })}
-                      >
-                        <RefreshCw size={12} className={syncAdsMutation.isPending ? "animate-spin" : ""} /> Sync TikTok
-                      </button>
-                    </div>
-                    <form
-                      className="fin-compact-form"
-                      onSubmit={e => {
-                        e.preventDefault();
-                        saveAdCredsMutation.mutate({
-                          platform: "tiktok",
-                          accountId: ttAdvInput,
-                          accessToken: ttTokenInput,
-                        });
-                      }}
-                    >
-                      <input
-                        type="text"
-                        placeholder="Advertiser ID TikTok (ex: 734567890123)"
-                        value={ttAdvInput}
-                        onChange={e => setTtAdvInput(e.target.value)}
-                      />
-                      <input
-                        type="password"
-                        placeholder={
-                          data.adConnections.tiktok.configured
-                            ? "Laisser vide pour garder le token actuel"
-                            : "Access Token TikTok Business API"
-                        }
-                        value={ttTokenInput}
-                        onChange={e => setTtTokenInput(e.target.value)}
-                      />
-                      <div className="fin-form-row-actions">
-                        <button type="submit" className="fin-primary-btn" disabled={saveAdCredsMutation.isPending}>
-                          <Link2 size={13} /> Enregistrer TikTok
-                        </button>
-                        {data.adConnections.tiktok.configured && (
-                          <button
-                            type="button"
-                            className="fin-danger-ghost"
-                            onClick={() => clearAdCredsMutation.mutate({ platform: "tiktok" })}
-                          >
-                            Déconnecter
-                          </button>
-                        )}
-                      </div>
-                    </form>
-                    {data.adConnections.tiktok.lastError && (
-                      <p className="fin-error-note">{data.adConnections.tiktok.lastError}</p>
-                    )}
-                  </div>
+                {/* API Connections Meta + TikTok (OAuth 1-clic) */}
+                <div className="fin-two-col">
+                  <AdPlatformOAuthCard
+                    platform="meta"
+                    connection={{
+                      ...data.adConnections.meta,
+                      primaryAccountId: data.adConnections.meta.adAccountId,
+                    }}
+                    syncPending={syncAdsMutation.isPending}
+                    onSync={() => syncAdsMutation.mutate({ platform: "meta" })}
+                    onDisconnect={() => clearAdCredsMutation.mutate({ platform: "meta" })}
+                    onSaveManual={(accountId, accessToken) =>
+                      saveAdCredsMutation.mutate({ platform: "meta", accountId, accessToken })
+                    }
+                    manualPending={saveAdCredsMutation.isPending}
+                    onSaveOAuthApp={(appId, appSecret) =>
+                      saveOAuthAppMutation.mutate({ platform: "meta", appId, appSecret })
+                    }
+                    onClearOAuthApp={() => clearOAuthAppMutation.mutate({ platform: "meta" })}
+                    oauthAppPending={saveOAuthAppMutation.isPending || clearOAuthAppMutation.isPending}
+                    onToggleAccounts={accountIds =>
+                      setSelectedAccountsMutation.mutate({ platform: "meta", accountIds })
+                    }
+                    accountsPending={setSelectedAccountsMutation.isPending}
+                    notify={notify}
+                  />
+
+                  <AdPlatformOAuthCard
+                    platform="tiktok"
+                    connection={{
+                      ...data.adConnections.tiktok,
+                      primaryAccountId: data.adConnections.tiktok.advertiserId,
+                    }}
+                    syncPending={syncAdsMutation.isPending}
+                    onSync={() => syncAdsMutation.mutate({ platform: "tiktok" })}
+                    onDisconnect={() => clearAdCredsMutation.mutate({ platform: "tiktok" })}
+                    onSaveManual={(accountId, accessToken) =>
+                      saveAdCredsMutation.mutate({ platform: "tiktok", accountId, accessToken })
+                    }
+                    manualPending={saveAdCredsMutation.isPending}
+                    onSaveOAuthApp={(appId, appSecret) =>
+                      saveOAuthAppMutation.mutate({ platform: "tiktok", appId, appSecret })
+                    }
+                    onClearOAuthApp={() => clearOAuthAppMutation.mutate({ platform: "tiktok" })}
+                    oauthAppPending={saveOAuthAppMutation.isPending || clearOAuthAppMutation.isPending}
+                    onToggleAccounts={accountIds =>
+                      setSelectedAccountsMutation.mutate({ platform: "tiktok", accountIds })
+                    }
+                    accountsPending={setSelectedAccountsMutation.isPending}
+                    notify={notify}
+                  />
                 </div>
 
                 {/* Unmapped Campaigns + AI Mapper */}
@@ -1767,5 +1754,387 @@ export function FinancePanel({
         </div>
       )}
     </section>
+  );
+}
+
+type AdConnectionCardModel = {
+  configured: boolean;
+  primaryAccountId: string;
+  tokenPreview: string;
+  lastSyncAt?: string;
+  lastError?: string;
+  authMode?: "oauth" | "manual";
+  oauthAppConfigured?: boolean;
+  oauthAppId?: string;
+  oauthAppSecretPreview?: string;
+  oauthFromEnv?: boolean;
+  userName?: string;
+  tokenExpiresAt?: string;
+  discoveredAccounts?: FinanceAdDiscoveredAccount[];
+  selectedAccountIds?: string[];
+};
+
+const AD_PLATFORM_META: Record<
+  FinanceAdPlatform,
+  {
+    title: string;
+    oauthLabel: string;
+    oauthReconnectLabel: string;
+    devPortalLabel: string;
+    devPortalUrl: string;
+    setupHint: string;
+    accountPlaceholder: string;
+    tokenPlaceholder: string;
+  }
+> = {
+  meta: {
+    title: "Meta Ads (Facebook / IG)",
+    oauthLabel: "Continuer avec Facebook (1 clic)",
+    oauthReconnectLabel: "Reconnecter / Actualiser comptes FB",
+    devPortalLabel: "developers.facebook.com",
+    devPortalUrl: "https://developers.facebook.com/apps/",
+    setupHint: "App Business → ajouter « Facebook Login for Business » & « Marketing API » → coller l’URL ci-dessous dans Redirect URIs.",
+    accountPlaceholder: "Ad Account ID (ex: act_123456789)",
+    tokenPlaceholder: "Token Meta Graph manuel",
+  },
+  tiktok: {
+    title: "TikTok Ads",
+    oauthLabel: "Connecter TikTok Ads (1 clic)",
+    oauthReconnectLabel: "Reconnecter / Actualiser comptes TikTok",
+    devPortalLabel: "business-api.tiktok.com",
+    devPortalUrl: "https://business-api.tiktok.com/portal/apps",
+    setupHint: "App Marketing API → cocher lecture Comptes & Reporting → coller l’URL ci-dessous dans Advertiser Redirect URL.",
+    accountPlaceholder: "Advertiser ID TikTok (ex: 734567890123)",
+    tokenPlaceholder: "Access Token TikTok manuel",
+  },
+};
+
+function AdPlatformOAuthCard({
+  platform,
+  connection,
+  syncPending,
+  onSync,
+  onDisconnect,
+  onSaveManual,
+  manualPending,
+  onSaveOAuthApp,
+  onClearOAuthApp,
+  oauthAppPending,
+  onToggleAccounts,
+  accountsPending,
+  notify,
+}: {
+  platform: FinanceAdPlatform;
+  connection: AdConnectionCardModel;
+  syncPending: boolean;
+  onSync: () => void;
+  onDisconnect: () => void;
+  onSaveManual: (accountId: string, accessToken?: string) => void;
+  manualPending: boolean;
+  onSaveOAuthApp: (appId: string, appSecret?: string) => void;
+  onClearOAuthApp: () => void;
+  oauthAppPending: boolean;
+  onToggleAccounts: (accountIds: string[]) => void;
+  accountsPending: boolean;
+  notify: (msg: string, type?: "normal" | "urgent" | "victory" | "order") => void;
+}) {
+  const meta = AD_PLATFORM_META[platform];
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [appIdDraft, setAppIdDraft] = useState(connection.oauthAppId || "");
+  const [appSecretDraft, setAppSecretDraft] = useState("");
+  const [manualAccountDraft, setManualAccountDraft] = useState(connection.primaryAccountId || "");
+  const [manualTokenDraft, setManualTokenDraft] = useState("");
+
+  useEffect(() => {
+    if (connection.oauthAppId) setAppIdDraft(connection.oauthAppId);
+  }, [connection.oauthAppId]);
+
+  useEffect(() => {
+    if (connection.primaryAccountId && !manualAccountDraft) {
+      setManualAccountDraft(connection.primaryAccountId);
+    }
+  }, [connection.primaryAccountId]);
+
+  const callbackUrl = `${window.location.origin}/api/ad-oauth/${platform}/callback`;
+  const startHref = `/api/ad-oauth/${platform}/start`;
+
+  const discovered = connection.discoveredAccounts || [];
+  const activeSet = new Set(
+    connection.selectedAccountIds && connection.selectedAccountIds.length > 0
+      ? connection.selectedAccountIds
+      : connection.primaryAccountId
+        ? [connection.primaryAccountId]
+        : []
+  );
+
+  const daysUntilExpiry = useMemo(() => {
+    if (!connection.tokenExpiresAt) return null;
+    const ms = new Date(connection.tokenExpiresAt).getTime() - Date.now();
+    if (!Number.isFinite(ms)) return null;
+    return Math.ceil(ms / (24 * 60 * 60 * 1000));
+  }, [connection.tokenExpiresAt]);
+
+  const copyCallback = async () => {
+    try {
+      await navigator.clipboard.writeText(callbackUrl);
+      notify(`URL de redirection ${platform === "meta" ? "Meta" : "TikTok"} copiée ✓`);
+    } catch {
+      notify(callbackUrl);
+    }
+  };
+
+  const toggleOneAccount = (accId: string) => {
+    const next = new Set(activeSet);
+    if (next.has(accId)) {
+      if (next.size <= 1) {
+        notify("Garde au moins 1 compte publicitaire actif (ou clique sur Déconnecter).", "urgent");
+        return;
+      }
+      next.delete(accId);
+    } else {
+      next.add(accId);
+    }
+    onToggleAccounts(Array.from(next));
+  };
+
+  return (
+    <div className="fin-panel-card">
+      <div className="fin-panel-head">
+        <div className="fin-oauth-title-wrap">
+          <span className={`fin-oauth-logo is-${platform}`}>
+            {platform === "meta" ? <Facebook size={16} /> : <span>♪</span>}
+          </span>
+          <div>
+            <h3>{meta.title}</h3>
+            <small>
+              {connection.configured
+                ? connection.authMode === "oauth"
+                  ? `OAuth 1-clic${connection.userName ? ` · ${connection.userName}` : ""}`
+                  : `Manuel (${connection.primaryAccountId} · ${connection.tokenPreview})`
+                : "Non connecté"}
+            </small>
+          </div>
+        </div>
+        {connection.configured && (
+          <button
+            type="button"
+            className="fin-mini-btn"
+            disabled={syncPending}
+            onClick={onSync}
+          >
+            <RefreshCw size={12} className={syncPending ? "animate-spin" : ""} /> Sync Dépenses
+          </button>
+        )}
+      </div>
+
+      {/* OAuth 1-click CTA */}
+      {connection.oauthAppConfigured ? (
+        <div className="fin-oauth-cta-row">
+          <a href={startHref} className={`fin-oauth-btn is-${platform}`}>
+            {platform === "meta" ? <Facebook size={15} /> : <span className="fin-tt-note">♪</span>}
+            <span>{connection.configured ? meta.oauthReconnectLabel : meta.oauthLabel}</span>
+          </a>
+          {daysUntilExpiry !== null && (
+            <span className={`fin-oauth-expiry ${daysUntilExpiry <= 7 ? "is-soon" : ""}`}>
+              {daysUntilExpiry <= 0
+                ? "Token expiré — clique ci-dessus"
+                : daysUntilExpiry <= 7
+                  ? `Expire dans ${daysUntilExpiry}j`
+                  : `Valide ${daysUntilExpiry}j`}
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="fin-oauth-setup-callout">
+          <p>
+            Configure <strong>1 seule fois</strong> ton App ID &amp; Secret ({meta.devPortalLabel}) pour débloquer le bouton 1-clic :
+          </p>
+          <button
+            type="button"
+            className={`fin-oauth-btn is-${platform}`}
+            onClick={() => setSetupOpen(true)}
+          >
+            <KeyRound size={15} /> Activer la connexion OAuth (1 fois)
+          </button>
+        </div>
+      )}
+
+      {/* Discovered Ad Accounts multi-select */}
+      {connection.configured && discovered.length > 0 && (
+        <div className="fin-accounts-box">
+          <div className="fin-accounts-head">
+            <span>Comptes pub actifs ({activeSet.size}/{discovered.length})</span>
+            {discovered.length > 1 && activeSet.size < discovered.length && (
+              <button
+                type="button"
+                className="fin-link-btn"
+                disabled={accountsPending}
+                onClick={() => onToggleAccounts(discovered.map(a => a.id))}
+              >
+                Tout activer
+              </button>
+            )}
+          </div>
+          <div className="fin-accounts-list">
+            {discovered.map(acc => {
+              const isChecked = activeSet.has(acc.id);
+              return (
+                <label
+                  key={acc.id}
+                  className={`fin-account-item ${isChecked ? "is-active" : ""}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    disabled={accountsPending}
+                    onChange={() => toggleOneAccount(acc.id)}
+                  />
+                  <div className="fin-account-meta">
+                    <strong>{acc.name}</strong>
+                    <small>{acc.id}</small>
+                  </div>
+                  <span className="fin-account-cur">{acc.currency}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {connection.configured && connection.authMode === "oauth" && discovered.length === 0 && (
+        <p className="fin-error-note">
+          Autorisation accordée, mais aucun compte pub trouvé sur ce profil. Vérifie que ce compte Facebook/TikTok gère un Ad Account.
+        </p>
+      )}
+
+      {/* Status + Disconnect */}
+      {connection.configured && (
+        <div className="fin-oauth-foot">
+          <small>
+            {connection.lastSyncAt
+              ? `Dernière synchro : ${new Date(connection.lastSyncAt).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}`
+              : "Prêt à synchroniser (synchro auto toutes les 2h activable dans Paramètres)"}
+          </small>
+          <button type="button" className="fin-danger-ghost" onClick={onDisconnect}>
+            Déconnecter
+          </button>
+        </div>
+      )}
+
+      {connection.lastError && <p className="fin-error-note">{connection.lastError}</p>}
+
+      {/* Collapsible 1-time App OAuth Configuration */}
+      <div className="fin-oauth-drawer">
+        <button
+          type="button"
+          className="fin-oauth-drawer-toggle"
+          onClick={() => setSetupOpen(v => !v)}
+        >
+          <span>⚙️ Réglage App OAuth (1 seule fois)</span>
+          <span className={`fin-setup-chip ${connection.oauthAppConfigured ? "is-ok" : ""}`}>
+            {connection.oauthAppConfigured
+              ? connection.oauthFromEnv
+                ? "Prêt (Render Env)"
+                : "Configuré ✓"
+              : "À configurer"}
+          </span>
+        </button>
+
+        {setupOpen && (
+          <div className="fin-oauth-drawer-body">
+            <p className="fin-setup-hint">
+              Sur{" "}
+              <a href={meta.devPortalUrl} target="_blank" rel="noreferrer">
+                {meta.devPortalLabel} <ExternalLink size={11} style={{ display: "inline" }} />
+              </a>{" "}
+              : {meta.setupHint}
+            </p>
+            <div className="fin-callback-box">
+              <code>{callbackUrl}</code>
+              <button type="button" className="fin-mini-btn" onClick={copyCallback}>
+                <Copy size={11} /> Copier URL
+              </button>
+            </div>
+            <form
+              className="fin-compact-form"
+              onSubmit={e => {
+                e.preventDefault();
+                onSaveOAuthApp(appIdDraft, appSecretDraft);
+                setAppSecretDraft("");
+              }}
+            >
+              <div className="fin-form-pair">
+                <input
+                  type="text"
+                  placeholder={`${platform === "meta" ? "Meta" : "TikTok"} App ID`}
+                  value={appIdDraft}
+                  onChange={e => setAppIdDraft(e.target.value)}
+                  required
+                />
+                <input
+                  type="password"
+                  placeholder={
+                    connection.oauthAppConfigured
+                      ? `Secret actuel (${connection.oauthAppSecretPreview || "•••"})`
+                      : `${platform === "meta" ? "Meta" : "TikTok"} App Secret`
+                  }
+                  value={appSecretDraft}
+                  onChange={e => setAppSecretDraft(e.target.value)}
+                />
+              </div>
+              <div className="fin-form-row-actions">
+                <button type="submit" className="fin-primary-btn" disabled={oauthAppPending}>
+                  <CheckCircle2 size={13} /> Enregistrer App OAuth
+                </button>
+                {connection.oauthAppConfigured && !connection.oauthFromEnv && (
+                  <button
+                    type="button"
+                    className="fin-danger-ghost"
+                    disabled={oauthAppPending}
+                    onClick={onClearOAuthApp}
+                  >
+                    Effacer
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
+
+      {/* Collapsible Manual Token Fallback */}
+      <details className="fin-advanced-details">
+        <summary>Mode manuel avancé (Token + ID)</summary>
+        <form
+          className="fin-compact-form"
+          style={{ marginTop: "8px" }}
+          onSubmit={e => {
+            e.preventDefault();
+            onSaveManual(manualAccountDraft, manualTokenDraft);
+            setManualTokenDraft("");
+          }}
+        >
+          <input
+            type="text"
+            placeholder={meta.accountPlaceholder}
+            value={manualAccountDraft}
+            onChange={e => setManualAccountDraft(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder={
+              connection.configured
+                ? "Laisser vide pour garder le token actuel"
+                : meta.tokenPlaceholder
+            }
+            value={manualTokenDraft}
+            onChange={e => setManualTokenDraft(e.target.value)}
+          />
+          <button type="submit" className="fin-primary-btn" disabled={manualPending}>
+            <Link2 size={13} /> Enregistrer manuellement
+          </button>
+        </form>
+      </details>
+    </div>
   );
 }
