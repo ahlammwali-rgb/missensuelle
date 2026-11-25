@@ -27,29 +27,9 @@ import {
   playAbandonedAlertSound,
 } from "@/lib/sound";
 import { trpc } from "@/lib/trpc";
+import { ensurePushSubscription } from "@/lib/pushSubscription";
 
 export type NotificationType = "order" | "urgent_issue" | "delivered" | "abandoned";
-
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer | null): string {
-  if (!buffer) return "";
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return window.btoa(binary);
-}
 
 export function showPushNotification(
   title: string,
@@ -291,31 +271,13 @@ export function MobileAppCard({
 
       if (res === "granted") {
         if ("serviceWorker" in navigator && "PushManager" in window) {
-          const reg = await navigator.serviceWorker.ready;
           const vapidRes = await vapidQuery.refetch();
           const publicKey = vapidRes.data?.publicKey;
 
           if (publicKey) {
-            const applicationServerKey = urlBase64ToUint8Array(publicKey);
-            let sub = await reg.pushManager.getSubscription();
-            if (!sub) {
-              sub = await reg.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: applicationServerKey as unknown as BufferSource,
-              });
-            }
-
-            if (sub) {
-              const p256dh = arrayBufferToBase64(sub.getKey ? sub.getKey("p256dh") : null);
-              const auth = arrayBufferToBase64(sub.getKey ? sub.getKey("auth") : null);
-
-              await savePushMutation.mutateAsync({
-                endpoint: sub.endpoint,
-                expirationTime: sub.expirationTime,
-                keys: { p256dh, auth },
-                userAgent: navigator.userAgent,
-              });
-
+            const serialized = await ensurePushSubscription(publicKey, true);
+            if (serialized) {
+              await savePushMutation.mutateAsync(serialized);
               setIsPushSubscribed(true);
             }
           }

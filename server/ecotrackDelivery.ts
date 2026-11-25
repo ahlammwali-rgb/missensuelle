@@ -941,28 +941,44 @@ function inferStatusFromEcoEvent(ev?: RawEcoEvent): string {
   const evReason = firstNonEmptyStr(ev.reason, ev.details, ev.description, ev.status_label);
   const evReasonNorm = normCarrierText(evReason);
   const evStatusNorm = normCarrierText(evStatus).replace(/[\s-]+/g, "_");
+  const isAttemptEvent =
+    evStatusNorm === "attempt_delivery" || evStatusNorm === "tentative_echouee";
 
-  if ((evStatusNorm === "attempt_delivery" || evStatusNorm === "tentative_echouee" || !evStatusNorm) && evReasonNorm) {
+  if ((isAttemptEvent || !evStatusNorm) && evReasonNorm) {
     if (/repond|injoignable|joignable|nrp/.test(evReasonNorm)) {
       return "ne_repond_pas";
     }
     if (/report|reprogramm/.test(evReasonNorm)) {
       return "reporte";
     }
-    if (/refus|annul/.test(evReasonNorm)) {
+    if (/refus|annul|echec|echou|retour/.test(evReasonNorm)) {
       return "refuse";
     }
-    if (/livr|encais/.test(evReasonNorm) && !/non[\s_]+livr/.test(evReasonNorm)) {
+    if (/tentative|absent|ferme|incomplet|introuvable|adresse|faux[\s_]+numero/.test(evReasonNorm)) {
+      return evStatus || "attempt_delivery";
+    }
+    // Strict delivery token check only (never match "livreur" or "tentative de livraison")
+    if (!isAttemptEvent && isCarrierStatusTextDelivered(evReason)) {
       return "livree";
     }
   }
   return evStatus || evReason;
 }
 
-const TERMINAL_OR_LATE_STATUS_RE =
-  /(?:livr\w*|delivered|encais\w*|recouvr\w*|paye\w*|retour\w*|refus\w*|annul\w*|ne_repond_pas|reporte|en_livraison|sorti_en_livraison|dispatched_to_driver|au_bureau)/;
+const LATE_TRANSIT_STATUS_RE =
+  /(?:^|[\s_-])(?:ne_repond_pas|reporte|en_livraison|sorti_en_livraison|dispatched_to_driver|au_bureau)(?:$|[\s_-])/;
 const EARLY_STATUS_RE =
   /(?:^|[\s_-])(?:prete?_a_expedier|en_preparation|order_information|expedie|accepted_by_carrier|vers_hub|en_hub|vers_wilaya|attempt_delivery|suspendu|en_suivi)(?:$|[\s_-])/;
+
+function isTerminalOrLateEcoStatus(raw?: string): boolean {
+  if (!raw) return false;
+  const slug = normCarrierText(raw).replace(/[\s-]+/g, "_");
+  return (
+    isCarrierStatusTextDelivered(raw) ||
+    isCarrierStatusTextReturned(raw) ||
+    LATE_TRANSIT_STATUS_RE.test(slug)
+  );
+}
 
 export function buildEcoTrackingItem(trk: string, rawNode: RawEcoTrackingNode): EcomTrackingInfo {
   const info = rawNode.OrderInfo ?? rawNode.order ?? rawNode.parcel ?? rawNode;
@@ -989,8 +1005,7 @@ export function buildEcoTrackingItem(trk: string, rawNode: RawEcoTrackingNode): 
     rawStatus = eventDerivedStatus;
   } else if (rawStatus && eventDerivedStatus) {
     const rawNormSlug = normCarrierText(rawStatus).replace(/[\s-]+/g, "_");
-    const evNormSlug = normCarrierText(eventDerivedStatus).replace(/[\s-]+/g, "_");
-    if (EARLY_STATUS_RE.test(rawNormSlug) && TERMINAL_OR_LATE_STATUS_RE.test(evNormSlug)) {
+    if (EARLY_STATUS_RE.test(rawNormSlug) && isTerminalOrLateEcoStatus(eventDerivedStatus)) {
       rawStatus = eventDerivedStatus;
     }
   }
@@ -1188,8 +1203,18 @@ function mergeEcoTrackingItems(
       isCarrierStatusTextReturned(detail.situation) ||
       normCarrierText(detail.etat_logistique) !== normCarrierText(base.etat_logistique));
 
-  const encaisser = Boolean(detail.encaisser || base.encaisser);
-  const recouvert = Boolean(detail.recouvert || base.recouvert);
+  const detailContradictsDelivery =
+    useDetailSit &&
+    !isCarrierTrackingDelivered(detail) &&
+    !isCarrierStatusTextDelivered(detail.situation) &&
+    !isCarrierStatusTextDelivered(detail.etat_logistique);
+
+  const encaisser = detailContradictsDelivery
+    ? Boolean(detail.encaisser)
+    : Boolean(detail.encaisser || base.encaisser);
+  const recouvert = detailContradictsDelivery
+    ? Boolean(detail.recouvert)
+    : Boolean(detail.recouvert || base.recouvert);
 
   return {
     ...base,

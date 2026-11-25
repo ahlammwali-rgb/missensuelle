@@ -46,7 +46,7 @@ export function trackSiteVisit(params: {
   path?: string;
 }) {
   if (typeof window === "undefined" || typeof fetch !== "function") return;
-  const currentPath = params.path || window.location.pathname || "/";
+  const currentPath = params.path || window.location?.pathname || "/";
   if (currentPath.startsWith("/admin")) return;
   if (params.productName === "Vérification du pixel") return;
 

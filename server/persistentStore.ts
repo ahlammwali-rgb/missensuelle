@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { sitePixelConfig, type PublicPixelConfig } from "../shared/site-pixels";
+import {
+  normalizePublicPixelConfig,
+  sitePixelConfig,
+  type PublicPixelConfig,
+} from "../shared/site-pixels";
 import {
   createDefaultPersistedFinanceState,
   DEFAULT_FINANCE_SETTINGS,
@@ -135,22 +139,106 @@ export function markSentVictoryTag(tag: string): void {
   }
 }
 
+export function clearSentVictoryTag(tag: string): void {
+  const clean = tag.trim();
+  if (!clean) return;
+  memorySentVictoryTags.delete(clean);
+}
+
+const DELIVERY_REVERT_SUMMARY_RE =
+  /statut\s+livr[ée]\s+corrig[ée]\s+automatiquement|correction\s+auto\s*:\s*statut\s+transporteur\s+non\s+livr[ée]/i;
+
+export function isDeliveryRevertHistoryEvent(event?: {
+  type?: string;
+  summary?: string;
+  meta?: { statusFrom?: string };
+} | null): boolean {
+  if (!event) return false;
+  if (event.meta?.statusFrom === "livree") return true;
+  return DELIVERY_REVERT_SUMMARY_RE.test(String(event.summary || ""));
+}
+
+export function hasActiveDeliveredHistory(order: Pick<CheckoutOrder, "history">): boolean {
+  const hist = Array.isArray(order.history) ? order.history : [];
+  if (hist.length === 0) return false;
+
+  // `appendOrderHistory` prepends newest entries (`[newest, ..., created]`), whereas some fixtures append chronologically.
+  const hasCreatedTail = hist.length > 1 && hist[hist.length - 1]?.type === "created" && hist[0]?.type !== "created";
+  const firstMs = Date.parse(hist[0]?.at || "") || 0;
+  const lastMs = Date.parse(hist[hist.length - 1]?.at || "") || 0;
+  const isNewestFirst = hasCreatedTail || firstMs > lastMs;
+
+  if (isNewestFirst) {
+    for (let i = 0; i < hist.length; i++) {
+      const ev = hist[i];
+      if (!ev) continue;
+      if (isDeliveryRevertHistoryEvent(ev)) return false;
+      if (ev.type === "delivered") return true;
+    }
+    return false;
+  }
+
+  for (let i = hist.length - 1; i >= 0; i--) {
+    const ev = hist[i];
+    if (!ev) continue;
+    if (isDeliveryRevertHistoryEvent(ev)) return false;
+    if (ev.type === "delivered") return true;
+  }
+  return false;
+}
+
+/**
+ * Normalizes legacy auto-revert logs (previously saved as `type: "delivered"`) into `status_change`
+ * and unlocks stale victory push locks on reverted orders still marked `!isDelivered`.
+ */
+export function normalizeOrderDeliveryHistory(order: CheckoutOrder): boolean {
+  let changed = false;
+  let sawRevert = false;
+  if (Array.isArray(order.history)) {
+    for (const ev of order.history) {
+      if (!ev) continue;
+      if (isDeliveryRevertHistoryEvent(ev)) {
+        sawRevert = true;
+        if (ev.type === "delivered") {
+          ev.type = "status_change";
+          ev.meta = {
+            ...(ev.meta || {}),
+            statusFrom: "livree",
+            statusTo: order.status,
+          };
+          changed = true;
+        }
+      }
+    }
+  }
+  if (!order.isDelivered && sawRevert && !hasActiveDeliveredHistory(order)) {
+    if (order.deliveredNotified) {
+      order.deliveredNotified = false;
+      changed = true;
+    }
+    if (order.id) {
+      clearSentVictoryTag(`victory-${order.id}`);
+    }
+  }
+  return changed;
+}
+
 export function getSentVictoryTags(): string[] {
   return Array.from(memorySentVictoryTags);
 }
 
 export function getServerPixelConfig(): PublicPixelConfig {
-  return memoryPixelConfig ? { ...memoryPixelConfig } : { ...sitePixelConfig };
+  return normalizePublicPixelConfig(memoryPixelConfig ?? sitePixelConfig, sitePixelConfig);
 }
 
 export function setServerPixelConfig(config: Partial<PublicPixelConfig>): PublicPixelConfig {
   const current = getServerPixelConfig();
-  memoryPixelConfig = {
-    facebookPixelId: typeof config.facebookPixelId === "string" ? config.facebookPixelId.trim() : current.facebookPixelId,
-    tiktokPixelId: typeof config.tiktokPixelId === "string" ? config.tiktokPixelId.trim() : current.tiktokPixelId,
-    tiktokCode: typeof config.tiktokCode === "string" ? config.tiktokCode.trim() : current.tiktokCode,
+  memoryPixelConfig = normalizePublicPixelConfig(config, current);
+  return {
+    ...memoryPixelConfig,
+    facebookPixelIds: [...(memoryPixelConfig.facebookPixelIds ?? [])],
+    tiktokPixelIds: [...(memoryPixelConfig.tiktokPixelIds ?? [])],
   };
-  return { ...memoryPixelConfig };
 }
 
 const EXTENSION_SHADE_ALIASES: Record<string, string> = {
@@ -519,9 +607,14 @@ async function pushCloudState(state: PersistedState): Promise<void> {
         if (tag) mergedVictoryTags.add(tag);
       }
       for (const ord of finalOrders) {
-        if (ord?.id && (ord.deliveredNotified || ord.isDelivered || (ord.history ?? []).some(h => h.type === "delivered"))) {
-          mergedVictoryTags.add(`victory-${ord.id}`);
+        if (!ord?.id) continue;
+        const tag = `victory-${ord.id}`;
+        if (ord.deliveredNotified || ord.isDelivered) {
+          mergedVictoryTags.add(tag);
           ord.deliveredNotified = true;
+        } else {
+          // Authoritative in-memory order is not delivered and not locked (e.g. reverted false positive)
+          mergedVictoryTags.delete(tag);
         }
       }
       const finalSentVictoryTags = Array.from(mergedVictoryTags).slice(-MAX_SENT_VICTORY_TAGS);
@@ -609,15 +702,16 @@ function mergeStateIntoMemory(
   getCounters: () => { nextOrderId: number; nextSessionId: number },
 ) {
   const existingById = new Map(memoryOrders.map(o => [o.id, o]));
+  const unlockedVictoryTags = new Set<string>();
   for (const order of source.orders ?? []) {
     if (order && order.id) {
-      if (
-        order.deliveredNotified ||
-        order.isDelivered ||
-        (order.history ?? []).some(h => h.type === "delivered")
-      ) {
+      normalizeOrderDeliveryHistory(order);
+      if (order.deliveredNotified || order.isDelivered) {
         markSentVictoryTag(`victory-${order.id}`);
         order.deliveredNotified = true;
+      } else if ((order.history ?? []).some(ev => isDeliveryRevertHistoryEvent(ev)) && !hasActiveDeliveredHistory(order)) {
+        unlockedVictoryTags.add(`victory-${order.id}`);
+        clearSentVictoryTag(`victory-${order.id}`);
       }
       if (!existingById.has(order.id)) {
         memoryOrders.push(order);
@@ -626,7 +720,9 @@ function mergeStateIntoMemory(
     }
   }
   for (const tag of source.sentVictoryTags ?? []) {
-    if (typeof tag === "string") markSentVictoryTag(tag);
+    if (typeof tag === "string" && !unlockedVictoryTags.has(tag)) {
+      markSentVictoryTag(tag);
+    }
   }
   memoryOrders.sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -663,6 +759,9 @@ function mergeStateIntoMemory(
     const existingLogIds = new Set(memoryStaffActivityLogs.map(l => l.id));
     for (const log of source.staffActivityLogs) {
       if (log && log.id && !existingLogIds.has(log.id)) {
+        if (log.type === "delivered" && isDeliveryRevertHistoryEvent(log)) {
+          log.type = "status_change";
+        }
         memoryStaffActivityLogs.push(log);
         existingLogIds.add(log.id);
       }
@@ -678,17 +777,7 @@ function mergeStateIntoMemory(
   }
 
   if (source.pixelConfig && typeof source.pixelConfig === "object") {
-    memoryPixelConfig = {
-      facebookPixelId: typeof source.pixelConfig.facebookPixelId === "string"
-        ? source.pixelConfig.facebookPixelId.trim()
-        : sitePixelConfig.facebookPixelId,
-      tiktokPixelId: typeof source.pixelConfig.tiktokPixelId === "string"
-        ? source.pixelConfig.tiktokPixelId.trim()
-        : sitePixelConfig.tiktokPixelId,
-      tiktokCode: typeof source.pixelConfig.tiktokCode === "string"
-        ? source.pixelConfig.tiktokCode.trim()
-        : sitePixelConfig.tiktokCode,
-    };
+    memoryPixelConfig = normalizePublicPixelConfig(source.pixelConfig, sitePixelConfig);
   }
 
   if (source.financeState && typeof source.financeState === "object") {

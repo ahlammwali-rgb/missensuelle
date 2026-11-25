@@ -10,8 +10,14 @@ import {
 import { reconcileCarrierBatchOrders, wasOrderAutoDelivered } from "./carrierSync";
 import { markOrderDelivered, submitCheckoutOrder, updateMemoryOrderStatus, listCheckoutOrders } from "./checkout";
 import { buildEcoTrackingItem, getEcoTrackTrackingBatch } from "./ecotrackDelivery";
-import { hasSentVictoryTag, markSentVictoryTag } from "./persistentStore";
+import {
+  clearSentVictoryTag,
+  hasSentVictoryTag,
+  markSentVictoryTag,
+  normalizeOrderDeliveryHistory,
+} from "./persistentStore";
 import { sendAdminPushNotification } from "./webPush";
+import { buildAdminNotifications } from "@/components/AdminNotificationCenter";
 
 describe("strict carrier status detection", () => {
   it("recognizes genuine delivered / collected DHD & E-com statuses", () => {
@@ -377,5 +383,207 @@ describe("bidirectional carrier delivery reconciliation", () => {
       if (prevTok === undefined) delete process.env.ECOTRACK_API_TOKEN;
       else process.env.ECOTRACK_API_TOKEN = prevTok;
     }
+  });
+
+  it("never misclassifies attempt_delivery or driver/livraison reasons as livree", () => {
+    const samples = [
+      buildEcoTrackingItem("DHD-ATTEMPT-1", {
+        tracking: "DHD-ATTEMPT-1",
+        status: "attempt_delivery",
+        activity: [{ status: "attempt_delivery", reason: "Tentative de livraison" }],
+      }),
+      buildEcoTrackingItem("DHD-ATTEMPT-2", {
+        tracking: "DHD-ATTEMPT-2",
+        status: "tentative_echouee",
+        activity: [{ status: "tentative_echouee", reason: "Livreur injoignable pour livraison" }],
+      }),
+      buildEcoTrackingItem("DHD-ATTEMPT-3", {
+        tracking: "DHD-ATTEMPT-3",
+        status: "en_suivi",
+        activity: [{ status: "attempt_delivery", details: "Repasser livraison demain" }],
+      }),
+      buildEcoTrackingItem("DHD-DRIVER-4", {
+        tracking: "DHD-DRIVER-4",
+        status: "en_livraison",
+        activity: [{ status: "", details: "Livreur : Karim 0550112233" }],
+      }),
+    ];
+
+    for (const item of samples) {
+      expect(isCarrierTrackingDelivered(item)).toBe(false);
+    }
+  });
+
+  it("unlocks victory notification tags on carrier auto-revert so genuine delivery notifies later, and heals legacy revert logs", async () => {
+    const created = await submitCheckoutOrder({
+      token: "880e8400-e29b-41d4-a716-446655440123",
+      payload: {
+        source: "abaya",
+        customer: "Imane Reverted Push",
+        phone: "0551223344",
+        wilaya: "Alger",
+        commune: "Hydra",
+        address: "Hydra",
+        note: "",
+        delivery: "home",
+        items: [{ productId: "p-007", quantity: 1, color: "Noir", size: "M" }],
+      },
+    });
+
+    await updateMemoryOrderStatus(created.orderId, "transferee", {
+      actorId: "admin",
+      actorName: "Admin",
+    });
+
+    const trk = "DHD-REVERT-UNLOCK-1";
+    const getOrder = async () =>
+      (await listCheckoutOrders()).find(o => o.id === created.orderNumber)!;
+
+    // 1. Initial auto-delivery locks victory tag
+    const firstSync = await reconcileCarrierBatchOrders({
+      carrier: "ecotrack",
+      orders: [await getOrder()],
+      shipments: { [created.orderNumber]: { tracking: trk } },
+      trackingMap: { [trk]: { situation: "livré_non_encaissé", encaisser: false } },
+      db: null,
+    });
+    expect(firstSync.syncedCount).toBe(1);
+    expect(hasSentVictoryTag(`victory-${created.orderNumber}`)).toBe(true);
+
+    // 2. Carrier reverts to En cours de livraison -> must unlock victory tag & log as status_change (not delivered)
+    const revertSync = await reconcileCarrierBatchOrders({
+      carrier: "ecotrack",
+      orders: [await getOrder()],
+      shipments: { [created.orderNumber]: { tracking: trk } },
+      trackingMap: { [trk]: { situation: "En cours de livraison", encaisser: false } },
+      db: null,
+    });
+    expect(revertSync.revertedCount).toBe(1);
+
+    const afterRevert = await getOrder();
+    expect(afterRevert.isDelivered).toBe(false);
+    expect(afterRevert.deliveredNotified).toBe(false);
+    expect(hasSentVictoryTag(`victory-${created.orderNumber}`)).toBe(false);
+    const latestEvt = afterRevert.history?.[0];
+    expect(latestEvt?.type).toBe("status_change");
+    expect(latestEvt?.meta?.statusFrom).toBe("livree");
+
+    // 3. Genuine final delivery must be allowed to notify again (tag re-locked cleanly)
+    const finalSync = await reconcileCarrierBatchOrders({
+      carrier: "ecotrack",
+      orders: [afterRevert],
+      shipments: { [created.orderNumber]: { tracking: trk } },
+      trackingMap: { [trk]: { situation: "Livrée & Encaissée", encaisser: true } },
+      db: null,
+    });
+    expect(finalSync.syncedCount).toBe(1);
+    const afterFinal = await getOrder();
+    expect(afterFinal.isDelivered).toBe(true);
+    expect(afterFinal.deliveredNotified).toBe(true);
+    expect(hasSentVictoryTag(`victory-${created.orderNumber}`)).toBe(true);
+    expect(afterFinal.history?.[0]?.type).toBe("delivered");
+    expect((afterFinal.history ?? []).filter(h => h.type === "delivered")).toHaveLength(2);
+
+    // 4. Legacy store healing: legacy revert stored as type="delivered" unlocks !isDelivered orders
+    const legacyTag = "victory-MS-LEGACY-REVERT";
+    markSentVictoryTag(legacyTag);
+    const legacyOrder = {
+      ...afterRevert,
+      id: "MS-LEGACY-REVERT",
+      isDelivered: false,
+      deliveredNotified: true,
+      history: [
+        {
+          id: "evt-1",
+          at: new Date().toISOString(),
+          type: "delivered" as const,
+          actorId: "system",
+          actorName: "DHD / EcoTrack (Auto)",
+          summary: "🎉 Colis Livré et encaissé",
+        },
+        {
+          id: "evt-2",
+          at: new Date().toISOString(),
+          type: "delivered" as const,
+          actorId: "system",
+          actorName: "DHD / EcoTrack (Correction Auto)",
+          summary: "↩️ Statut Livré corrigé automatiquement (statut transporteur non livré)",
+        },
+      ],
+    };
+    const healed = normalizeOrderDeliveryHistory(legacyOrder);
+    expect(healed).toBe(true);
+    expect(legacyOrder.deliveredNotified).toBe(false);
+    expect(hasSentVictoryTag(legacyTag)).toBe(false);
+    expect(legacyOrder.history[1]?.type).toBe("status_change");
+    clearSentVictoryTag(legacyTag);
+  });
+
+  it("never shows revert logs as Livré/victory in notification bell", () => {
+    const nowIso = new Date().toISOString();
+    const order = {
+      dbId: 9001,
+      id: "MS-BELL-REVERT-1",
+      createdAt: nowIso,
+      customer: "Sarah Test",
+      phone: "0550001122",
+      product: "Abaya Test",
+      quantity: 1,
+      total: 4500,
+      wilaya: "Alger",
+      commune: "Hydra",
+      address: "Hydra",
+      note: "",
+      delivery: "home" as const,
+      carrier: "ecotrack" as const,
+      status: "transferee" as const,
+      isDelivered: false,
+    };
+
+    const notifs = buildAdminNotifications(
+      [order],
+      [
+        {
+          id: "log-false-deliv",
+          at: nowIso,
+          actorId: "system",
+          actorName: "DHD / EcoTrack (Auto)",
+          orderDbId: 9001,
+          orderId: "MS-BELL-REVERT-1",
+          type: "delivered",
+          summary: "🎉 Colis Livré et encaissé (4 500 DA)",
+        },
+        {
+          id: "log-legacy-revert",
+          at: nowIso,
+          actorId: "system",
+          actorName: "DHD / EcoTrack (Correction Auto)",
+          orderDbId: 9001,
+          orderId: "MS-BELL-REVERT-1",
+          type: "delivered",
+          summary: "↩️ Statut Livré corrigé automatiquement (statut transporteur non livré)",
+        },
+      ],
+      [
+        {
+          id: "victory-MS-BELL-REVERT-1",
+          kind: "victory",
+          title: "🎉 COLIS LIVRÉ : Succès !",
+          body: "Stale push",
+          timestamp: nowIso,
+          tsMs: Date.now(),
+          orderId: "MS-BELL-REVERT-1",
+          targetSection: "transferred",
+          statusLabel: "Livré",
+        },
+      ]
+    );
+
+    expect(notifs.some(n => n.kind === "victory")).toBe(false);
+    expect(notifs.some(n => n.title.startsWith("Livré ·"))).toBe(false);
+    const revertNotif = notifs.find(n => n.id === "log:log-legacy-revert");
+    expect(revertNotif).toBeDefined();
+    expect(revertNotif?.kind).toBe("transferred");
+    expect(revertNotif?.statusLabel).toContain("Non livré");
   });
 });

@@ -81,6 +81,18 @@ function formatRelativeFr(tsMs: number): string {
   }).format(new Date(tsMs));
 }
 
+export function isDeliveryRevertLogSummary(summary: string): boolean {
+  const lower = summary.toLowerCase();
+  return (
+    lower.includes("non livré") ||
+    lower.includes("non livre") ||
+    lower.includes("corrigé") ||
+    lower.includes("corrige") ||
+    lower.includes("retiré") ||
+    lower.includes("retire")
+  );
+}
+
 export function buildAdminNotifications(
   orders: CheckoutOrder[],
   activityLogs: StaffActivityLog[] = [],
@@ -90,13 +102,22 @@ export function buildAdminNotifications(
   const now = Date.now();
   const minRelevantMs = now - 30 * 24 * 60 * 60 * 1000;
 
-  for (const live of liveItems) {
-    byId.set(live.id, live);
-  }
-
   const orderMap = new Map<string, CheckoutOrder>();
   for (const order of orders) {
     orderMap.set(order.id, order);
+  }
+
+  for (const live of liveItems) {
+    if (live.kind === "victory" && live.orderId) {
+      const matched = orderMap.get(live.orderId);
+      if (matched && !matched.isDelivered) {
+        continue;
+      }
+    }
+    byId.set(live.id, live);
+  }
+
+  for (const order of orders) {
     const createdMs = parseTimestampMs(order.createdAt);
     const deliveredMs = parseTimestampMs(order.deliveredAt || order.createdAt);
 
@@ -169,16 +190,24 @@ export function buildAdminNotifications(
     if (!tsMs || tsMs < minRelevantMs) continue;
     const summaryText = String(log.summary || "");
     const summaryLower = summaryText.toLowerCase();
-    const isDeliveredAction = summaryLower.includes("livré");
+    const isRevertAction = isDeliveryRevertLogSummary(summaryText);
+    const isDeliveredAction =
+      !isRevertAction && (log.type === "delivered" || summaryLower.includes("livré"));
     const isCreatedAction = summaryLower.includes("créée") || summaryLower.includes("nouvelle");
     const oid = log.orderId || "";
+    const matchedOrder = oid ? orderMap.get(oid) : undefined;
+
+    if (matchedOrder && isDeliveredAction && !matchedOrder.isDelivered) {
+      // Stale "Colis Livré" entry from a previously reverted false positive: do not show contradictory green alert
+      continue;
+    }
     if (oid && isDeliveredAction && byId.has(`delivered:${oid}`)) continue;
     if (oid && isCreatedAction && byId.has(`new:${oid}`)) continue;
 
-    const matchedOrder = oid ? orderMap.get(oid) : undefined;
     const isTransferredAction = summaryLower.includes("transfér");
     const targetSection: "dashboard" | "transferred" =
       isDeliveredAction ||
+      isRevertAction ||
       isTransferredAction ||
       matchedOrder?.status === "transferee" ||
       Boolean(matchedOrder?.carrier) ||
@@ -191,15 +220,19 @@ export function buildAdminNotifications(
         ? "victory"
         : isCreatedAction
           ? "new_order"
-          : isTransferredAction
-            ? "transferred"
-            : log.warning ||
-                log.type === "postponed" ||
-                summaryLower.includes("annul") ||
-                summaryLower.includes("répond pas") ||
-                summaryLower.includes("report")
-              ? "urgent"
-              : "activity";
+          : isRevertAction
+            ? matchedOrder?.status === "transferee"
+              ? "transferred"
+              : "activity"
+            : isTransferredAction
+              ? "transferred"
+              : log.warning ||
+                  log.type === "postponed" ||
+                  summaryLower.includes("annul") ||
+                  summaryLower.includes("répond pas") ||
+                  summaryLower.includes("report")
+                ? "urgent"
+                : "activity";
 
     const id = `log:${log.id}`;
     if (!byId.has(id)) {
@@ -214,11 +247,13 @@ export function buildAdminNotifications(
         targetSection,
         statusLabel: matchedOrder?.isDelivered
           ? "Livré"
-          : matchedOrder?.status === "transferee"
-            ? "Transférée"
-            : matchedOrder?.status === "confirmee"
-              ? "Confirmée"
-              : log.actorName || "Suivi",
+          : isRevertAction
+            ? "Non livré · Suivi"
+            : matchedOrder?.status === "transferee"
+              ? "Transférée"
+              : matchedOrder?.status === "confirmee"
+                ? "Confirmée"
+                : log.actorName || "Suivi",
         amountDzd: matchedOrder?.total,
       });
     }

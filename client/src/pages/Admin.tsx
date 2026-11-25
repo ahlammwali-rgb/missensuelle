@@ -12,6 +12,7 @@ import { AiLandingCreatorWizard } from "@/components/AiLandingCreatorWizard";
 import { StatusPill } from "@/components/StoreLayout";
 import { useTheme } from "@/contexts/ThemeContext";
 import { getPixelConfig, applyServerPixelConfig, trackPixelEvent, type PixelConfig } from "@/lib/tracking";
+import { getFacebookPixelIds, getTikTokPixelIds, normalizePixelIdList } from "@shared/site-pixels";
 import "./admin-responsive.css";
 import "./admin-app.css";
 import { PixelDiagnostics } from "@/components/PixelDiagnostics";
@@ -34,6 +35,7 @@ import {
   PostponedReminderPopup,
 } from "@/components/OrderStatusActionModal";
 import { MobileAppCard, showPushNotification } from "@/components/MobileAppCard";
+import { ensurePushSubscription } from "@/lib/pushSubscription";
 import {
   AdminNotificationCenter,
   useAdminNotifications,
@@ -53,6 +55,22 @@ const FinancePanel = lazy(() => import("@/components/FinancePanel").then(m => ({
 
 const actionLabels: { status: OrderStatus; label: string }[] = [{ status: "confirmee", label: "Confirmer" }, { status: "annulee", label: "Annuler" }, { status: "reportee", label: "Reporter" }, { status: "ne_repond_pas", label: "Pas de réponse" }, { status: "transferee", label: "Transférer" }];
 type AdminSection = "dashboard" | "abandoned" | "catalogue" | "settings" | "ecom" | "sheet" | "transferred" | "returns" | "staff" | "finance";
+
+function prioritizeTrackings(
+  shipmentMap: Record<string, { tracking?: string } | undefined>,
+  orderById: Map<string, CheckoutOrder>,
+  limit: number = 500
+): string[] {
+  const active: string[] = [];
+  const delivered: string[] = [];
+  for (const [orderId, sh] of Object.entries(shipmentMap)) {
+    const trk = sh?.tracking?.trim();
+    if (!trk) continue;
+    if (orderById.get(orderId)?.isDelivered) delivered.push(trk);
+    else active.push(trk);
+  }
+  return [...active, ...delivered].slice(0, limit);
+}
 
 type DashboardOrder = Order;
 
@@ -289,6 +307,33 @@ function AdminPageContent() {
   const restoreOrders = trpc.admin.restoreOrders.useMutation();
   const restoredOnceRef = useRef(false);
   const backupSignatureRef = useRef("");
+  const pushSyncedOnMountRef = useRef(false);
+  const receivedServerVictoryOrderIdsRef = useRef<Set<string>>(new Set());
+  const prevOrderDeliveredRef = useRef<Map<string, boolean>>(new Map());
+  const vapidPublicKeyQuery = trpc.admin.getVapidPublicKey.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+  const savePushSubMutation = trpc.admin.savePushSubscription.useMutation();
+  useEffect(() => {
+    const publicKey = vapidPublicKeyQuery.data?.publicKey;
+    if (!publicKey || pushSyncedOnMountRef.current) return;
+    if (typeof window === "undefined" || !("Notification" in window) || Notification.permission !== "granted") {
+      return;
+    }
+    pushSyncedOnMountRef.current = true;
+    void ensurePushSubscription(publicKey, true)
+      .then(serialized => {
+        if (serialized) {
+          return savePushSubMutation.mutateAsync(serialized);
+        }
+        return undefined;
+      })
+      .catch(() => {
+        pushSyncedOnMountRef.current = false;
+      });
+  }, [vapidPublicKeyQuery.data?.publicKey]);
   const syncSheetMutation = trpc.googleSheet.syncOrders.useMutation({
     onSuccess: (data) => {
       if (data && data.added > 0) {
@@ -305,6 +350,31 @@ function AdminPageContent() {
   }, []);
   const serverOrders = ordersQuery.data ?? [];
   const orderById = useMemo(() => new Map(serverOrders.map(order => [order.id, order])), [serverOrders]);
+
+  useEffect(() => {
+    if (serverOrders.length === 0) return;
+    const undeliveredIds = new Set<string>();
+    for (const o of serverOrders) {
+      const wasDelivered = prevOrderDeliveredRef.current.get(o.id);
+      const isNowDelivered = Boolean(o.isDelivered);
+      prevOrderDeliveredRef.current.set(o.id, isNowDelivered);
+      if (!isNowDelivered) {
+        undeliveredIds.add(o.id);
+        if (wasDelivered) {
+          receivedServerVictoryOrderIdsRef.current.delete(o.id);
+          try {
+            localStorage.removeItem(`ms_victory_seen_${o.id}`);
+          } catch {}
+        }
+      }
+    }
+    setLivePushNotifs(prev => {
+      const next = prev.filter(
+        item => !(item.kind === "victory" && item.orderId && undeliveredIds.has(item.orderId))
+      );
+      return next.length === prev.length ? prev : next;
+    });
+  }, [serverOrders]);
 
   // Background-prefetch TransferredOrdersPanel so notification deep-links switch without suspense lag
   useEffect(() => {
@@ -344,6 +414,9 @@ function AdminPageContent() {
                   : parsedSection === "transferred"
                     ? "transferred"
                     : "activity";
+          if (pushKind === "victory" && parsedOrderId && !String(payload.tag || "").startsWith("test-")) {
+            receivedServerVictoryOrderIdsRef.current.add(parsedOrderId);
+          }
           const pushId = String(payload.tag || `push:${parsedOrderId || ""}:${String(payload.title || "").slice(0, 40)}`).trim();
           const pushItem: AdminNotificationItem = {
             id: pushId,
@@ -587,21 +660,15 @@ function AdminPageContent() {
   const ecoShipments = useMemo(() => ecotrackStatusQuery.data?.shipments || {}, [ecotrackStatusQuery.data]);
   const shipments = useMemo(() => ({ ...ecomShipments, ...ecoShipments }), [ecomShipments, ecoShipments]);
 
-  const activeEcomTrackings = useMemo(() => {
-    const list: string[] = [];
-    for (const sh of Object.values(ecomShipments)) {
-      if (sh?.tracking) list.push(sh.tracking);
-    }
-    return list.slice(0, 100);
-  }, [ecomShipments]);
+  const activeEcomTrackings = useMemo(
+    () => prioritizeTrackings(ecomShipments, orderById),
+    [ecomShipments, orderById]
+  );
 
-  const activeEcoTrackings = useMemo(() => {
-    const list: string[] = [];
-    for (const sh of Object.values(ecoShipments)) {
-      if (sh?.tracking) list.push(sh.tracking);
-    }
-    return list.slice(0, 100);
-  }, [ecoShipments]);
+  const activeEcoTrackings = useMemo(
+    () => prioritizeTrackings(ecoShipments, orderById),
+    [ecoShipments, orderById]
+  );
 
   const trackingBatchQuery = trpc.ecom.trackBatch.useQuery(
     { trackings: activeEcomTrackings },
@@ -676,7 +743,7 @@ function AdminPageContent() {
         const wilaya = order?.wilaya || "";
         const total = order?.total || 0;
 
-        // 1. Colis LIVRÉ -> GREEN VICTORY (Push envoyé exclusivement côté serveur pour éviter tout doublon)
+        // 1. Colis LIVRÉ -> GREEN VICTORY (serveur Web Push prioritaire + fallback local dédupliqué par tag)
         if (currentCat === "delivered") {
           const seenKey = `ms_victory_seen_${orderId || tracking}`;
           let alreadySeenLocally = false;
@@ -689,6 +756,23 @@ function AdminPageContent() {
           if (!alreadySeenLocally) {
             if (soundVictoryEnabled) playVictoryDeliveredSound();
             notify(`🎉 VICTOIRE : Colis ${orderId || tracking} livré à ${customerName} (+${formatDZD(total)}) !`, "victory");
+            if (pushEnabled && orderId && !receivedServerVictoryOrderIdsRef.current.has(orderId)) {
+              const targetOrderId = orderId;
+              window.setTimeout(() => {
+                if (receivedServerVictoryOrderIdsRef.current.has(targetOrderId)) return;
+                showPushNotification(
+                  "🎉 COLIS LIVRÉ : Succès !",
+                  `Colis #${targetOrderId} pour ${customerName} (${formatDZD(total)}) a été livré !`,
+                  `victory-${targetOrderId}`,
+                  "delivered",
+                  {
+                    url: `/admin?section=transferred&orderId=${encodeURIComponent(targetOrderId)}`,
+                    orderId: targetOrderId,
+                    section: "transferred",
+                  }
+                );
+              }, 4000);
+            }
           }
         }
         // 2. Client NE RÉPOND PAS -> RED ALERT
@@ -3218,19 +3302,104 @@ function ProductForm({
   );
 }
 
+function PixelIdListField({
+  label,
+  rows,
+  onChange,
+  placeholder,
+  addLabel,
+  inputMode = "text",
+}: {
+  label: string;
+  rows: string[];
+  onChange: (next: string[]) => void;
+  placeholder: string;
+  addLabel: string;
+  inputMode?: "numeric" | "text";
+}) {
+  const displayRows = rows.length > 0 ? rows : [""];
+  const updateAt = (index: number, value: string) => {
+    const next = [...displayRows];
+    next[index] = value;
+    onChange(next);
+  };
+  const removeAt = (index: number) => {
+    const next = displayRows.filter((_, i) => i !== index);
+    onChange(next.length > 0 ? next : [""]);
+  };
+  return (
+    <div className="multi-pixel-field">
+      <span className="multi-pixel-field-label">{label}</span>
+      <div className="multi-pixel-list">
+        {displayRows.map((val, idx) => (
+          <div className="multi-pixel-row" key={idx}>
+            <span className="multi-pixel-badge">{idx === 0 ? "#1 Principal" : `#${idx + 1}`}</span>
+            <input
+              value={val}
+              onChange={e => updateAt(idx, e.target.value)}
+              placeholder={placeholder}
+              inputMode={inputMode}
+              aria-label={`${label} #${idx + 1}`}
+            />
+            {(displayRows.length > 1 || val.trim() !== "") && (
+              <button
+                type="button"
+                className="multi-pixel-remove"
+                onClick={() => removeAt(idx)}
+                title="Supprimer ce pixel"
+                aria-label={`Supprimer ${label} #${idx + 1}`}
+              >
+                <Trash2 size={15} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="button button-light multi-pixel-add"
+        onClick={() => onChange([...displayRows, ""])}
+      >
+        <Plus size={15} /> {addLabel}
+      </button>
+    </div>
+  );
+}
+
 function TrackingSettings({ notify }: { notify: (message: string, type?: "normal" | "urgent" | "victory" | "order") => void }) {
   const utils = trpc.useUtils();
-  const [config, setConfig] = useState<PixelConfig>(() => getPixelConfig());
+  const initialConfig = getPixelConfig();
+  const [fbRows, setFbRows] = useState<string[]>(() => {
+    const ids = getFacebookPixelIds(initialConfig);
+    return ids.length > 0 ? ids : [""];
+  });
+  const [ttRows, setTtRows] = useState<string[]>(() => {
+    const ids = getTikTokPixelIds(initialConfig);
+    return ids.length > 0 ? ids : [""];
+  });
+  const [tiktokCode, setTiktokCode] = useState<string>(() => initialConfig.tiktokCode || "");
+
   const pixelQuery = trpc.admin.getPixelConfig.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   });
+
+  const syncFormFromConfig = (cfg: PixelConfig) => {
+    const fIds = getFacebookPixelIds(cfg);
+    const tIds = getTikTokPixelIds(cfg);
+    setFbRows(fIds.length > 0 ? fIds : [""]);
+    setTtRows(tIds.length > 0 ? tIds : [""]);
+    setTiktokCode(cfg.tiktokCode || "");
+  };
+
   const savePixelMutation = trpc.admin.setPixelConfig.useMutation({
     onSuccess: saved => {
       const normalized = applyServerPixelConfig(saved);
-      setConfig(normalized);
+      syncFormFromConfig(normalized);
       void utils.admin.getPixelConfig.invalidate();
-      notify("✅ Pixels enregistrés sur le serveur pour tous les visiteurs !");
+      const fbCount = getFacebookPixelIds(normalized).length;
+      const ttCount = getTikTokPixelIds(normalized).length;
+      notify(`✅ Pixels enregistrés (${fbCount} Meta · ${ttCount} TikTok) pour tous les visiteurs !`);
     },
     onError: error => {
       notify(error instanceof Error ? error.message : "Impossible d’enregistrer les pixels sur le serveur", "urgent");
@@ -3240,23 +3409,35 @@ function TrackingSettings({ notify }: { notify: (message: string, type?: "normal
   useEffect(() => {
     if (pixelQuery.data) {
       const normalized = applyServerPixelConfig(pixelQuery.data);
-      setConfig(normalized);
+      syncFormFromConfig(normalized);
     }
   }, [pixelQuery.data]);
 
-  const update = (key: keyof PixelConfig, value: string) => setConfig(current => ({ ...current, [key]: value }));
+  const buildDraftPayload = () => {
+    const facebookPixelIds = normalizePixelIdList(fbRows);
+    const tiktokPixelIds = normalizePixelIdList(ttRows);
+    const cleanCode = tiktokCode.trim();
+    return {
+      facebookPixelId: facebookPixelIds[0] || "",
+      facebookPixelIds,
+      tiktokPixelId: tiktokPixelIds[0] || "",
+      tiktokPixelIds,
+      tiktokCode: cleanCode,
+    };
+  };
+
   const save = () => {
-    const cleanFb = config.facebookPixelId.trim();
-    if (cleanFb && !/^\d{6,30}$/.test(cleanFb)) {
-      notify("L'ID du Pixel Facebook ne doit contenir que des chiffres (ex: 916933364742371).", "urgent");
+    const payload = buildDraftPayload();
+    const invalidFb = payload.facebookPixelIds.find(id => !/^\d{6,30}$/.test(id));
+    if (invalidFb) {
+      notify(`L'ID du Pixel Facebook "${invalidFb}" ne doit contenir que des chiffres (ex: 916933364742371).`, "urgent");
       return;
     }
-    savePixelMutation.mutate({
-      facebookPixelId: cleanFb,
-      tiktokPixelId: config.tiktokPixelId.trim(),
-      tiktokCode: config.tiktokCode.trim(),
-    });
+    savePixelMutation.mutate(payload);
   };
+
+  const activeFbCount = normalizePixelIdList(fbRows).length;
+  const activeTtCount = normalizePixelIdList(ttRows).length;
 
   return (
     <section className="tracking-settings">
@@ -3265,57 +3446,55 @@ function TrackingSettings({ notify }: { notify: (message: string, type?: "normal
       <div className="settings-hero">
         <span className="eyebrow">Mesure & acquisition</span>
         <h2>Connecte tes pixels<br /><em>sans perdre le signal.</em></h2>
-        <p>Les événements ViewContent, InitiateCheckout et Purchase sont envoyés sur les pages produit et après validation COD.</p>
+        <p>Les événements ViewContent, InitiateCheckout et Purchase sont envoyés simultanément sur tous tes pixels configurés (Meta &amp; TikTok).</p>
       </div>
-      <p className="tracking-config-notice">Modifie et enregistre tes identifiants Meta &amp; TikTok ci-dessous : ils sont sauvegardés sur le serveur et appliqués immédiatement à tous les visiteurs du site (sans redéploiement).</p>
+      <p className="tracking-config-notice">Ajoute autant de pixels Meta &amp; TikTok que tu veux ci-dessous : ils sont sauvegardés sur le serveur et déclenchés en parallèle pour tous les visiteurs (sans redéploiement).</p>
       <PixelDiagnostics />
       <div className="tracking-grid">
         <div className="tracking-card">
           <div className="tracking-card-head">
             <Facebook size={22} />
             <div>
-              <h3>Meta Pixel</h3>
-              <p>Facebook / Instagram</p>
+              <h3>Meta Pixels</h3>
+              <p>Facebook / Instagram (Multi-Pixels)</p>
             </div>
-            <span>Global • Éditable</span>
+            <span>{activeFbCount > 0 ? `${activeFbCount} actif${activeFbCount > 1 ? "s" : ""}` : "Aucun"}</span>
           </div>
-          <label>
-            ID du pixel Facebook
-            <input
-              value={config.facebookPixelId}
-              onChange={e => update("facebookPixelId", e.target.value)}
-              placeholder="Ex. 916933364742371"
-              inputMode="numeric"
-            />
-          </label>
-          <small>Saisis l'identifiant du Dataset / Pixel Meta (ex. 916933364742371) puis clique sur « Enregistrer les pixels » pour l'activer pour tous les visiteurs.</small>
+          <PixelIdListField
+            label="IDs des pixels Facebook"
+            rows={fbRows}
+            onChange={setFbRows}
+            placeholder="Ex. 916933364742371"
+            addLabel="Ajouter un pixel Facebook"
+            inputMode="numeric"
+          />
+          <small>Saisis un ou plusieurs identifiants Dataset / Pixel Meta (ou colle plusieurs IDs séparés par virgule), puis clique sur « Enregistrer les pixels ».</small>
         </div>
         <div className="tracking-card">
           <div className="tracking-card-head">
             <span className="tiktok-mark">♪</span>
             <div>
-              <h3>TikTok Pixel</h3>
-              <p>ID ou code complet</p>
+              <h3>TikTok Pixels</h3>
+              <p>Multi-IDs ou code complet</p>
             </div>
-            <span>Global • Éditable</span>
+            <span>{activeTtCount > 0 ? `${activeTtCount} actif${activeTtCount > 1 ? "s" : ""}` : "Aucun"}</span>
           </div>
-          <label>
-            ID TikTok
-            <input
-              value={config.tiktokPixelId}
-              onChange={e => update("tiktokPixelId", e.target.value)}
-              placeholder="Ex. CUD92NJC77U74NKABJI0"
-            />
-          </label>
+          <PixelIdListField
+            label="IDs des pixels TikTok"
+            rows={ttRows}
+            onChange={setTtRows}
+            placeholder="Ex. CUD92NJC77U74NKABJI0"
+            addLabel="Ajouter un pixel TikTok"
+          />
           <label>
             Code TikTok fourni (optionnel)
             <textarea
-              value={config.tiktokCode}
-              onChange={e => update("tiktokCode", e.target.value)}
-              placeholder="Colle ici le code TikTok uniquement si tu n'utilises pas d'ID…"
+              value={tiktokCode}
+              onChange={e => setTiktokCode(e.target.value)}
+              placeholder="Colle ici un script TikTok personnalisé en plus ou à la place des IDs…"
             />
           </label>
-          <small>Tu peux modifier l'ID global TikTok directement ici et l'enregistrer pour tous les visiteurs.</small>
+          <small>Ajoute autant d’IDs TikTok que nécessaire (nouveaux comptes pub, sauvegardes…) et enregistre pour les activer partout.</small>
         </div>
       </div>
       <div className="event-map">
@@ -3334,13 +3513,14 @@ function TrackingSettings({ notify }: { notify: (message: string, type?: "normal
           className="button button-light"
           type="button"
           onClick={() => {
-            if (!config.facebookPixelId && !config.tiktokPixelId && !config.tiktokCode) {
-              notify("Renseigne et enregistre un pixel avant le test");
+            const payload = buildDraftPayload();
+            if (payload.facebookPixelIds.length === 0 && payload.tiktokPixelIds.length === 0 && !payload.tiktokCode) {
+              notify("Renseigne et enregistre au moins un pixel avant le test");
               return;
             }
-            applyServerPixelConfig(config);
+            applyServerPixelConfig(payload);
             trackPixelEvent("ViewContent", { content_name: "Vérification du pixel", currency: "DZD" });
-            notify("Événement test envoyé ! Vérifie « Tester les évènements » dans Facebook — aucune commande créée");
+            notify(`Événement test envoyé sur ${payload.facebookPixelIds.length} pixel(s) Meta et ${payload.tiktokPixelIds.length} pixel(s) TikTok !`);
           }}
         >
           <Facebook size={16} />Tester l’événement

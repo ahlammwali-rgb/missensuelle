@@ -38,12 +38,15 @@ import { importGoogleSheetToOrders, pushOrderToGoogleSheet } from "./googleSheet
 import { normalizeOrderLocation } from "../shared/shipping";
 import {
   appendStaffActivityLog,
+  clearSentVictoryTag,
   ensurePersistentStoreLoaded,
   schedulePersistentStoreSave,
   getNotificationPreferences,
   getServerCatalogProducts,
+  hasActiveDeliveredHistory,
   hasSentVictoryTag,
   markSentVictoryTag,
+  normalizeOrderDeliveryHistory,
   setServerCatalogProducts,
 } from "./persistentStore";
 import { sendAdminPushNotification } from "./webPush";
@@ -146,12 +149,19 @@ const loadStore = async () => {
   await ensurePersistentStoreLoaded(memoryOrders, memorySessions, getCounters, setCounters);
   let locationNormalized = false;
   let dbIdRepaired = false;
+  let deliveryRepaired = false;
   const usedDbIds = new Set<number>();
   let maxDbId = memoryOrders.reduce(
     (max, o) => (typeof o.dbId === "number" && Number.isInteger(o.dbId) && o.dbId > max ? o.dbId : max),
     Math.max(0, nextMemoryOrderId - 1),
   );
   for (const o of memoryOrders) {
+    if (normalizeOrderDeliveryHistory(o)) {
+      deliveryRepaired = true;
+    }
+    if (!o.isDelivered && !o.deliveredNotified) {
+      deliveredVictoryLockIds.delete(o.id);
+    }
     if (typeof o.dbId !== "number" || !Number.isInteger(o.dbId) || o.dbId <= 0 || usedDbIds.has(o.dbId)) {
       maxDbId += 1;
       o.dbId = maxDbId;
@@ -178,7 +188,7 @@ const loadStore = async () => {
     nextMemoryOrderId = maxDbId + 1;
   }
   const dedup = autoDeduplicateOrders(memoryOrders);
-  if (dedup.removed > 0 || locationNormalized || dbIdRepaired) {
+  if (dedup.removed > 0 || locationNormalized || dbIdRepaired || deliveryRepaired) {
     saveStore();
   }
 };
@@ -543,7 +553,7 @@ export async function markOrderDelivered(
   found.isDelivered = isDelivered;
   if (isDelivered && !wasDelivered) {
     found.deliveredAt = new Date().toISOString();
-    const hasDeliveredHistory = (found.history ?? []).some(h => h.type === "delivered");
+    const hasDeliveredHistory = hasActiveDeliveredHistory(found);
     const victoryTag = `victory-${found.id}`;
     const alreadyNotified =
       Boolean(found.deliveredNotified) ||
@@ -583,11 +593,24 @@ export async function markOrderDelivered(
   } else if (!isDelivered) {
     found.deliveredAt = undefined;
     if (wasDelivered && actor) {
+      const isSystemRevert =
+        actor.actorId === "system" ||
+        actor.actorId === "webhook" ||
+        /correction/i.test(actor.actorName || "");
+      found.deliveredNotified = false;
+      deliveredVictoryLockIds.delete(found.id);
+      clearSentVictoryTag(`victory-${found.id}`);
       appendOrderHistory(found, {
-        type: "delivered",
+        type: "status_change",
         actorId: actor.actorId || "system",
         actorName: actor.actorName || "Sync Transporteur",
-        summary: "↩️ Statut Livré corrigé automatiquement (statut transporteur non livré)",
+        summary: isSystemRevert
+          ? "↩️ Correction auto : statut transporteur non livré"
+          : "↩️ Statut Livré retiré manuellement",
+        meta: {
+          statusFrom: "livree",
+          statusTo: found.status,
+        },
       });
     }
   }

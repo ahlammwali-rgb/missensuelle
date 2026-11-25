@@ -528,9 +528,21 @@ export const appRouter = router({
             .string()
             .trim()
             .max(64)
-            .refine(v => v === "" || /^\d{6,30}$/.test(v), "ID Pixel Facebook invalide (chiffres uniquement)"),
-          tiktokPixelId: z.string().trim().max(128),
-          tiktokCode: z.string().trim().max(8000),
+            .refine(v => v === "" || /^\d{6,30}$/.test(v), "ID Pixel Facebook invalide (chiffres uniquement)")
+            .optional()
+            .default(""),
+          facebookPixelIds: z
+            .array(
+              z
+                .string()
+                .trim()
+                .regex(/^\d{6,30}$/, "ID Pixel Facebook invalide (chiffres uniquement)")
+            )
+            .max(20)
+            .optional(),
+          tiktokPixelId: z.string().trim().max(128).optional().default(""),
+          tiktokPixelIds: z.array(z.string().trim().min(1).max(128)).max(20).optional(),
+          tiktokCode: z.string().trim().max(8000).optional().default(""),
         })
       )
       .mutation(async ({ input }) => {

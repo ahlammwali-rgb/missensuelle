@@ -1,14 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runInNewContext } from "node:vm";
 import { publicTrackingScript } from "./_core/siteTracking";
-import { sitePixelConfig } from "../shared/site-pixels";
+import { sitePixelConfig, type PublicPixelConfig } from "../shared/site-pixels";
+import { getServerPixelConfig, setServerPixelConfig } from "./persistentStore";
 import { getPixelConfig, getPixelDiagnostics, initializePixels, trackPixelEvent } from "../client/src/lib/tracking";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 
 afterEach(() => vi.unstubAllGlobals());
 
-function createPage(saved: string | null = null, blocked = false) {
+function createPage(
+  saved: string | null = null,
+  blocked = false,
+  config: PublicPixelConfig = sitePixelConfig,
+) {
   const scripts: Array<Record<string, any>> = [];
   const win: Record<string, any> = { dispatchEvent: vi.fn() };
   const document = {
@@ -16,7 +21,7 @@ function createPage(saved: string | null = null, blocked = false) {
     head: { appendChild: (script: Record<string, any>) => scripts.push(script) },
     querySelector: () => null,
   };
-  runInNewContext(publicTrackingScript(), { window: win, document, Event, console });
+  runInNewContext(publicTrackingScript(config), { window: win, document, Event, console });
   vi.stubGlobal("window", win);
   vi.stubGlobal("document", document);
   vi.stubGlobal("localStorage", { getItem: () => { if (blocked) throw new Error("storage blocked"); return saved; } });
@@ -42,7 +47,11 @@ describe("Globally installed TikTok pixel", () => {
     trackPixelEvent("InitiateCheckout", { value: 9600, currency: "DZD" });
     trackPixelEvent("Purchase", { value: 9600, currency: "DZD", order_id: "UNIT_TEST_ONLY" });
     expect(scripts.filter(script => script.dataset.missTiktokPixel)).toHaveLength(1);
-    expect(win.ttq).toContainEqual(["track", "Purchase", { value: 9600, currency: "DZD", order_id: "UNIT_TEST_ONLY" }]);
+    expect(win.ttq).toContainEqual([
+      "track",
+      "Purchase",
+      expect.objectContaining({ value: 9600, currency: "DZD", order_id: "UNIT_TEST_ONLY" }),
+    ]);
     expect(win.ttq.filter((call: string[]) => call[0] === "page")).toHaveLength(1);
   });
 
@@ -51,7 +60,7 @@ describe("Globally installed TikTok pixel", () => {
     trackPixelEvent("ViewContent");
     expect(scripts.filter(script => script.dataset.missTiktokPixel)).toHaveLength(1);
     expect(getPixelConfig().tiktokPixelId).toBe(sitePixelConfig.tiktokPixelId);
-    expect(win.ttq).toContainEqual(["track", "ViewContent", {}]);
+    expect(win.ttq).toContainEqual(["track", "ViewContent", expect.objectContaining({ currency: "DZD" })]);
   });
 
   it("reports load failures instead of displaying a false connected status", () => {
@@ -81,5 +90,37 @@ describe("Globally installed TikTok pixel", () => {
     expect(html.indexOf(path)).toBeLessThan(html.indexOf('</head>'));
     expect(html.indexOf(path)).toBeLessThan(html.indexOf('/src/main.tsx'));
     expect(readFileSync(new URL(`../client/public${path}`, import.meta.url), "utf8")).toBe(script);
+  });
+
+  it("loads and tracks multiple TikTok pixel IDs concurrently and persists multi-pixel server config", () => {
+    const multiConfig: PublicPixelConfig = {
+      facebookPixelId: "916933364742371",
+      facebookPixelIds: ["916933364742371", "11223344556677"],
+      tiktokPixelId: "CUD92NJC77U74NKABJI0",
+      tiktokPixelIds: ["CUD92NJC77U74NKABJI0", "TTPIXEL2_XYZ99"],
+      tiktokCode: "",
+    };
+    const { win, scripts } = createPage(null, false, multiConfig);
+    initializePixels();
+    const ttScripts = scripts.filter(s => s.dataset.missTiktokPixel);
+    expect(ttScripts).toHaveLength(2);
+    expect(ttScripts[0]?.src).toContain("sdkid=CUD92NJC77U74NKABJI0");
+    expect(ttScripts[1]?.src).toContain("sdkid=TTPIXEL2_XYZ99");
+    expect(win.ttq.filter((call: string[]) => call[0] === "page")).toHaveLength(1);
+    expect(getPixelConfig().tiktokPixelIds).toEqual(["CUD92NJC77U74NKABJI0", "TTPIXEL2_XYZ99"]);
+
+    win.ttq._i["CUD92NJC77U74NKABJI0"].info = { pixelCode: "CUD92NJC77U74NKABJI0" };
+    expect(getPixelDiagnostics().registered).toBe(false);
+    win.ttq._i["TTPIXEL2_XYZ99"].info = { pixelCode: "TTPIXEL2_XYZ99" };
+    expect(getPixelDiagnostics().registered).toBe(true);
+    expect(getPixelDiagnostics().pixelIds).toEqual(["CUD92NJC77U74NKABJI0", "TTPIXEL2_XYZ99"]);
+
+    const saved = setServerPixelConfig(multiConfig);
+    expect(saved.facebookPixelIds).toEqual(["916933364742371", "11223344556677"]);
+    expect(saved.tiktokPixelIds).toEqual(["CUD92NJC77U74NKABJI0", "TTPIXEL2_XYZ99"]);
+    expect(getServerPixelConfig().facebookPixelIds).toEqual(["916933364742371", "11223344556677"]);
+    expect(getServerPixelConfig().tiktokPixelIds).toEqual(["CUD92NJC77U74NKABJI0", "TTPIXEL2_XYZ99"]);
+    // Restore default
+    setServerPixelConfig(sitePixelConfig);
   });
 });
