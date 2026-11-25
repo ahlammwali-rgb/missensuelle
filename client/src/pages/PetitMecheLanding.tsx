@@ -440,29 +440,53 @@ export default function PetitMecheLanding({ product }: { product?: Product }) {
         {colorOptions.some(c => Boolean(c.image)) && (
           <section className="pm-showcase" aria-label="اختاري لونك المفضل">
             <div className="pm-showcase-head">
-              <span>♡ اختاري لونك المفضل ♡</span>
-              <small>اضغطي على الصورة لاختيار اللون مباشرة</small>
+              <span>♡ الألوان المتوفرة ♡</span>
+              <small>اضغطي على أي صورة لاختيار اللون</small>
             </div>
-            <div className="pm-showcase-grid">
-              {colorOptions.map(c => {
-                const checked = selectedColors.includes(c.value);
-                return (
-                  <button
-                    key={c.value}
-                    type="button"
-                    aria-pressed={checked}
-                    className={`pm-showcase-card${checked ? " is-selected" : ""}`}
-                    onClick={() => handleColorToggle(c.value)}
+            <div className="pm-marquee-viewport" dir="ltr">
+              <div className="pm-marquee-track">
+                {[0, 1].map(copyIdx => (
+                  <div
+                    key={copyIdx}
+                    className="pm-marquee-group"
+                    aria-hidden={copyIdx === 1 || undefined}
                   >
-                    {c.image && <img src={c.image} alt={c.value} loading="lazy" />}
-                    <span className="pm-showcase-cap">
-                      <i style={{ background: c.hex }} />
-                      <b>{c.value}</b>
-                    </span>
-                    {checked && <span className="pm-variant-check" aria-hidden="true">✓</span>}
-                  </button>
-                );
-              })}
+                    {colorOptions
+                      .filter(c => Boolean(c.image))
+                      .map(c => {
+                        const checked = selectedColors.includes(c.value);
+                        return (
+                          <button
+                            key={`${copyIdx}-${c.value}`}
+                            type="button"
+                            tabIndex={copyIdx === 1 ? -1 : undefined}
+                            aria-pressed={copyIdx === 0 ? checked : undefined}
+                            className={`pm-showcase-slide${checked ? " is-selected" : ""}`}
+                            onClick={() => handleColorToggle(c.value)}
+                          >
+                            {c.image && (
+                              <img
+                                src={c.image}
+                                alt={copyIdx === 0 ? c.value : ""}
+                                loading="eager"
+                                decoding="async"
+                              />
+                            )}
+                            <span className="pm-showcase-cap" dir="rtl">
+                              <i style={{ background: c.hex }} />
+                              <b>{c.value}</b>
+                            </span>
+                            {checked && (
+                              <span className="pm-variant-check" aria-hidden="true">
+                                ✓
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                  </div>
+                ))}
+              </div>
             </div>
           </section>
         )}
@@ -502,12 +526,12 @@ export default function PetitMecheLanding({ product }: { product?: Product }) {
               {colorOptions.length > 0 ? (
                 <>
                   <div className="pm-lab">اختاري اللون ({selectedColors.length > 0 ? `تم اختيار ${selectedColors.length}` : "يمكنك اختيار لون أو أكثر"})</div>
-                  <div className={colorOptions.some(c => Boolean(c.image)) ? "pm-variant-grid" : "pm-chips"}>
+                  <div className={colorOptions.some(c => Boolean(c.image)) ? "pm-variant-mini-list" : "pm-chips"}>
                     {colorOptions.map(c => {
                       const checked = selectedColors.includes(c.value);
                       if (c.image) {
                         return (
-                          <label key={c.value} className={`pm-variant-card${checked ? " is-selected" : ""}`}>
+                          <label key={c.value} className={`pm-variant-mini${checked ? " is-selected" : ""}`}>
                             <input
                               type="checkbox"
                               name="c"
@@ -515,14 +539,15 @@ export default function PetitMecheLanding({ product }: { product?: Product }) {
                               checked={checked}
                               onChange={() => handleColorToggle(c.value)}
                             />
-                            <div className="pm-variant-thumb">
-                              <img src={c.image} alt={c.value} loading="lazy" />
-                              {checked && <span className="pm-variant-check" aria-hidden="true">✓</span>}
-                            </div>
-                            <span className="pm-variant-name">
-                              <i style={{ background: c.hex }} />
-                              <span>{c.value}</span>
+                            <span className="pm-variant-mini-thumb">
+                              <img src={c.image} alt={c.value} loading="eager" decoding="async" />
                             </span>
+                            <span className="pm-variant-mini-name">{c.value}</span>
+                            {checked && (
+                              <span className="pm-variant-mini-tick" aria-hidden="true">
+                                ✓
+                              </span>
+                            )}
                           </label>
                         );
                       }
