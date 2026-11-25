@@ -10,11 +10,13 @@ import {
   Layers,
   PackageCheck,
   RefreshCw,
+  ShoppingBag,
   Truck,
 } from "lucide-react";
 import {
   buildMultiMetricChartSummary,
   type ChartViewMode,
+  type GlobalChartSeriesKey,
   type MultiMetricChartPoint,
   type OrderLikeForMultiChart,
   type VisitAnalyticsData,
@@ -31,7 +33,38 @@ const DATE_PRESETS: Array<{ key: VisitDateFilterKey; label: string }> = [
   { key: "custom", label: "Dates" },
 ];
 
-const CHART_MODES: ChartViewMode[] = ["views", "delivered", "transferred", "global"];
+const CHART_MODES: ChartViewMode[] = ["views", "created", "transferred", "delivered", "global"];
+const GLOBAL_SERIES_KEYS: GlobalChartSeriesKey[] = ["views", "created", "transferred", "delivered"];
+const GLOBAL_SERIES_STORAGE_KEY = "ms_global_chart_series_v1";
+
+type GlobalSeriesSelection = Record<GlobalChartSeriesKey, boolean>;
+
+const DEFAULT_GLOBAL_SERIES: GlobalSeriesSelection = {
+  views: true,
+  created: true,
+  transferred: true,
+  delivered: true,
+};
+
+function readStoredGlobalSeries(): GlobalSeriesSelection {
+  try {
+    const raw = localStorage.getItem(GLOBAL_SERIES_STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_GLOBAL_SERIES };
+    const parsed = JSON.parse(raw) as Partial<Record<GlobalChartSeriesKey, unknown>>;
+    const next: GlobalSeriesSelection = {
+      views: typeof parsed.views === "boolean" ? parsed.views : true,
+      created: typeof parsed.created === "boolean" ? parsed.created : true,
+      transferred: typeof parsed.transferred === "boolean" ? parsed.transferred : true,
+      delivered: typeof parsed.delivered === "boolean" ? parsed.delivered : true,
+    };
+    if (!GLOBAL_SERIES_KEYS.some(k => next[k])) {
+      return { ...DEFAULT_GLOBAL_SERIES };
+    }
+    return next;
+  } catch {
+    return { ...DEFAULT_GLOBAL_SERIES };
+  }
+}
 
 interface ChartModeMeta {
   key: ChartViewMode;
@@ -49,6 +82,13 @@ const CHART_MODE_META: Record<ChartViewMode, ChartModeMeta> = {
     subtitle: "Trafic & visiteurs en direct",
     dotColor: "#a855f7",
   },
+  created: {
+    key: "created",
+    eyebrow: "COMMANDES CRÉÉES",
+    shortLabel: "Créées",
+    subtitle: "Site, manuelles & Google Sheet",
+    dotColor: "#f59e0b",
+  },
   delivered: {
     key: "delivered",
     eyebrow: "COMMANDES LIVRÉES",
@@ -65,12 +105,24 @@ const CHART_MODE_META: Record<ChartViewMode, ChartModeMeta> = {
   },
   global: {
     key: "global",
-    eyebrow: "VUE GLOBALE (3 GRAPHES)",
+    eyebrow: "VUE GLOBALE",
     shortLabel: "Globale",
-    subtitle: "Vues + Transférées + Livrées",
+    subtitle: "Vues + Créées + Transférées + Livrées",
     dotColor: "#ec4899",
   },
 };
+
+const GLOBAL_SERIES_CONFIG: Array<{
+  key: GlobalChartSeriesKey;
+  label: string;
+  color: string;
+  tooltipColor: string;
+}> = [
+  { key: "views", label: "Vues", color: "#a855f7", tooltipColor: "#d8b4fe" },
+  { key: "created", label: "Créées", color: "#f59e0b", tooltipColor: "#fcd34d" },
+  { key: "transferred", label: "Transférées", color: "#3b82f6", tooltipColor: "#93c5fd" },
+  { key: "delivered", label: "Livrées", color: "#10b981", tooltipColor: "#6ee7b7" },
+];
 
 type SvgCoord = { x: number; y: number };
 
@@ -106,6 +158,7 @@ function mapValuesToCoords(
 }
 
 function renderModeIcon(mode: ChartViewMode, size = 14) {
+  if (mode === "created") return <ShoppingBag size={size} />;
   if (mode === "delivered") return <PackageCheck size={size} />;
   if (mode === "transferred") return <Truck size={size} />;
   if (mode === "global") return <Layers size={size} />;
@@ -132,6 +185,7 @@ export function VisitsAnalyticsChart({
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const [globalSeries, setGlobalSeries] = useState<GlobalSeriesSelection>(readStoredGlobalSeries);
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const touchStartRef = useRef<{ x: number; y: number; t: number; ignore: boolean } | null>(null);
@@ -146,6 +200,25 @@ export function VisitsAnalyticsChart({
     window.addEventListener("mousedown", onDocDown);
     return () => window.removeEventListener("mousedown", onDocDown);
   }, [dropdownOpen]);
+
+  const activeGlobalCount = useMemo(
+    () => GLOBAL_SERIES_KEYS.filter(k => globalSeries[k]).length,
+    [globalSeries]
+  );
+
+  const toggleGlobalSeries = (key: GlobalChartSeriesKey) => {
+    setGlobalSeries(prev => {
+      const enabledCount = GLOBAL_SERIES_KEYS.filter(k => prev[k]).length;
+      if (prev[key] && enabledCount <= 1) {
+        return prev; // Keep at least 1 curve visible
+      }
+      const next: GlobalSeriesSelection = { ...prev, [key]: !prev[key] };
+      try {
+        localStorage.setItem(GLOBAL_SERIES_STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   const switchMode = (nextMode: ChartViewMode, dir?: "left" | "right") => {
     if (nextMode === viewMode) {
@@ -189,17 +262,26 @@ export function VisitsAnalyticsChart({
 
   const chartGeometry = useMemo(() => {
     const viewsVals = points.map(p => p.views);
+    const createdVals = points.map(p => p.created);
     const deliveredVals = points.map(p => p.delivered);
     const transferredVals = points.map(p => p.transferred);
 
     const maxViews = Math.max(1, ...viewsVals);
-    const maxOrders = Math.max(1, ...deliveredVals, ...transferredVals);
+    const maxCreated = Math.max(1, ...createdVals);
     const maxDelivered = Math.max(1, ...deliveredVals);
     const maxTransferred = Math.max(1, ...transferredVals);
 
+    const activeOrderPeaks: number[] = [];
+    if (globalSeries.created) activeOrderPeaks.push(...createdVals);
+    if (globalSeries.transferred) activeOrderPeaks.push(...transferredVals);
+    if (globalSeries.delivered) activeOrderPeaks.push(...deliveredVals);
+    const maxGlobalOrders = Math.max(1, ...activeOrderPeaks);
+
     const viewsCoords = mapValuesToCoords(viewsVals, maxViews, SVG_W, PAD_X, PAD_TOP, PLOT_H);
-    const globalDeliveredCoords = mapValuesToCoords(deliveredVals, maxOrders, SVG_W, PAD_X, PAD_TOP, PLOT_H);
-    const globalTransferredCoords = mapValuesToCoords(transferredVals, maxOrders, SVG_W, PAD_X, PAD_TOP, PLOT_H);
+    const globalCreatedCoords = mapValuesToCoords(createdVals, maxGlobalOrders, SVG_W, PAD_X, PAD_TOP, PLOT_H);
+    const globalDeliveredCoords = mapValuesToCoords(deliveredVals, maxGlobalOrders, SVG_W, PAD_X, PAD_TOP, PLOT_H);
+    const globalTransferredCoords = mapValuesToCoords(transferredVals, maxGlobalOrders, SVG_W, PAD_X, PAD_TOP, PLOT_H);
+    const singleCreatedCoords = mapValuesToCoords(createdVals, maxCreated, SVG_W, PAD_X, PAD_TOP, PLOT_H);
     const singleDeliveredCoords = mapValuesToCoords(deliveredVals, maxDelivered, SVG_W, PAD_X, PAD_TOP, PLOT_H);
     const singleTransferredCoords = mapValuesToCoords(transferredVals, maxTransferred, SVG_W, PAD_X, PAD_TOP, PLOT_H);
 
@@ -212,44 +294,67 @@ export function VisitsAnalyticsChart({
     };
 
     const viewsLineD = buildSmoothCurvePath(viewsCoords);
+    const globalCreatedLineD = buildSmoothCurvePath(globalCreatedCoords);
     const globalDeliveredLineD = buildSmoothCurvePath(globalDeliveredCoords);
     const globalTransferredLineD = buildSmoothCurvePath(globalTransferredCoords);
+    const singleCreatedLineD = buildSmoothCurvePath(singleCreatedCoords);
     const singleDeliveredLineD = buildSmoothCurvePath(singleDeliveredCoords);
     const singleTransferredLineD = buildSmoothCurvePath(singleTransferredCoords);
 
     return {
       maxViews,
-      maxOrders,
+      maxGlobalOrders,
+      maxCreated,
       maxDelivered,
       maxTransferred,
       viewsCoords,
+      globalCreatedCoords,
       globalDeliveredCoords,
       globalTransferredCoords,
+      singleCreatedCoords,
       singleDeliveredCoords,
       singleTransferredCoords,
       viewsLineD,
       viewsAreaD: closeArea(viewsCoords, viewsLineD),
+      globalCreatedLineD,
+      globalCreatedAreaD: closeArea(globalCreatedCoords, globalCreatedLineD),
       globalDeliveredLineD,
       globalDeliveredAreaD: closeArea(globalDeliveredCoords, globalDeliveredLineD),
       globalTransferredLineD,
       globalTransferredAreaD: closeArea(globalTransferredCoords, globalTransferredLineD),
+      singleCreatedLineD,
+      singleCreatedAreaD: closeArea(singleCreatedCoords, singleCreatedLineD),
       singleDeliveredLineD,
       singleDeliveredAreaD: closeArea(singleDeliveredCoords, singleDeliveredLineD),
       singleTransferredLineD,
       singleTransferredAreaD: closeArea(singleTransferredCoords, singleTransferredLineD),
     };
-  }, [points, PLOT_H]);
+  }, [points, PLOT_H, globalSeries]);
 
   const activeModeMeta = CHART_MODE_META[viewMode];
+  const headerEyebrow =
+    viewMode === "global"
+      ? `VUE GLOBALE (${activeGlobalCount}/${GLOBAL_SERIES_KEYS.length})`
+      : activeModeMeta.eyebrow;
+
+  const globalPrimaryCoords = globalSeries.delivered
+    ? chartGeometry.globalDeliveredCoords
+    : globalSeries.transferred
+      ? chartGeometry.globalTransferredCoords
+      : globalSeries.created
+        ? chartGeometry.globalCreatedCoords
+        : chartGeometry.viewsCoords;
 
   const primaryCoords =
-    viewMode === "delivered"
-      ? chartGeometry.singleDeliveredCoords
-      : viewMode === "transferred"
-        ? chartGeometry.singleTransferredCoords
-        : viewMode === "global"
-          ? chartGeometry.globalDeliveredCoords
-          : chartGeometry.viewsCoords;
+    viewMode === "created"
+      ? chartGeometry.singleCreatedCoords
+      : viewMode === "delivered"
+        ? chartGeometry.singleDeliveredCoords
+        : viewMode === "transferred"
+          ? chartGeometry.singleTransferredCoords
+          : viewMode === "global"
+            ? globalPrimaryCoords
+            : chartGeometry.viewsCoords;
 
   const activeIndex = hoveredIdx !== null && hoveredIdx < pointCount ? hoveredIdx : null;
   const activePoint: MultiMetricChartPoint | null = activeIndex !== null ? points[activeIndex] : null;
@@ -259,40 +364,56 @@ export function VisitsAnalyticsChart({
     for (let i = points.length - 1; i >= 0; i--) {
       const p = points[i];
       const v =
-        viewMode === "delivered"
-          ? p.delivered
-          : viewMode === "transferred"
-            ? p.transferred
-            : viewMode === "global"
-              ? p.views + p.delivered + p.transferred
-              : p.views;
+        viewMode === "created"
+          ? p.created
+          : viewMode === "delivered"
+            ? p.delivered
+            : viewMode === "transferred"
+              ? p.transferred
+              : viewMode === "global"
+                ? (globalSeries.views ? p.views : 0) +
+                  (globalSeries.created ? p.created : 0) +
+                  (globalSeries.transferred ? p.transferred : 0) +
+                  (globalSeries.delivered ? p.delivered : 0)
+                : p.views;
       if (v > 0) return i;
     }
     return Math.max(0, points.length - 1);
-  }, [points, viewMode]);
+  }, [points, viewMode, globalSeries]);
 
   const primaryTotal =
-    viewMode === "delivered"
-      ? summary.totals.delivered
-      : viewMode === "transferred"
-        ? summary.totals.transferred
-        : summary.totals.views;
+    viewMode === "created"
+      ? summary.totals.created
+      : viewMode === "delivered"
+        ? summary.totals.delivered
+        : viewMode === "transferred"
+          ? summary.totals.transferred
+          : summary.totals.views;
 
   const primaryDelta =
-    viewMode === "delivered"
-      ? summary.deltas.delivered
-      : viewMode === "transferred"
-        ? summary.deltas.transferred
-        : summary.deltas.views;
+    viewMode === "created"
+      ? summary.deltas.created
+      : viewMode === "delivered"
+        ? summary.deltas.delivered
+        : viewMode === "transferred"
+          ? summary.deltas.transferred
+          : summary.deltas.views;
 
+  const anyGlobalOrderSelected = globalSeries.created || globalSeries.transferred || globalSeries.delivered;
   const primaryYMax =
-    viewMode === "delivered"
-      ? chartGeometry.maxDelivered
-      : viewMode === "transferred"
-        ? chartGeometry.maxTransferred
-        : viewMode === "global"
-          ? Math.max(chartGeometry.maxViews, chartGeometry.maxOrders)
-          : chartGeometry.maxViews;
+    viewMode === "created"
+      ? chartGeometry.maxCreated
+      : viewMode === "delivered"
+        ? chartGeometry.maxDelivered
+        : viewMode === "transferred"
+          ? chartGeometry.maxTransferred
+          : viewMode === "global"
+            ? globalSeries.views && anyGlobalOrderSelected
+              ? Math.max(chartGeometry.maxViews, chartGeometry.maxGlobalOrders)
+              : anyGlobalOrderSelected
+                ? chartGeometry.maxGlobalOrders
+                : chartGeometry.maxViews
+            : chartGeometry.maxViews;
 
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     if (e.touches.length !== 1) return;
@@ -300,7 +421,8 @@ export function VisitsAnalyticsChart({
     const ignore = Boolean(
       target?.closest(".gcome-raw-dates") ||
         target?.closest(".gcome-mcustom-dates") ||
-        target?.closest(".gcome-mode-dropdown")
+        target?.closest(".gcome-mode-dropdown") ||
+        target?.closest(".gcome-raw-global-stats")
     );
     touchStartRef.current = {
       x: e.touches[0].clientX,
@@ -358,7 +480,7 @@ export function VisitsAnalyticsChart({
                 }}
                 aria-hidden="true"
               />
-              <span className="gcome-raw-eyebrow">{activeModeMeta.eyebrow}</span>
+              <span className="gcome-raw-eyebrow">{headerEyebrow}</span>
               <ChevronDown size={13} className="gcome-mode-chevron" />
             </button>
             <span className="gcome-raw-period-txt">{summary.rangeLabel}</span>
@@ -371,11 +493,13 @@ export function VisitsAnalyticsChart({
                   const modeCount =
                     modeKey === "views"
                       ? summary.totals.views
-                      : modeKey === "delivered"
-                        ? summary.totals.delivered
-                        : modeKey === "transferred"
-                          ? summary.totals.transferred
-                          : summary.totals.views + summary.totals.delivered + summary.totals.transferred;
+                      : modeKey === "created"
+                        ? summary.totals.created
+                        : modeKey === "delivered"
+                          ? summary.totals.delivered
+                          : modeKey === "transferred"
+                            ? summary.totals.transferred
+                            : activeGlobalCount;
                   return (
                     <button
                       key={modeKey}
@@ -397,7 +521,7 @@ export function VisitsAnalyticsChart({
                       </span>
                       <span className="gcome-mode-option-val">
                         {modeKey === "global"
-                          ? "3x"
+                          ? `${activeGlobalCount}/${GLOBAL_SERIES_KEYS.length}`
                           : modeCount.toLocaleString("fr-FR")}
                       </span>
                     </button>
@@ -408,28 +532,36 @@ export function VisitsAnalyticsChart({
           </div>
 
           {viewMode === "global" ? (
-            <div className="gcome-raw-global-stats">
-              <div className="gcome-global-stat-pill is-views">
-                <span className="gcome-gs-dot" />
-                <span className="gcome-gs-label">Vues</span>
-                <strong>{summary.totals.views.toLocaleString("fr-FR")}</strong>
-              </div>
-              <div className="gcome-global-stat-pill is-transferred">
-                <span className="gcome-gs-dot" />
-                <span className="gcome-gs-label">Transférées</span>
-                <strong>{summary.totals.transferred.toLocaleString("fr-FR")}</strong>
-              </div>
-              <div className="gcome-global-stat-pill is-delivered">
-                <span className="gcome-gs-dot" />
-                <span className="gcome-gs-label">Livrées</span>
-                <strong>{summary.totals.delivered.toLocaleString("fr-FR")}</strong>
-              </div>
+            <div className="gcome-raw-global-stats" role="group" aria-label="Courbes affichées en vue globale">
+              {GLOBAL_SERIES_CONFIG.map(({ key, label }) => {
+                const isOn = globalSeries[key];
+                const totalVal = summary.totals[key];
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={isOn}
+                    title={isOn ? `Masquer ${label}` : `Afficher ${label}`}
+                    className={`gcome-global-stat-pill is-toggleable is-${key} ${isOn ? "is-on" : "is-off"}`}
+                    onClick={() => toggleGlobalSeries(key)}
+                  >
+                    <span className="gcome-gs-dot" />
+                    <span className="gcome-gs-label">{label}</span>
+                    <strong>{totalVal.toLocaleString("fr-FR")}</strong>
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="gcome-raw-num-row">
               <span className="gcome-raw-big-num">
                 {isLoading && !data ? "—" : primaryTotal.toLocaleString("fr-FR")}
               </span>
+              {viewMode === "created" && summary.totals.createdAmount > 0 && (
+                <span className="gcome-raw-amount-chip is-created">
+                  {summary.totals.createdAmount.toLocaleString("fr-DZ")} DA
+                </span>
+              )}
               {viewMode === "delivered" && summary.totals.deliveredAmount > 0 && (
                 <span className="gcome-raw-amount-chip is-delivered">
                   +{summary.totals.deliveredAmount.toLocaleString("fr-DZ")} DA
@@ -514,7 +646,7 @@ export function VisitsAnalyticsChart({
           preserveAspectRatio="none"
           className="gcome-mchart-svg"
           role="img"
-          aria-label={`Courbe ${activeModeMeta.eyebrow}`}
+          aria-label={`Courbe ${headerEyebrow}`}
         >
           <defs>
             <linearGradient id="gcomeRawGradViews" x1="0" y1="0" x2="1" y2="0">
@@ -526,6 +658,17 @@ export function VisitsAnalyticsChart({
               <stop offset="0%" stopColor="#a855f7" stopOpacity="0.42" />
               <stop offset="65%" stopColor="#ec4899" stopOpacity="0.14" />
               <stop offset="100%" stopColor="#a855f7" stopOpacity="0.01" />
+            </linearGradient>
+
+            <linearGradient id="gcomeRawGradCreated" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#d97706" />
+              <stop offset="55%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#fbbf24" />
+            </linearGradient>
+            <linearGradient id="gcomeRawAreaCreated" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.4" />
+              <stop offset="70%" stopColor="#fbbf24" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.01" />
             </linearGradient>
 
             <linearGradient id="gcomeRawGradDelivered" x1="0" y1="0" x2="1" y2="0">
@@ -592,7 +735,7 @@ export function VisitsAnalyticsChart({
 
           {viewMode === "global" ? (
             <g clipPath="url(#gcomeRawSweep)">
-              {chartGeometry.viewsAreaD && (
+              {globalSeries.views && chartGeometry.viewsAreaD && (
                 <path
                   d={chartGeometry.viewsAreaD}
                   fill="url(#gcomeRawAreaViews)"
@@ -600,7 +743,15 @@ export function VisitsAnalyticsChart({
                   opacity={0.55}
                 />
               )}
-              {chartGeometry.globalDeliveredAreaD && (
+              {globalSeries.created && chartGeometry.globalCreatedAreaD && (
+                <path
+                  d={chartGeometry.globalCreatedAreaD}
+                  fill="url(#gcomeRawAreaCreated)"
+                  className="gcome-area-fade"
+                  opacity={0.45}
+                />
+              )}
+              {globalSeries.delivered && chartGeometry.globalDeliveredAreaD && (
                 <path
                   d={chartGeometry.globalDeliveredAreaD}
                   fill="url(#gcomeRawAreaDelivered)"
@@ -608,7 +759,7 @@ export function VisitsAnalyticsChart({
                   opacity={0.55}
                 />
               )}
-              {chartGeometry.viewsLineD && (
+              {globalSeries.views && chartGeometry.viewsLineD && (
                 <path
                   d={chartGeometry.viewsLineD}
                   fill="none"
@@ -619,7 +770,17 @@ export function VisitsAnalyticsChart({
                   strokeLinejoin="round"
                 />
               )}
-              {chartGeometry.globalTransferredLineD && (
+              {globalSeries.created && chartGeometry.globalCreatedLineD && (
+                <path
+                  d={chartGeometry.globalCreatedLineD}
+                  fill="none"
+                  stroke="#f59e0b"
+                  strokeWidth={3.0}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
+              {globalSeries.transferred && chartGeometry.globalTransferredLineD && (
                 <path
                   d={chartGeometry.globalTransferredLineD}
                   fill="none"
@@ -629,7 +790,7 @@ export function VisitsAnalyticsChart({
                   strokeLinejoin="round"
                 />
               )}
-              {chartGeometry.globalDeliveredLineD && (
+              {globalSeries.delivered && chartGeometry.globalDeliveredLineD && (
                 <path
                   d={chartGeometry.globalDeliveredLineD}
                   fill="none"
@@ -646,6 +807,9 @@ export function VisitsAnalyticsChart({
               {viewMode === "views" && chartGeometry.viewsAreaD && (
                 <path d={chartGeometry.viewsAreaD} fill="url(#gcomeRawAreaViews)" className="gcome-area-fade" />
               )}
+              {viewMode === "created" && chartGeometry.singleCreatedAreaD && (
+                <path d={chartGeometry.singleCreatedAreaD} fill="url(#gcomeRawAreaCreated)" className="gcome-area-fade" />
+              )}
               {viewMode === "delivered" && chartGeometry.singleDeliveredAreaD && (
                 <path d={chartGeometry.singleDeliveredAreaD} fill="url(#gcomeRawAreaDelivered)" className="gcome-area-fade" />
               )}
@@ -658,6 +822,17 @@ export function VisitsAnalyticsChart({
                   d={chartGeometry.viewsLineD}
                   fill="none"
                   stroke="url(#gcomeRawGradViews)"
+                  strokeWidth={3.4}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  filter="url(#gcomeRawGlow)"
+                />
+              )}
+              {viewMode === "created" && chartGeometry.singleCreatedLineD && (
+                <path
+                  d={chartGeometry.singleCreatedLineD}
+                  fill="none"
+                  stroke="url(#gcomeRawGradCreated)"
                   strokeWidth={3.4}
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -756,30 +931,46 @@ export function VisitsAnalyticsChart({
               />
               {viewMode === "global" && activeIndex !== null ? (
                 <>
-                  <circle
-                    cx={chartGeometry.viewsCoords[activeIndex]?.x ?? activeCoord.x}
-                    cy={chartGeometry.viewsCoords[activeIndex]?.y ?? activeCoord.y}
-                    r={4.6}
-                    fill="#a855f7"
-                    stroke="#fff"
-                    strokeWidth={1.6}
-                  />
-                  <circle
-                    cx={chartGeometry.globalTransferredCoords[activeIndex]?.x ?? activeCoord.x}
-                    cy={chartGeometry.globalTransferredCoords[activeIndex]?.y ?? activeCoord.y}
-                    r={4.8}
-                    fill="#3b82f6"
-                    stroke="#fff"
-                    strokeWidth={1.6}
-                  />
-                  <circle
-                    cx={chartGeometry.globalDeliveredCoords[activeIndex]?.x ?? activeCoord.x}
-                    cy={chartGeometry.globalDeliveredCoords[activeIndex]?.y ?? activeCoord.y}
-                    r={5.4}
-                    fill="#10b981"
-                    stroke="#fff"
-                    strokeWidth={2}
-                  />
+                  {globalSeries.views && (
+                    <circle
+                      cx={chartGeometry.viewsCoords[activeIndex]?.x ?? activeCoord.x}
+                      cy={chartGeometry.viewsCoords[activeIndex]?.y ?? activeCoord.y}
+                      r={4.6}
+                      fill="#a855f7"
+                      stroke="#fff"
+                      strokeWidth={1.6}
+                    />
+                  )}
+                  {globalSeries.created && (
+                    <circle
+                      cx={chartGeometry.globalCreatedCoords[activeIndex]?.x ?? activeCoord.x}
+                      cy={chartGeometry.globalCreatedCoords[activeIndex]?.y ?? activeCoord.y}
+                      r={4.7}
+                      fill="#f59e0b"
+                      stroke="#fff"
+                      strokeWidth={1.6}
+                    />
+                  )}
+                  {globalSeries.transferred && (
+                    <circle
+                      cx={chartGeometry.globalTransferredCoords[activeIndex]?.x ?? activeCoord.x}
+                      cy={chartGeometry.globalTransferredCoords[activeIndex]?.y ?? activeCoord.y}
+                      r={4.8}
+                      fill="#3b82f6"
+                      stroke="#fff"
+                      strokeWidth={1.6}
+                    />
+                  )}
+                  {globalSeries.delivered && (
+                    <circle
+                      cx={chartGeometry.globalDeliveredCoords[activeIndex]?.x ?? activeCoord.x}
+                      cy={chartGeometry.globalDeliveredCoords[activeIndex]?.y ?? activeCoord.y}
+                      r={5.4}
+                      fill="#10b981"
+                      stroke="#fff"
+                      strokeWidth={2}
+                    />
+                  )}
                 </>
               ) : (
                 <circle
@@ -806,17 +997,24 @@ export function VisitsAnalyticsChart({
             <div className="gcome-tt-date">{activePoint.label}</div>
             {viewMode === "global" ? (
               <>
-                <div className="gcome-tt-row">
-                  <span style={{ color: "#d8b4fe" }}>● Vues</span>
-                  <strong>{activePoint.views.toLocaleString("fr-FR")}</strong>
+                {GLOBAL_SERIES_CONFIG.filter(item => globalSeries[item.key]).map(item => (
+                  <div className="gcome-tt-row" key={item.key}>
+                    <span style={{ color: item.tooltipColor }}>● {item.label}</span>
+                    <strong>{activePoint[item.key].toLocaleString("fr-FR")}</strong>
+                  </div>
+                ))}
+              </>
+            ) : viewMode === "created" ? (
+              <>
+                <div className="gcome-tt-row is-primary">
+                  <span>Créées</span>
+                  <strong style={{ color: "#fbbf24" }}>
+                    {activePoint.created.toLocaleString("fr-FR")}
+                  </strong>
                 </div>
                 <div className="gcome-tt-row">
-                  <span style={{ color: "#93c5fd" }}>● Transférées</span>
-                  <strong>{activePoint.transferred.toLocaleString("fr-FR")}</strong>
-                </div>
-                <div className="gcome-tt-row">
-                  <span style={{ color: "#6ee7b7" }}>● Livrées</span>
-                  <strong>{activePoint.delivered.toLocaleString("fr-FR")}</strong>
+                  <span>Valeur</span>
+                  <strong>{activePoint.createdAmount.toLocaleString("fr-DZ")} DA</strong>
                 </div>
               </>
             ) : viewMode === "delivered" ? (
@@ -855,7 +1053,7 @@ export function VisitsAnalyticsChart({
         )}
       </div>
 
-      {/* Mobile Swipe / Quick Slide Indicators Bar (Option 2) */}
+      {/* Mobile Swipe / Quick Slide Indicators Bar */}
       <div className="gcome-chart-swipe-bar">
         <button
           type="button"

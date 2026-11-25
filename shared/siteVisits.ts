@@ -488,7 +488,8 @@ export function buildVisitDashboardSummary(params: {
   };
 }
 
-export type ChartViewMode = "views" | "delivered" | "transferred" | "global";
+export type GlobalChartSeriesKey = "views" | "created" | "transferred" | "delivered";
+export type ChartViewMode = GlobalChartSeriesKey | "global";
 
 export interface OrderLikeForMultiChart {
   createdAt: string;
@@ -504,8 +505,10 @@ export interface MultiMetricChartPoint {
   label: string;
   shortLabel: string;
   views: number;
+  created: number;
   delivered: number;
   transferred: number;
+  createdAmount: number;
   deliveredAmount: number;
   transferredAmount: number;
 }
@@ -516,13 +519,16 @@ export interface MultiMetricChartSummary {
   rangeLabel: string;
   totals: {
     views: number;
+    created: number;
     delivered: number;
     transferred: number;
+    createdAmount: number;
     deliveredAmount: number;
     transferredAmount: number;
   };
   deltas: {
     views: number | null;
+    created: number | null;
     delivered: number | null;
     transferred: number | null;
   };
@@ -575,14 +581,38 @@ export function buildMultiMetricChartSummary(params: {
   const currentSet = new Set(currentKeys);
   const previousSet = new Set(previousKeys);
 
-  // Pre-aggregate transferred & delivered orders by dateKey and hour
+  // Pre-aggregate created, transferred & delivered orders by dateKey and hour
+  const createdByDateHour = new Map<string, { count: number; amount: number }>();
   const transferredByDateHour = new Map<string, { count: number; amount: number }>();
   const deliveredByDateHour = new Map<string, { count: number; amount: number }>();
+  const createdByDate = new Map<string, { count: number; amount: number }>();
   const transferredByDate = new Map<string, { count: number; amount: number }>();
   const deliveredByDate = new Map<string, { count: number; amount: number }>();
 
+  const recordOrderBucket = (
+    byDate: Map<string, { count: number; amount: number }>,
+    byHour: Map<string, { count: number; amount: number }>,
+    parsed: { dateKey: string; hour: number } | null,
+    amount: number,
+  ) => {
+    if (!parsed) return;
+    const dAcc = byDate.get(parsed.dateKey) ?? { count: 0, amount: 0 };
+    dAcc.count += 1;
+    dAcc.amount += amount;
+    byDate.set(parsed.dateKey, dAcc);
+
+    const dhKey = `${parsed.dateKey}#${parsed.hour}`;
+    const hAcc = byHour.get(dhKey) ?? { count: 0, amount: 0 };
+    hAcc.count += 1;
+    hAcc.amount += amount;
+    byHour.set(dhKey, hAcc);
+  };
+
   for (const order of orders) {
     const amount = Number(order.total || 0);
+    const parsedCreated = parseOrderAlgiersDateAndHour(order.createdAt);
+    recordOrderBucket(createdByDate, createdByDateHour, parsedCreated, amount);
+
     const isCancelled = order.status === "annulee";
     const isTransferred =
       order.status === "transferee" ||
@@ -590,35 +620,16 @@ export function buildMultiMetricChartSummary(params: {
       Boolean(order.isDelivered);
 
     if (isTransferred) {
-      const parsedCreated = parseOrderAlgiersDateAndHour(order.createdAt);
-      if (parsedCreated) {
-        const dAcc = transferredByDate.get(parsedCreated.dateKey) ?? { count: 0, amount: 0 };
-        dAcc.count += 1;
-        dAcc.amount += amount;
-        transferredByDate.set(parsedCreated.dateKey, dAcc);
-
-        const dhKey = `${parsedCreated.dateKey}#${parsedCreated.hour}`;
-        const hAcc = transferredByDateHour.get(dhKey) ?? { count: 0, amount: 0 };
-        hAcc.count += 1;
-        hAcc.amount += amount;
-        transferredByDateHour.set(dhKey, hAcc);
-      }
+      recordOrderBucket(transferredByDate, transferredByDateHour, parsedCreated, amount);
     }
 
     if (order.isDelivered) {
-      const parsedDelivered = parseOrderAlgiersDateAndHour(order.deliveredAt || order.createdAt);
-      if (parsedDelivered) {
-        const dAcc = deliveredByDate.get(parsedDelivered.dateKey) ?? { count: 0, amount: 0 };
-        dAcc.count += 1;
-        dAcc.amount += amount;
-        deliveredByDate.set(parsedDelivered.dateKey, dAcc);
-
-        const dhKey = `${parsedDelivered.dateKey}#${parsedDelivered.hour}`;
-        const hAcc = deliveredByDateHour.get(dhKey) ?? { count: 0, amount: 0 };
-        hAcc.count += 1;
-        hAcc.amount += amount;
-        deliveredByDateHour.set(dhKey, hAcc);
-      }
+      recordOrderBucket(
+        deliveredByDate,
+        deliveredByDateHour,
+        parseOrderAlgiersDateAndHour(order.deliveredAt || order.createdAt),
+        amount,
+      );
     }
   }
 
@@ -630,6 +641,7 @@ export function buildMultiMetricChartSummary(params: {
     for (let hour = 0; hour < 24; hour++) {
       const hh = String(hour).padStart(2, "0");
       const dhKey = `${targetDay}#${hour}`;
+      const cr = createdByDateHour.get(dhKey) ?? { count: 0, amount: 0 };
       const tr = transferredByDateHour.get(dhKey) ?? { count: 0, amount: 0 };
       const dl = deliveredByDateHour.get(dhKey) ?? { count: 0, amount: 0 };
       points.push({
@@ -637,8 +649,10 @@ export function buildMultiMetricChartSummary(params: {
         label: `${hh}h00`,
         shortLabel: hour % 6 === 0 || hour === 23 ? `${hour}h` : "",
         views: getBucketHourlyForProduct(dayBucket, selectedProductKey, hour),
+        created: cr.count,
         delivered: dl.count,
         transferred: tr.count,
+        createdAmount: cr.amount,
         deliveredAmount: dl.amount,
         transferredAmount: tr.amount,
       });
@@ -648,6 +662,7 @@ export function buildMultiMetricChartSummary(params: {
     const step = totalLen <= 8 ? 1 : totalLen <= 16 ? 2 : Math.max(2, Math.ceil(totalLen / 6));
     currentKeys.forEach((dateKey, idx) => {
       const dayBucket = daysMap.get(dateKey);
+      const cr = createdByDate.get(dateKey) ?? { count: 0, amount: 0 };
       const tr = transferredByDate.get(dateKey) ?? { count: 0, amount: 0 };
       const dl = deliveredByDate.get(dateKey) ?? { count: 0, amount: 0 };
       const showShort = idx === 0 || idx === totalLen - 1 || idx % step === 0;
@@ -656,8 +671,10 @@ export function buildMultiMetricChartSummary(params: {
         label: formatShortFrDate(dateKey),
         shortLabel: showShort ? formatCompactBucketLabel(dateKey) : "",
         views: getBucketViewsForProduct(dayBucket, selectedProductKey),
+        created: cr.count,
         delivered: dl.count,
         transferred: tr.count,
+        createdAmount: cr.amount,
         deliveredAmount: dl.amount,
         transferredAmount: tr.amount,
       });
@@ -665,13 +682,20 @@ export function buildMultiMetricChartSummary(params: {
   }
 
   let totalViews = 0;
+  let totalCreated = 0;
   let totalDelivered = 0;
   let totalTransferred = 0;
+  let totalCreatedAmount = 0;
   let totalDeliveredAmount = 0;
   let totalTransferredAmount = 0;
 
   for (const key of currentKeys) {
     totalViews += getBucketViewsForProduct(daysMap.get(key), selectedProductKey);
+    const cr = createdByDate.get(key);
+    if (cr) {
+      totalCreated += cr.count;
+      totalCreatedAmount += cr.amount;
+    }
     const dl = deliveredByDate.get(key);
     if (dl) {
       totalDelivered += dl.count;
@@ -685,11 +709,13 @@ export function buildMultiMetricChartSummary(params: {
   }
 
   let prevViews = 0;
+  let prevCreated = 0;
   let prevDelivered = 0;
   let prevTransferred = 0;
   for (const key of previousKeys) {
     if (currentSet.has(key) && !previousSet.has(key)) continue;
     prevViews += getBucketViewsForProduct(daysMap.get(key), selectedProductKey);
+    prevCreated += createdByDate.get(key)?.count ?? 0;
     prevDelivered += deliveredByDate.get(key)?.count ?? 0;
     prevTransferred += transferredByDate.get(key)?.count ?? 0;
   }
@@ -705,13 +731,16 @@ export function buildMultiMetricChartSummary(params: {
     rangeLabel,
     totals: {
       views: totalViews,
+      created: totalCreated,
       delivered: totalDelivered,
       transferred: totalTransferred,
+      createdAmount: totalCreatedAmount,
       deliveredAmount: totalDeliveredAmount,
       transferredAmount: totalTransferredAmount,
     },
     deltas: {
       views: calcDeltaPct(totalViews, prevViews),
+      created: calcDeltaPct(totalCreated, prevCreated),
       delivered: calcDeltaPct(totalDelivered, prevDelivered),
       transferred: calcDeltaPct(totalTransferred, prevTransferred),
     },

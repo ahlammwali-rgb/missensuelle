@@ -231,11 +231,14 @@ describe("site visits tracking & analytics aggregation", () => {
     expect(todayMulti.hourlyMode).toBe(true);
     expect(todayMulti.points).toHaveLength(24);
     expect(todayMulti.totals.views).toBe(1);
+    expect(todayMulti.totals.created).toBe(1);
+    expect(todayMulti.totals.createdAmount).toBe(6500);
     expect(todayMulti.totals.transferred).toBe(1);
     expect(todayMulti.totals.delivered).toBe(1);
     expect(todayMulti.totals.transferredAmount).toBe(6500);
     expect(todayMulti.totals.deliveredAmount).toBe(8900);
     expect(todayMulti.points[15]?.views).toBe(1);
+    expect(todayMulti.points[15]?.created).toBe(1);
     expect(todayMulti.points[15]?.transferred).toBe(1);
     expect(todayMulti.points[15]?.delivered).toBe(1);
 
@@ -248,8 +251,41 @@ describe("site visits tracking & analytics aggregation", () => {
     expect(rangeMulti.hourlyMode).toBe(false);
     expect(rangeMulti.points).toHaveLength(7);
     expect(rangeMulti.totals.views).toBe(2);
+    expect(rangeMulti.totals.created).toBe(2);
+    expect(rangeMulti.totals.createdAmount).toBe(15400);
     expect(rangeMulti.totals.transferred).toBe(2);
     expect(rangeMulti.totals.delivered).toBe(1);
     expect(rangeMulti.totals.deliveredAmount).toBe(8900);
+  });
+
+  it("counts all created orders (checkout, manual, Google Sheet) separately from transferred/delivered", () => {
+    const orders = [
+      // Checkout web nouvelle (10h Algiers)
+      { createdAt: "2026-11-25T09:10:00.000Z", status: "nouvelle", total: 4200 },
+      // Manual admin confirmer (10h Algiers)
+      { createdAt: "2026-11-25T09:45:00.000Z", status: "confirmee", total: 5500 },
+      // Google Sheet imported nouvelle (14h Algiers)
+      { createdAt: "2026-11-25T13:20:00.000Z", status: "nouvelle", total: 0 },
+      // Transferred (14h Algiers)
+      { createdAt: "2026-11-25T13:50:00.000Z", status: "transferee", carrier: "ecotrack", total: 6800 },
+      // Previous day created for delta comparison (2 orders on Nov 24)
+      { createdAt: "2026-11-24T11:00:00.000Z", status: "nouvelle", total: 3000 },
+      { createdAt: "2026-11-24T16:00:00.000Z", status: "annulee", total: 3000 },
+    ];
+
+    const summary = buildMultiMetricChartSummary({
+      data: undefined,
+      orders,
+      dateFilter: "today",
+      now: new Date("2026-11-25T15:00:00.000Z"),
+    });
+
+    expect(summary.totals.created).toBe(4);
+    expect(summary.totals.createdAmount).toBe(16500);
+    expect(summary.totals.transferred).toBe(1);
+    expect(summary.totals.delivered).toBe(0);
+    expect(summary.deltas.created).toBe(100); // 4 today vs 2 yesterday = +100%
+    expect(summary.points[10]?.created).toBe(2);
+    expect(summary.points[14]?.created).toBe(2);
   });
 });

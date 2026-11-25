@@ -7985,6 +7985,18 @@ html.dark .multi-pixel-remove,
   background: rgba(139, 92, 246, 0.15);
 }
 
+.gcome-raw-mode-btn.mode-created {
+  border-color: rgba(245, 158, 11, 0.34);
+  background: rgba(245, 158, 11, 0.11);
+}
+.gcome-raw-mode-btn.mode-created .gcome-raw-eyebrow {
+  color: #b45309;
+}
+html.dark .gcome-raw-mode-btn.mode-created .gcome-raw-eyebrow,
+.dark .gcome-raw-mode-btn.mode-created .gcome-raw-eyebrow {
+  color: #fcd34d;
+}
+
 .gcome-raw-mode-btn.mode-delivered {
   border-color: rgba(16, 185, 129, 0.3);
   background: rgba(16, 185, 129, 0.1);
@@ -8131,6 +8143,10 @@ html.dark .gcome-mode-option-val,
   font-weight: 900;
 }
 
+.gcome-raw-amount-chip.is-created {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
 .gcome-raw-amount-chip.is-delivered {
   background: rgba(16, 185, 129, 0.15);
   color: #047857;
@@ -8140,6 +8156,10 @@ html.dark .gcome-mode-option-val,
   color: #1d4ed8;
 }
 
+html.dark .gcome-raw-amount-chip.is-created {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fcd34d;
+}
 html.dark .gcome-raw-amount-chip.is-delivered {
   background: rgba(16, 185, 129, 0.22);
   color: #6ee7b7;
@@ -8163,9 +8183,26 @@ html.dark .gcome-raw-amount-chip.is-transferred {
   gap: 5px;
   padding: 4px 10px;
   border-radius: 999px;
+  border: 1px solid transparent;
   background: rgba(148, 163, 184, 0.12);
   font-size: 12px;
   color: var(--app-text-muted, #475569);
+  transition: opacity 0.15s ease, transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+button.gcome-global-stat-pill.is-toggleable {
+  cursor: pointer;
+}
+button.gcome-global-stat-pill.is-toggleable.is-on {
+  border-color: rgba(148, 163, 184, 0.28);
+}
+button.gcome-global-stat-pill.is-toggleable.is-off {
+  opacity: 0.44;
+  text-decoration: line-through;
+  background: rgba(148, 163, 184, 0.08);
+}
+button.gcome-global-stat-pill.is-toggleable:active {
+  transform: scale(0.97);
 }
 
 .gcome-global-stat-pill strong {
@@ -8180,6 +8217,16 @@ html.dark .gcome-global-stat-pill,
   color: #cbd5e1;
 }
 
+html.dark button.gcome-global-stat-pill.is-toggleable.is-on,
+.dark button.gcome-global-stat-pill.is-toggleable.is-on {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+html.dark button.gcome-global-stat-pill.is-toggleable.is-off,
+.dark button.gcome-global-stat-pill.is-toggleable.is-off {
+  opacity: 0.4;
+  background: rgba(15, 23, 42, 0.55);
+}
+
 html.dark .gcome-global-stat-pill strong,
 .dark .gcome-global-stat-pill strong {
   color: #ffffff;
@@ -8192,6 +8239,9 @@ html.dark .gcome-global-stat-pill strong,
 }
 .gcome-global-stat-pill.is-views .gcome-gs-dot {
   background: #a855f7;
+}
+.gcome-global-stat-pill.is-created .gcome-gs-dot {
+  background: #f59e0b;
 }
 .gcome-global-stat-pill.is-transferred .gcome-gs-dot {
   background: #3b82f6;
