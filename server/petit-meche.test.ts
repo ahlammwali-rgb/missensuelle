@@ -5,7 +5,7 @@ import { shippingFeeFor } from "../shared/shipping";
 import { validateFullCheckoutPayload } from "./checkout";
 
 describe("Petit Mèche product & checkout integration", () => {
-  it("registers Petit Mèche (p-012) with 2500 DA price, 5 colors and 6 gallery images", () => {
+  it("registers Petit Mèche (p-012) with 2500 DA price, 5 variant images and updated gallery", () => {
     const pm = products.find(p => p.id === "p-012");
     expect(pm).toBeDefined();
     expect(pm?.slug).toBe("petit-meche");
@@ -15,12 +15,16 @@ describe("Petit Mèche product & checkout integration", () => {
     expect(pm?.landingTemplate).toBe("petit-meche");
     expect(pm?.colors).toEqual([
       "أسود",
-      "شاتان فونسي",
-      "شاتان فاتح",
-      "بلوند ذهبي",
-      "بلوند بلاتيني",
+      "شاتين كلير",
+      "بلوند ذهبي طبيعي",
+      "شاتين فونسي",
+      "بلوند بلاتين",
     ]);
+    expect(pm?.variantImages).toHaveLength(5);
+    expect(pm?.variantImages?.[0]?.image).toBe("/images/petit-meche/variants/noir.jpg");
+    expect(pm?.variantImages?.[4]?.image).toBe("/images/petit-meche/variants/blond-platine.jpg");
     expect(pm?.gallery).toHaveLength(6);
+    expect(pm?.gallery).not.toContain("/images/petit-meche/02-petit-meche.jpg");
   });
 
   it("injects p-012 into legacy saved localStorage catalogs via getCatalogProducts", () => {

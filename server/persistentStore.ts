@@ -257,6 +257,35 @@ function normalizeServerCatalogProducts(productsList: Record<string, unknown>[])
     .map(p => {
       let changed = false;
       const next: Record<string, unknown> = { ...p };
+      if (p.id === "p-012") {
+        const hasNewVariants =
+          Array.isArray(p.variantImages) &&
+          p.variantImages.some(
+            v => v && typeof v === "object" && typeof (v as { image?: unknown }).image === "string" &&
+              String((v as { image?: unknown }).image).includes("/images/petit-meche/variants/")
+          );
+        const hasLegacyGallery =
+          Array.isArray(p.gallery) && p.gallery.includes("/images/petit-meche/02-petit-meche.jpg");
+        if (!hasNewVariants || hasLegacyGallery) {
+          next.colors = ["أسود", "شاتين كلير", "بلوند ذهبي طبيعي", "شاتين فونسي", "بلوند بلاتين"];
+          next.variantImages = [
+            { name: "أسود", image: "/images/petit-meche/variants/noir.jpg" },
+            { name: "شاتين كلير", image: "/images/petit-meche/variants/chatain-clair.jpg" },
+            { name: "بلوند ذهبي طبيعي", image: "/images/petit-meche/variants/blond-dore.jpg" },
+            { name: "شاتين فونسي", image: "/images/petit-meche/variants/chatain-fonce.jpg" },
+            { name: "بلوند بلاتين", image: "/images/petit-meche/variants/blond-platine.jpg" },
+          ];
+          next.gallery = [
+            "/images/petit-meche/01-petit-meche.jpg",
+            "/images/petit-meche/variants/noir.jpg",
+            "/images/petit-meche/03-petit-meche.jpg",
+            "/images/petit-meche/04-petit-meche.jpg",
+            "/images/petit-meche/05-petit-meche.jpg",
+            "/images/petit-meche/06-petit-meche.jpg",
+          ];
+          changed = true;
+        }
+      }
       if (Array.isArray(p.colors)) {
         const nextColors = p.colors.map(c => {
           if (typeof c !== "string") return c;

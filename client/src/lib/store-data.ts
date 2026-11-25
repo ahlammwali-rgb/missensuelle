@@ -431,15 +431,22 @@ export const products: Product[] = [
     description: "Extension Petit Mèche Miss Sensuelle effet naturel invisible, pose facile en quelques secondes en 5 nuances.",
     details: [
       "تمنحك كثافة وطولاً طبيعياً في ثوانٍ بدون أي ضرر للشعر",
-      "متوفرة بـ 5 ألوان جذابة: أسود، شاتان فونسي، شاتان فاتح، بلوند ذهبي، بلوند بلاتيني",
+      "متوفرة بـ 5 ألوان جذابة: أسود، شاتين كلير، بلوند ذهبي طبيعي، شاتين فونسي، بلوند بلاتين",
       "عرض خاص: 2500 DA فقط بدلاً من 3500 DA",
       "توصيل سريع 58 ولاية مع الدفع عند الاستلام",
     ],
-    colors: ["أسود", "شاتان فونسي", "شاتان فاتح", "بلوند ذهبي", "بلوند بلاتيني"],
+    colors: ["أسود", "شاتين كلير", "بلوند ذهبي طبيعي", "شاتين فونسي", "بلوند بلاتين"],
+    variantImages: [
+      { name: "أسود", image: "/images/petit-meche/variants/noir.jpg" },
+      { name: "شاتين كلير", image: "/images/petit-meche/variants/chatain-clair.jpg" },
+      { name: "بلوند ذهبي طبيعي", image: "/images/petit-meche/variants/blond-dore.jpg" },
+      { name: "شاتين فونسي", image: "/images/petit-meche/variants/chatain-fonce.jpg" },
+      { name: "بلوند بلاتين", image: "/images/petit-meche/variants/blond-platine.jpg" },
+    ],
     image: "/images/petit-meche/01-petit-meche.jpg",
     gallery: [
       "/images/petit-meche/01-petit-meche.jpg",
-      "/images/petit-meche/02-petit-meche.jpg",
+      "/images/petit-meche/variants/noir.jpg",
       "/images/petit-meche/03-petit-meche.jpg",
       "/images/petit-meche/04-petit-meche.jpg",
       "/images/petit-meche/05-petit-meche.jpg",
@@ -570,6 +577,23 @@ export function getCatalogProducts(): Product[] {
           accent: canonicalExtensions.accent,
           stock: Math.max(product.stock || 0, canonicalExtensions.stock),
         };
+      }
+      if (product.id === "p-012") {
+        const canonicalPetitMeche = products.find(item => item.id === "p-012");
+        const hasLegacyGallery = (product.gallery ?? []).includes("/images/petit-meche/02-petit-meche.jpg");
+        const hasNewVariants =
+          Array.isArray(product.variantImages) &&
+          product.variantImages.some(v => v.image?.includes("/images/petit-meche/variants/"));
+        if (canonicalPetitMeche && (!hasNewVariants || hasLegacyGallery)) {
+          colorsChanged = true;
+          return {
+            ...product,
+            details: canonicalPetitMeche.details,
+            colors: canonicalPetitMeche.colors,
+            variantImages: canonicalPetitMeche.variantImages,
+            gallery: canonicalPetitMeche.gallery,
+          };
+        }
       }
       if (product.id !== "p-007") return product;
       const colors = product.colors.filter(color => color.trim().toLowerCase() !== "bordeaux");

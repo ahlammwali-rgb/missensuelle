@@ -8,12 +8,12 @@ import { useCheckoutDraft } from "@/components/useCheckoutDraft";
 import { shippingFeeFor } from "@shared/shipping";
 import "./petit-meche-template.css";
 
-const PETIT_MECHE_COLORS: ReadonlyArray<{ value: string; hex: string }> = [
-  { value: "أسود", hex: "#111111" },
-  { value: "شاتان فونسي", hex: "#4a2418" },
-  { value: "شاتان فاتح", hex: "#b0764a" },
-  { value: "بلوند ذهبي", hex: "#e2b46a" },
-  { value: "بلوند بلاتيني", hex: "#d9d3cc" },
+const PETIT_MECHE_VARIANTS: ReadonlyArray<{ value: string; hex: string; image: string }> = [
+  { value: "أسود", hex: "#171516", image: "/images/petit-meche/variants/noir.jpg" },
+  { value: "شاتين كلير", hex: "#945b35", image: "/images/petit-meche/variants/chatain-clair.jpg" },
+  { value: "بلوند ذهبي طبيعي", hex: "#d6a256", image: "/images/petit-meche/variants/blond-dore.jpg" },
+  { value: "شاتين فونسي", hex: "#4a281a", image: "/images/petit-meche/variants/chatain-fonce.jpg" },
+  { value: "بلوند بلاتين", hex: "#ebd7b5", image: "/images/petit-meche/variants/blond-platine.jpg" },
 ];
 
 const PETIT_MECHE_WILAYAS: ReadonlyArray<{ value: string; label: string }> = [
@@ -120,27 +120,48 @@ export default function PetitMecheLanding({ product }: { product?: Product }) {
   const productTitle = activeProduct?.name || "Petit Mèche";
 
   const colorOptions = useMemo(() => {
-    if (isBuiltIn) return PETIT_MECHE_COLORS.map(c => ({ value: c.value, hex: c.hex }));
+    if (isBuiltIn) {
+      return PETIT_MECHE_VARIANTS.map(c => ({ value: c.value, hex: c.hex, image: c.image }));
+    }
+    const hexMap = new Map(PETIT_MECHE_VARIANTS.map(c => [c.value, c.hex]));
+    const imgMap = new Map(PETIT_MECHE_VARIANTS.map(c => [c.value, c.image]));
+    if (activeProduct?.variantImages && activeProduct.variantImages.length > 0) {
+      return activeProduct.variantImages.map(v => ({
+        value: v.name,
+        hex: hexMap.get(v.name) ?? "#7d0c2a",
+        image: v.image || imgMap.get(v.name) || "",
+      }));
+    }
     if (cfg?.colorSwatches && cfg.colorSwatches.length > 0) {
-      return cfg.colorSwatches.map(c => ({ value: c.name, hex: c.hex || "#7d0c2a" }));
+      return cfg.colorSwatches.map(c => ({
+        value: c.name,
+        hex: c.hex || "#7d0c2a",
+        image: imgMap.get(c.name) || "",
+      }));
     }
     if (activeProduct?.colors && activeProduct.colors.length > 0) {
-      const hexMap = new Map(PETIT_MECHE_COLORS.map(c => [c.value, c.hex]));
-      return activeProduct.colors.map(name => ({ value: name, hex: hexMap.get(name) ?? "#7d0c2a" }));
+      return activeProduct.colors.map(name => ({
+        value: name,
+        hex: hexMap.get(name) ?? "#7d0c2a",
+        image: imgMap.get(name) || "",
+      }));
     }
-    return PETIT_MECHE_COLORS.map(c => ({ value: c.value, hex: c.hex }));
-  }, [isBuiltIn, cfg?.colorSwatches, activeProduct?.colors]);
+    return PETIT_MECHE_VARIANTS.map(c => ({ value: c.value, hex: c.hex, image: c.image }));
+  }, [isBuiltIn, cfg?.colorSwatches, activeProduct?.colors, activeProduct?.variantImages]);
 
   const gallery = useMemo(() => {
     if (isBuiltIn) {
       const g = activeProduct?.gallery;
+      const pick = (idx: number, fallback: string) => {
+        const src = g?.[idx];
+        return src && src !== "/images/petit-meche/02-petit-meche.jpg" ? src : fallback;
+      };
       return [
-        { src: g?.[0] || "/images/petit-meche/01-petit-meche.jpg", alt: productTitle, lazy: false },
-        { src: g?.[1] || "/images/petit-meche/02-petit-meche.jpg", alt: "اختاري لونك المفضل", lazy: true },
-        { src: g?.[2] || "/images/petit-meche/03-petit-meche.jpg", alt: `${productTitle} - تفاصيل المنتج`, lazy: true },
-        { src: g?.[3] || "/images/petit-meche/04-petit-meche.jpg", alt: "طريقة التركيب", lazy: true },
-        { src: g?.[4] || "/images/petit-meche/05-petit-meche.jpg", alt: "آراء زبائننا", lazy: true },
-        { src: g?.[5] || "/images/petit-meche/06-petit-meche.jpg", alt: "جودة عالية", lazy: true },
+        { src: pick(0, "/images/petit-meche/01-petit-meche.jpg"), alt: productTitle, lazy: false },
+        { src: pick(2, "/images/petit-meche/03-petit-meche.jpg"), alt: `${productTitle} - مميزات المنتج`, lazy: true },
+        { src: pick(3, "/images/petit-meche/04-petit-meche.jpg"), alt: "طريقة التركيب", lazy: true },
+        { src: pick(4, "/images/petit-meche/05-petit-meche.jpg"), alt: "آراء زبائننا", lazy: true },
+        { src: pick(5, "/images/petit-meche/06-petit-meche.jpg"), alt: "جودة عالية", lazy: true },
       ];
     }
     const imgs = activeProduct?.gallery?.length
@@ -409,9 +430,46 @@ export default function PetitMecheLanding({ product }: { product?: Product }) {
   return (
     <div className="pm-page" dir="rtl" lang="ar">
       <div className="pm-w">
-        {gallery.map((item, idx) => (
+        {gallery[0] && (
           <img
-            key={`${item.src}-${idx}`}
+            src={gallery[0].src}
+            alt={gallery[0].alt}
+          />
+        )}
+
+        {colorOptions.some(c => Boolean(c.image)) && (
+          <section className="pm-showcase" aria-label="اختاري لونك المفضل">
+            <div className="pm-showcase-head">
+              <span>♡ اختاري لونك المفضل ♡</span>
+              <small>اضغطي على الصورة لاختيار اللون مباشرة</small>
+            </div>
+            <div className="pm-showcase-grid">
+              {colorOptions.map(c => {
+                const checked = selectedColors.includes(c.value);
+                return (
+                  <button
+                    key={c.value}
+                    type="button"
+                    aria-pressed={checked}
+                    className={`pm-showcase-card${checked ? " is-selected" : ""}`}
+                    onClick={() => handleColorToggle(c.value)}
+                  >
+                    {c.image && <img src={c.image} alt={c.value} loading="lazy" />}
+                    <span className="pm-showcase-cap">
+                      <i style={{ background: c.hex }} />
+                      <b>{c.value}</b>
+                    </span>
+                    {checked && <span className="pm-variant-check" aria-hidden="true">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {gallery.slice(1).map((item, idx) => (
+          <img
+            key={`${item.src}-${idx + 1}`}
             src={item.src}
             alt={item.alt}
             loading={item.lazy ? "lazy" : undefined}
@@ -443,10 +501,31 @@ export default function PetitMecheLanding({ product }: { product?: Product }) {
 
               {colorOptions.length > 0 ? (
                 <>
-                  <div className="pm-lab">اختاري اللون</div>
-                  <div className="pm-chips">
+                  <div className="pm-lab">اختاري اللون ({selectedColors.length > 0 ? `تم اختيار ${selectedColors.length}` : "يمكنك اختيار لون أو أكثر"})</div>
+                  <div className={colorOptions.some(c => Boolean(c.image)) ? "pm-variant-grid" : "pm-chips"}>
                     {colorOptions.map(c => {
                       const checked = selectedColors.includes(c.value);
+                      if (c.image) {
+                        return (
+                          <label key={c.value} className={`pm-variant-card${checked ? " is-selected" : ""}`}>
+                            <input
+                              type="checkbox"
+                              name="c"
+                              value={c.value}
+                              checked={checked}
+                              onChange={() => handleColorToggle(c.value)}
+                            />
+                            <div className="pm-variant-thumb">
+                              <img src={c.image} alt={c.value} loading="lazy" />
+                              {checked && <span className="pm-variant-check" aria-hidden="true">✓</span>}
+                            </div>
+                            <span className="pm-variant-name">
+                              <i style={{ background: c.hex }} />
+                              <span>{c.value}</span>
+                            </span>
+                          </label>
+                        );
+                      }
                       return (
                         <label key={c.value}>
                           <input
