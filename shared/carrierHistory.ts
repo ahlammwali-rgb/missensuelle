@@ -452,8 +452,16 @@ export function buildTransferredCardStatusBadge(
       : null;
 
   const rawCat = classifyCarrierTracking(effectiveSummary);
+  const hasExplicitCarrierStatusText = Boolean(
+    trk &&
+      (String(trk.situation || "").trim() ||
+        String(trk.etat_logistique || "").trim() ||
+        String(lastScan?.situation || "").trim())
+  );
   const cat =
-    order?.isDelivered && rawCat === "in_transit" ? "delivered" : rawCat;
+    order?.isDelivered && rawCat === "in_transit" && !hasExplicitCarrierStatusText
+      ? "delivered"
+      : rawCat;
 
   const palette =
     cat === "delivered"

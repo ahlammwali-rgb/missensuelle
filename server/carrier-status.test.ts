@@ -5,11 +5,12 @@ import {
   isCarrierStatusTextReturned,
   isCarrierTrackingDelivered,
   isCarrierTrackingReturned,
+  parseCarrierBoolean,
   type CarrierTrackingSummary,
 } from "../shared/carrierStatus";
 import { reconcileCarrierBatchOrders, wasOrderAutoDelivered } from "./carrierSync";
 import { markOrderDelivered, submitCheckoutOrder, updateMemoryOrderStatus, listCheckoutOrders } from "./checkout";
-import { buildEcoTrackingItem, getEcoTrackTrackingBatch } from "./ecotrackDelivery";
+import { buildEcoTrackingItem, getEcoTrackLocations, getEcoTrackTrackingBatch } from "./ecotrackDelivery";
 import {
   clearSentVictoryTag,
   hasSentVictoryTag,
@@ -585,5 +586,155 @@ describe("bidirectional carrier delivery reconciliation", () => {
     expect(revertNotif).toBeDefined();
     expect(revertNotif?.kind).toBe("transferred");
     expect(revertNotif?.statusLabel).toContain("Non livré");
+  });
+
+  it("coerces PHP/SQL false flags and zero-dates cleanly without false Livré flips", () => {
+    expect(parseCarrierBoolean("0")).toBe(false);
+    expect(parseCarrierBoolean("false")).toBe(false);
+    expect(parseCarrierBoolean("non")).toBe(false);
+    expect(parseCarrierBoolean("null")).toBe(false);
+    expect(parseCarrierBoolean("0000-00-00 00:00:00")).toBe(false);
+    expect(parseCarrierBoolean(0)).toBe(false);
+    expect(parseCarrierBoolean(false)).toBe(false);
+    expect(parseCarrierBoolean("1")).toBe(true);
+    expect(parseCarrierBoolean("true")).toBe(true);
+    expect(parseCarrierBoolean("oui")).toBe(true);
+    expect(parseCarrierBoolean(true)).toBe(true);
+
+    // Hyphenated negations, future intents & internal hub/agency handoffs must NEVER trigger Livré
+    expect(isCarrierStatusTextDelivered("non-livré")).toBe(false);
+    expect(isCarrierStatusTextDelivered("non-payé")).toBe(false);
+    expect(isCarrierStatusTextDelivered("pas encore livré")).toBe(false);
+    expect(isCarrierStatusTextDelivered("reste à payer")).toBe(false);
+    expect(isCarrierStatusTextDelivered("livré au hub")).toBe(false);
+    expect(isCarrierStatusTextDelivered("livré station")).toBe(false);
+    expect(isCarrierStatusTextDelivered("livré à l'agence")).toBe(false);
+    expect(isCarrierStatusTextDelivered("livré au livreur")).toBe(false);
+    expect(isCarrierStatusTextDelivered("livré bureau")).toBe(false);
+
+    // Genuine delivered/cash strings stay preserved
+    expect(isCarrierStatusTextDelivered("livré_non_encaissé")).toBe(true);
+    expect(isCarrierStatusTextDelivered("encaissé_non_payé")).toBe(true);
+    expect(isCarrierStatusTextDelivered("Livré au client")).toBe(true);
+
+    // Stringified PHP flags ("0", "false") and zero-dates must NOT become isDelivered=true
+    expect(
+      isCarrierTrackingDelivered({
+        situation: "En transit",
+        etat_logistique: "vers_wilaya",
+        encaisser: "0" as unknown as boolean,
+        recouvert: "false" as unknown as boolean,
+      })
+    ).toBe(false);
+
+    const itemZeroDate = buildEcoTrackingItem("DHD-ZERO-DATE-1", {
+      tracking: "DHD-ZERO-DATE-1",
+      status: "vers_wilaya",
+      livred_at: "0000-00-00 00:00:00",
+      delivered_at: "null",
+      encaisser: "0" as unknown as boolean,
+    });
+    expect(itemZeroDate.encaisser).toBe(false);
+    expect(itemZeroDate.recouvert).toBe(false);
+    expect(isCarrierTrackingDelivered(itemZeroDate)).toBe(false);
+  });
+
+  it("deduplicates concurrent EcoTrack location fetches, retries HTTP 429, and avoids background tracking-info floods", async () => {
+    const prevUrl = process.env.ECOTRACK_BASE_URL;
+    const prevTok = process.env.ECOTRACK_API_TOKEN;
+    const prevFetch = globalThis.fetch;
+
+    process.env.ECOTRACK_BASE_URL = "https://mock.dhd-dz.example";
+    process.env.ECOTRACK_API_TOKEN = "test-token";
+
+    const counts: Record<string, number> = {
+      wilayas: 0,
+      communes: 0,
+      desks: 0,
+      orders: 0,
+      trackingInfo: 0,
+    };
+    let simulateFirst429 = true;
+
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/api/v1/get/wilayas") {
+        counts.wilayas++;
+        if (simulateFirst429) {
+          simulateFirst429 = false;
+          return new Response(JSON.stringify({ message: "Too Many Requests" }), {
+            status: 429,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify([{ wilaya_id: 16, wilaya_name: "Alger" }]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url.pathname === "/api/v1/get/communes") {
+        counts.communes++;
+        return new Response(
+          JSON.stringify([{ wilaya_id: 16, nom: "Hydra", is_active: 1 }]),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.pathname === "/api/v1/get/desks") {
+        counts.desks++;
+        return new Response(
+          JSON.stringify({ my_desk: { commune: "Bir Mourad Rais", hub_name: "Stop Desk Alger" }, other_desks: [] }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.pathname === "/api/v1/get/orders") {
+        counts.orders++;
+        return new Response(
+          JSON.stringify({
+            current_page: 1,
+            last_page: 1,
+            next_page_url: null,
+            data: [
+              { tracking: "DHD-BG-NOFLOOD-1", status: "en_preparation" },
+              { tracking: "DHD-BG-NOFLOOD-2", status: "en_hub" },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.pathname === "/api/v1/get/tracking/info") {
+        counts.trackingInfo++;
+        return new Response(JSON.stringify({ status: "en_preparation", activity: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response("Not Found", { status: 404 });
+    }) as typeof fetch;
+
+    try {
+      // 10 simultaneous location queries must share 1 wilayas (with 429 retry), 1 communes, 1 desks call
+      const locResults = await Promise.all(
+        Array.from({ length: 10 }, () => getEcoTrackLocations(16))
+      );
+      expect(locResults).toHaveLength(10);
+      expect(locResults[0].communes).toContain("Hydra");
+      expect(counts.wilayas).toBe(2); // 1 initial 429 + 1 successful retry, shared across all 10 callers
+      expect(counts.communes).toBe(1);
+      expect(counts.desks).toBe(1);
+
+      // Background poll (forceRefresh: false) must NOT blast /api/v1/get/tracking/info for parcels already returned by /get/orders
+      const bgBatch = await getEcoTrackTrackingBatch(
+        ["DHD-BG-NOFLOOD-1", "DHD-BG-NOFLOOD-2"],
+        { forceRefresh: false }
+      );
+      expect(Object.keys(bgBatch)).toEqual(["DHD-BG-NOFLOOD-1", "DHD-BG-NOFLOOD-2"]);
+      expect(counts.trackingInfo).toBe(0);
+    } finally {
+      globalThis.fetch = prevFetch;
+      if (prevUrl === undefined) delete process.env.ECOTRACK_BASE_URL;
+      else process.env.ECOTRACK_BASE_URL = prevUrl;
+      if (prevTok === undefined) delete process.env.ECOTRACK_API_TOKEN;
+      else process.env.ECOTRACK_API_TOKEN = prevTok;
+    }
   });
 });

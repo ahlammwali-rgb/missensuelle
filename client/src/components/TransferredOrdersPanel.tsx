@@ -113,6 +113,7 @@ export function TransferredOrdersPanel({
     new Date().toLocaleTimeString("fr-DZ", { hour: "2-digit", minute: "2-digit" })
   );
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const syncedDeliveredIdsRef = useRef<Set<string>>(new Set());
   const [selectedTimelineOrder, setSelectedTimelineOrder] = useState<{
     order: CheckoutOrder;
@@ -148,7 +149,6 @@ export function TransferredOrdersPanel({
 
   // E-com & EcoTrack status & live refresh mutations
   const utils = trpc.useUtils();
-  const initialEcoForcedRef = useRef(false);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   const syncDeliveriesMutation = trpc.admin.syncDeliveredFromCarriers.useMutation({
@@ -160,13 +160,13 @@ export function TransferredOrdersPanel({
   });
   const ecomStatusQuery = trpc.ecom.status.useQuery(undefined, {
     refetchOnWindowFocus: false,
-    refetchOnMount: "always",
-    staleTime: 0,
+    refetchOnMount: true,
+    staleTime: 30000,
   });
   const ecotrackStatusQuery = trpc.ecotrack.status.useQuery(undefined, {
     refetchOnWindowFocus: false,
-    refetchOnMount: "always",
-    staleTime: 0,
+    refetchOnMount: true,
+    staleTime: 30000,
   });
   const ecomShipments = useMemo(() => ecomStatusQuery.data?.shipments || {}, [ecomStatusQuery.data]);
   const ecoShipments = useMemo(() => ecotrackStatusQuery.data?.shipments || {}, [ecotrackStatusQuery.data]);
@@ -196,14 +196,14 @@ export function TransferredOrdersPanel({
     };
   }, [transferredOrders, ecomShipments, ecoShipments]);
 
-  // Batch tracking queries (E-com + EcoTrack)
+  // Batch tracking queries (E-com + EcoTrack) — utilisent le cache serveur 3 min pour éviter les 429
   const trackingQuery = trpc.ecom.trackBatch.useQuery(
     { trackings: ecomTrackings },
     {
       enabled: ecomTrackings.length > 0,
-      refetchInterval: 45000,
-      refetchOnMount: "always",
-      staleTime: 0,
+      refetchInterval: 120000,
+      refetchOnMount: true,
+      staleTime: 60000,
       refetchOnWindowFocus: false,
     }
   );
@@ -211,9 +211,9 @@ export function TransferredOrdersPanel({
     { trackings: ecoTrackings },
     {
       enabled: ecoTrackings.length > 0,
-      refetchInterval: 45000,
-      refetchOnMount: "always",
-      staleTime: 0,
+      refetchInterval: 120000,
+      refetchOnMount: true,
+      staleTime: 60000,
       refetchOnWindowFocus: false,
     }
   );
@@ -232,20 +232,6 @@ export function TransferredOrdersPanel({
       }
     },
   });
-
-  // Trigger a live cache-bypass sync for DHD on first view load
-  useEffect(() => {
-    if (ecoTrackings.length > 0 && !initialEcoForcedRef.current) {
-      initialEcoForcedRef.current = true;
-      void ecotrackRefreshMutation
-        .mutateAsync({ trackings: ecoTrackings })
-        .then(() => {
-          setLastSyncAt(new Date().toLocaleTimeString("fr-DZ", { hour: "2-digit", minute: "2-digit" }));
-          if (onRefreshOrders) onRefreshOrders();
-        })
-        .catch(() => {});
-    }
-  }, [ecoTrackings]);
 
   const handleForceRefreshAll = async () => {
     setIsManualRefreshing(true);
@@ -433,7 +419,57 @@ export function TransferredOrdersPanel({
     return [...matching].sort((a, b) => activityTs(b) - activityTs(a));
   }, [transferredOrders, shipments, ecoShipments, ecomShipments, trackingMap, inspectionMap, search, filterSituation, filterCarrier]);
 
-  const exportCSV = () => {
+  // Sync selectedIds when transferred orders change (prune removed/repatriated IDs)
+  useEffect(() => {
+    const validIds = new Set(transferredOrders.map(o => o.id));
+    setSelectedIds(prev => {
+      if (prev.size === 0) return prev;
+      let changed = false;
+      const next = new Set<string>();
+      prev.forEach(id => {
+        if (validIds.has(id)) next.add(id);
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [transferredOrders]);
+
+  const toggleSelectOrder = (orderId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
+
+  const selectedInViewCount = useMemo(
+    () => filteredOrders.filter(o => selectedIds.has(o.id)).length,
+    [filteredOrders, selectedIds]
+  );
+
+  const allFilteredSelected =
+    filteredOrders.length > 0 && selectedInViewCount === filteredOrders.length;
+
+  const toggleSelectAllFiltered = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        for (const o of filteredOrders) next.delete(o.id);
+      } else {
+        for (const o of filteredOrders) next.add(o.id);
+      }
+      return next;
+    });
+  };
+
+  const selectedOrdersList = useMemo(
+    () => transferredOrders.filter(o => selectedIds.has(o.id)),
+    [transferredOrders, selectedIds]
+  );
+
+  const exportCSV = (subset?: CheckoutOrder[]) => {
+    const sourceOrders = subset && subset.length > 0 ? subset : filteredOrders;
     const header = [
       "ID Commande",
       "Tracking Transporteur",
@@ -450,7 +486,7 @@ export function TransferredOrdersPanel({
       "Encaissé",
     ];
 
-    const rows = filteredOrders.map(o => {
+    const rows = sourceOrders.map(o => {
       const isEco = Boolean(ecoShipments[o.id]) || o.carrier === "ecotrack";
       const sh = isEco ? (ecoShipments[o.id] || shipments[o.id]) : (ecomShipments[o.id] || shipments[o.id]);
       const trk = findTrackingData(trackingMap, sh?.tracking);
@@ -484,7 +520,41 @@ export function TransferredOrdersPanel({
     link.download = `commandes-transferees-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-    notify("Export CSV des commandes transférées téléchargé ✦");
+    notify(
+      subset && subset.length > 0
+        ? `Export CSV de ${sourceOrders.length} colis sélectionné(s) téléchargé ✦`
+        : "Export CSV des commandes transférées téléchargé ✦"
+    );
+  };
+
+  const copySelectedTrackingList = () => {
+    if (selectedOrdersList.length === 0) return;
+    const lines = selectedOrdersList.map(o => {
+      const isEco = Boolean(ecoShipments[o.id]) || o.carrier === "ecotrack";
+      const sh = isEco ? (ecoShipments[o.id] || shipments[o.id]) : (ecomShipments[o.id] || shipments[o.id]);
+      const trk = findTrackingData(trackingMap, sh?.tracking);
+      const badge = getStatusBadge(trk, o);
+      return `${o.id} | ${sh?.tracking || "Sans tracking"} | ${o.customer} (${o.phone}) | ${o.wilaya} | ${formatDZD(o.total)} | ${badge.label}`;
+    });
+    void navigator.clipboard?.writeText(lines.join("\n"));
+    notify(`${selectedOrdersList.length} bordereau(x) copié(s) dans le presse-papiers ✦`);
+  };
+
+  const handleBulkRapatrier = () => {
+    if (selectedOrdersList.length === 0) return;
+    if (
+      !window.confirm(
+        `Rapatrier ${selectedOrdersList.length} commande(s) sélectionnée(s) vers le Dashboard actif ?`
+      )
+    ) {
+      return;
+    }
+    const count = selectedOrdersList.length;
+    for (const order of selectedOrdersList) {
+      onUpdateStatus(order.id, "confirmee");
+    }
+    setSelectedIds(new Set());
+    notify(`${count} commande(s) réintégrée(s) dans le Dashboard actif ✦`);
   };
 
   const openWhatsApp = (order: CheckoutOrder, trackingCode?: string) => {
@@ -577,7 +647,7 @@ export function TransferredOrdersPanel({
           <button
             type="button"
             className="trans-btn trans-btn-export"
-            onClick={exportCSV}
+            onClick={() => exportCSV()}
             title="Exporter en CSV"
           >
             <FileDown size={14} />
@@ -894,27 +964,90 @@ export function TransferredOrdersPanel({
         </div>
       </div>
 
-      {/* Live visible count & quick reset bar */}
+      {/* Live visible count, Select-All & quick reset bar */}
       <div className="trp-results-bar">
         <span className="trp-results-count">
           Affichées : <strong>{filteredOrders.length}</strong> / {transferredOrders.length} commande
           {transferredOrders.length > 1 ? "s" : ""}
         </span>
-        {hasActiveFilters && (
-          <button
-            type="button"
-            className="trp-results-reset-btn"
-            onClick={() => {
-              setFilterSituation("all");
-              setFilterCarrier("all");
-              setSearch("");
-            }}
-          >
-            <X size={12} />
-            <span>Tout afficher ({transferredOrders.length})</span>
-          </button>
-        )}
+        <div className="trp-results-actions">
+          {filteredOrders.length > 0 && (
+            <button
+              type="button"
+              className={`trp-select-all-btn${allFilteredSelected ? " is-active" : ""}`}
+              onClick={toggleSelectAllFiltered}
+            >
+              <Check size={12} />
+              <span>
+                {allFilteredSelected
+                  ? `Tout désélectionner (${selectedInViewCount})`
+                  : `Tout sélectionner (${filteredOrders.length})`}
+              </span>
+            </button>
+          )}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="trp-results-reset-btn"
+              onClick={() => {
+                setFilterSituation("all");
+                setFilterCarrier("all");
+                setSearch("");
+              }}
+            >
+              <X size={12} />
+              <span>Tout afficher ({transferredOrders.length})</span>
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Bulk actions bar for selected parcels */}
+      {selectedOrdersList.length > 0 && (
+        <div className="trp-bulk-bar">
+          <div className="trp-bulk-info">
+            <span className="trp-bulk-badge">{selectedOrdersList.length}</span>
+            <span>
+              colis sélectionné{selectedOrdersList.length > 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="trp-bulk-actions">
+            <button
+              type="button"
+              className="trp-bulk-btn"
+              onClick={() => exportCSV(selectedOrdersList)}
+            >
+              <FileDown size={13} />
+              <span>Exporter CSV ({selectedOrdersList.length})</span>
+            </button>
+            <button
+              type="button"
+              className="trp-bulk-btn"
+              onClick={copySelectedTrackingList}
+            >
+              <Copy size={13} />
+              <span>Copier bordereaux ({selectedOrdersList.length})</span>
+            </button>
+            <button
+              type="button"
+              className="trp-bulk-btn is-revert"
+              onClick={handleBulkRapatrier}
+            >
+              <ArrowLeftRight size={13} />
+              <span>Rapatrier ({selectedOrdersList.length})</span>
+            </button>
+            <button
+              type="button"
+              className="trp-bulk-clear"
+              onClick={() => setSelectedIds(new Set())}
+              title="Effacer la sélection"
+              aria-label="Effacer la sélection"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Orders List / Empty State */}
       {filteredOrders.length === 0 ? (
@@ -952,13 +1085,14 @@ export function TransferredOrdersPanel({
             const badge = getStatusBadge(trk, order);
             const latestScan = badge.lastScan || getLatestCarrierHistoryStep(trk);
             const isFocused = Boolean(focusedOrderId && focusedOrderId === order.id);
+            const isSelected = selectedIds.has(order.id);
             const fullDest = `${order.wilaya}${order.commune ? ` — ${order.commune}` : ""}${order.address ? ` (${order.address})` : ""}`;
 
             return (
               <div
                 key={order.id}
                 data-order-id={order.id}
-                className={`trans-order-card gcome-trans-card ${badge.cardClass}${isFocused ? " is-focused-order" : ""}`}
+                className={`trans-order-card gcome-trans-card ${badge.cardClass}${isFocused ? " is-focused-order" : ""}${isSelected ? " is-selected-card" : ""}`}
               >
                 {isFocused && (
                   <div className="trans-focus-banner">
@@ -979,6 +1113,13 @@ export function TransferredOrdersPanel({
                 <div className="trans-card-header">
                   <div className="trans-card-ids">
                     <div className="trans-compact-id-line">
+                      <input
+                        type="checkbox"
+                        className="trp-card-checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelectOrder(order.id)}
+                        aria-label={`Sélectionner le colis ${order.id}`}
+                      />
                       <span className="trans-order-id">{order.id}</span>
                       <span className={`trans-carrier-pill${isEcoTrack ? " is-ecotrack" : ""}`}>
                         <Truck size={10} />

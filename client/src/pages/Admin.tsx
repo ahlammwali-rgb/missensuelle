@@ -354,11 +354,45 @@ function AdminPageContent() {
   useEffect(() => {
     if (serverOrders.length === 0) return;
     const undeliveredIds = new Set<string>();
+    const soundVictoryEnabled = localStorage.getItem("ms_sound_victory_enabled") !== "false";
+    const pushEnabled = localStorage.getItem("ms_push_order_enabled") !== "false";
     for (const o of serverOrders) {
       const wasDelivered = prevOrderDeliveredRef.current.get(o.id);
       const isNowDelivered = Boolean(o.isDelivered);
       prevOrderDeliveredRef.current.set(o.id, isNowDelivered);
-      if (!isNowDelivered) {
+      if (wasDelivered === false && isNowDelivered && !o.returnReceived) {
+        const seenKey = `ms_victory_seen_${o.id}`;
+        let alreadySeenLocally = false;
+        try {
+          alreadySeenLocally = localStorage.getItem(seenKey) === "1";
+          if (!alreadySeenLocally) localStorage.setItem(seenKey, "1");
+        } catch {
+          // ignore storage errors
+        }
+        if (!alreadySeenLocally) {
+          if (soundVictoryEnabled) playVictoryDeliveredSound();
+          notify(`🎉 VICTOIRE : Colis ${o.id} livré à ${o.customer || "Cliente"} (+${formatDZD(o.total)}) !`, "victory");
+          if (pushEnabled && !receivedServerVictoryOrderIdsRef.current.has(o.id)) {
+            const targetOrderId = o.id;
+            const customerName = o.customer || "Cliente";
+            const total = o.total || 0;
+            window.setTimeout(() => {
+              if (receivedServerVictoryOrderIdsRef.current.has(targetOrderId)) return;
+              showPushNotification(
+                "🎉 COLIS LIVRÉ : Succès !",
+                `Colis #${targetOrderId} pour ${customerName} (${formatDZD(total)}) a été livré !`,
+                `victory-${targetOrderId}`,
+                "delivered",
+                {
+                  url: `/admin?section=transferred&orderId=${encodeURIComponent(targetOrderId)}`,
+                  orderId: targetOrderId,
+                  section: "transferred",
+                }
+              );
+            }, 3000);
+          }
+        }
+      } else if (!isNowDelivered) {
         undeliveredIds.add(o.id);
         if (wasDelivered) {
           receivedServerVictoryOrderIdsRef.current.delete(o.id);
@@ -643,17 +677,17 @@ function AdminPageContent() {
 
   // E-com & EcoTrack status & carrier batch tracking query for live parcel events
   const ecomStatusQuery = trpc.ecom.status.useQuery(undefined, {
-    refetchInterval: 60000,
+    refetchInterval: 120000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
-    staleTime: 60000,
+    staleTime: 120000,
     retry: false,
   });
   const ecotrackStatusQuery = trpc.ecotrack.status.useQuery(undefined, {
-    refetchInterval: 60000,
+    refetchInterval: 120000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
-    staleTime: 60000,
+    staleTime: 120000,
     retry: false,
   });
   const ecomShipments = useMemo(() => ecomStatusQuery.data?.shipments || {}, [ecomStatusQuery.data]);
@@ -674,10 +708,10 @@ function AdminPageContent() {
     { trackings: activeEcomTrackings },
     {
       enabled: activeEcomTrackings.length > 0,
-      refetchInterval: 60000,
+      refetchInterval: 180000,
       refetchIntervalInBackground: false,
       refetchOnWindowFocus: false,
-      staleTime: 60000,
+      staleTime: 180000,
       retry: false,
     }
   );
@@ -685,10 +719,10 @@ function AdminPageContent() {
     { trackings: activeEcoTrackings },
     {
       enabled: activeEcoTrackings.length > 0,
-      refetchInterval: 60000,
+      refetchInterval: 180000,
       refetchIntervalInBackground: false,
       refetchOnWindowFocus: false,
-      staleTime: 60000,
+      staleTime: 180000,
       retry: false,
     }
   );
@@ -718,7 +752,6 @@ function AdminPageContent() {
     }
 
     const soundUrgentEnabled = localStorage.getItem("ms_sound_urgent_enabled") !== "false";
-    const soundVictoryEnabled = localStorage.getItem("ms_sound_victory_enabled") !== "false";
     const pushEnabled = localStorage.getItem("ms_push_order_enabled") !== "false";
     const notifNrpEnabled = localStorage.getItem("ms_notif_nrp_enabled") !== "false";
     const notifCancelEnabled = localStorage.getItem("ms_notif_cancel_enabled") !== "false";
@@ -741,42 +774,10 @@ function AdminPageContent() {
         const customerName = order?.customer || "Cliente";
         const phone = order?.phone || "";
         const wilaya = order?.wilaya || "";
-        const total = order?.total || 0;
 
-        // 1. Colis LIVRÉ -> GREEN VICTORY (serveur Web Push prioritaire + fallback local dédupliqué par tag)
-        if (currentCat === "delivered") {
-          const seenKey = `ms_victory_seen_${orderId || tracking}`;
-          let alreadySeenLocally = false;
-          try {
-            alreadySeenLocally = localStorage.getItem(seenKey) === "1";
-            if (!alreadySeenLocally) localStorage.setItem(seenKey, "1");
-          } catch {
-            // ignore storage errors
-          }
-          if (!alreadySeenLocally) {
-            if (soundVictoryEnabled) playVictoryDeliveredSound();
-            notify(`🎉 VICTOIRE : Colis ${orderId || tracking} livré à ${customerName} (+${formatDZD(total)}) !`, "victory");
-            if (pushEnabled && orderId && !receivedServerVictoryOrderIdsRef.current.has(orderId)) {
-              const targetOrderId = orderId;
-              window.setTimeout(() => {
-                if (receivedServerVictoryOrderIdsRef.current.has(targetOrderId)) return;
-                showPushNotification(
-                  "🎉 COLIS LIVRÉ : Succès !",
-                  `Colis #${targetOrderId} pour ${customerName} (${formatDZD(total)}) a été livré !`,
-                  `victory-${targetOrderId}`,
-                  "delivered",
-                  {
-                    url: `/admin?section=transferred&orderId=${encodeURIComponent(targetOrderId)}`,
-                    orderId: targetOrderId,
-                    section: "transferred",
-                  }
-                );
-              }, 4000);
-            }
-          }
-        }
-        // 2. Client NE RÉPOND PAS -> RED ALERT
-        else if (currentCat === "no_answer" && notifNrpEnabled) {
+        // Victory ("Livré") toast/sound/push is triggered exclusively from confirmed serverOrders
+        // transitions (prevOrderDeliveredRef: false -> true) so temporary carrier flickers never mislead.
+        if (currentCat === "no_answer" && notifNrpEnabled) {
           if (soundUrgentEnabled) playUrgentAlertSound();
           if (pushEnabled) {
             showPushNotification(

@@ -102,6 +102,16 @@ export function EcoTrackPanel({
     setRows(current => ({ ...current, [order.id]: { ...rowOf(order), ...next } }));
 
   const selectedOrders = toShip.filter(o => rowOf(o).selected);
+  const allToShipSelected = toShip.length > 0 && selectedOrders.length === toShip.length;
+  const toggleSelectAllToShip = () => {
+    setRows(current => {
+      const next = { ...current };
+      for (const order of toShip) {
+        next[order.id] = { ...rowOf(order), selected: !allToShipSelected };
+      }
+      return next;
+    });
+  };
 
   const submitCredentials = () => {
     saveCredentials.mutate(
@@ -328,6 +338,17 @@ export function EcoTrackPanel({
             </button>
           )}
           <div className="ecom-card-head-actions">
+            {toShip.length > 0 && (
+              <button
+                type="button"
+                className="button button-light"
+                onClick={toggleSelectAllToShip}
+              >
+                {allToShipSelected
+                  ? "Tout désélectionner"
+                  : `Tout sélectionner (${toShip.length})`}
+              </button>
+            )}
             <button
               className="button button-outline"
               disabled={!connected || !selectedOrders.length || ship.isPending}

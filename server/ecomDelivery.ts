@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { CheckoutOrder, CheckoutPayload } from "../shared/checkout";
+import { parseCarrierBoolean } from "../shared/carrierStatus";
 import { matchEcomCommune, shippingFeeFor, wilayaIdFromName, type ShippingRate, type ShippingRates } from "../shared/shipping";
 import { getCloudToken } from "./persistentStore";
 
@@ -10,7 +11,7 @@ const LOCAL_DIR = path.resolve(process.cwd(), ".data");
 const LOCAL_FILE = path.join(LOCAL_DIR, "ecom-state.json");
 const RATES_TTL = 10 * 60 * 1000;
 const STATUS_TTL = 5 * 60 * 1000;
-const TRACKING_TTL = 90 * 1000;
+const TRACKING_TTL = 3 * 60 * 1000;
 
 export type EcomShipment = { tracking: string; at: string; idColis: number | null; readyToShip?: boolean };
 type EcomState = { key: string; token: string; shipments: Record<string, EcomShipment> };
@@ -114,6 +115,23 @@ async function credentials() {
   return key && token ? { key, token } : null;
 }
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+let ecomQueueTail: Promise<void> = Promise.resolve();
+let lastEcomCallAt = 0;
+
+function scheduleEcomSlot(): Promise<void> {
+  const minGapMs = isTestEnv() ? 0 : 85;
+  const slot = ecomQueueTail.then(async () => {
+    if (minGapMs > 0) {
+      const wait = lastEcomCallAt + minGapMs - Date.now();
+      if (wait > 0) await sleep(wait);
+    }
+    lastEcomCallAt = Date.now();
+  });
+  ecomQueueTail = slot.catch(() => undefined);
+  return slot;
+}
+
 async function ecomRequest<T>(
   endpoint: string,
   options: { method?: string; body?: unknown; query?: Record<string, string | number>; creds?: { key: string; token: string } } = {},
@@ -122,33 +140,56 @@ async function ecomRequest<T>(
   if (!creds) throw new EcomError("Identifiants E-com Delivery non configurés", 400);
   const url = new URL(`${BASE_URL}${endpoint}`);
   for (const [k, v] of Object.entries(options.query ?? {})) url.searchParams.set(k, String(v));
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: options.method ?? "GET",
-      headers: { "X-API-Key": creds.key, "X-API-Token": creds.token, "Content-Type": "application/json" },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: AbortSignal.timeout(20000),
-    });
-  } catch {
-    throw new EcomError("E-com Delivery est injoignable, réessayez.", 502);
-  }
-  const text = await res.text();
-  let json: unknown = null;
-  try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    json = null;
-  }
-  if (!res.ok) {
+  const maxAttempts = 3;
+  let lastError: EcomError | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    await scheduleEcomSlot();
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: options.method ?? "GET",
+        headers: { "X-API-Key": creds.key, "X-API-Token": creds.token, "Content-Type": "application/json" },
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch {
+      throw new EcomError("E-com Delivery est injoignable, réessayez.", 502);
+    }
+    const text = await res.text();
+    let json: unknown = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch {
+      json = null;
+    }
+    if (res.ok) {
+      return json as T;
+    }
+
     const err = (json as { error?: { message?: string; code?: string } } | null)?.error;
     const message =
       res.status === 401 ? "Identifiants API invalides ou accès désactivé" :
       res.status === 429 ? "Quota E-com Delivery dépassé, patientez une minute" :
       err?.message || `Erreur E-com Delivery (${res.status})`;
-    throw new EcomError(message, res.status);
+    lastError = new EcomError(message, res.status);
+
+    if (res.status === 429 && attempt < maxAttempts) {
+      const retryAfterSec = Number(res.headers.get("retry-after") || "0");
+      const baseMs = isTestEnv()
+        ? 15 * attempt
+        : retryAfterSec > 0 && retryAfterSec <= 8
+          ? retryAfterSec * 1000
+          : attempt === 1
+            ? 1200
+            : 2600;
+      await sleep(baseMs);
+      continue;
+    }
+    throw lastError;
   }
-  return json as T;
+
+  throw lastError ?? new EcomError("Quota E-com Delivery dépassé, patientez une minute", 429);
 }
 
 export type EcomAccount = { id_fournisseur: number; nom_fournisseur: string; stock: boolean; colis_0da: boolean };
@@ -236,25 +277,36 @@ export type EcomCommune = { id: number; commune: string; livrable: boolean };
 export type EcomStopdesk = { code_stopdesk: string; nom_bureau: string; commune: string; adresse: string };
 
 const locationsCache = new Map<number, { at: number; value: { communes: string[]; stopdesks: Array<{ code: string; label: string }> } }>();
+const locationsInFlight = new Map<number, Promise<{ communes: string[]; stopdesks: Array<{ code: string; label: string }> }>>();
 
 export async function getEcomLocations(wilayaId: number) {
   const cached = locationsCache.get(wilayaId);
   if (cached && Date.now() - cached.at < RATES_TTL) {
     return cached.value;
   }
-  const [communes, stopdesks] = await Promise.all([
-    ecomRequest<EcomCommune[]>("/communes", { query: { id_wilaya: wilayaId } }),
-    ecomRequest<EcomStopdesk[]>("/stopdesks", { query: { id_wilaya: wilayaId } }).catch(() => [] as EcomStopdesk[]),
-  ]);
-  const value = {
-    communes: communes.filter(c => c.livrable).map(c => c.commune),
-    stopdesks: stopdesks.map(s => ({
-      code: s.code_stopdesk,
-      label: `${s.nom_bureau} — ${s.commune}`,
-    })),
-  };
-  locationsCache.set(wilayaId, { at: Date.now(), value });
-  return value;
+  const pending = locationsInFlight.get(wilayaId);
+  if (pending) return pending;
+
+  const task = (async () => {
+    const [communes, stopdesks] = await Promise.all([
+      ecomRequest<EcomCommune[]>("/communes", { query: { id_wilaya: wilayaId } }),
+      ecomRequest<EcomStopdesk[]>("/stopdesks", { query: { id_wilaya: wilayaId } }).catch(() => [] as EcomStopdesk[]),
+    ]);
+    const value = {
+      communes: communes.filter(c => c.livrable).map(c => c.commune),
+      stopdesks: stopdesks.map(s => ({
+        code: s.code_stopdesk,
+        label: `${s.nom_bureau} — ${s.commune}`,
+      })),
+    };
+    locationsCache.set(wilayaId, { at: Date.now(), value });
+    return value;
+  })().finally(() => {
+    locationsInFlight.delete(wilayaId);
+  });
+
+  locationsInFlight.set(wilayaId, task);
+  return task;
 }
 
 export type ShipInput = {
@@ -414,15 +466,34 @@ export type EcomTrackingInfo = {
   historique?: EcomTrackingHistory[];
 };
 
+const ecomTrackingInFlight = new Map<string, Promise<EcomTrackingInfo | null>>();
+
 export async function getEcomTracking(tracking: string): Promise<EcomTrackingInfo | null> {
-  if (!tracking) return null;
-  try {
-    const creds = await credentials();
-    if (!creds) return null;
-    return await ecomRequest<EcomTrackingInfo>(`/colis/${encodeURIComponent(tracking.trim())}`, { creds });
-  } catch {
-    return null;
-  }
+  const key = tracking.trim();
+  if (!key) return null;
+  const pending = ecomTrackingInFlight.get(key);
+  if (pending) return pending;
+
+  const task = (async () => {
+    try {
+      const creds = await credentials();
+      if (!creds) return null;
+      const raw = await ecomRequest<EcomTrackingInfo>(`/colis/${encodeURIComponent(key)}`, { creds });
+      if (!raw) return null;
+      return {
+        ...raw,
+        encaisser: parseCarrierBoolean(raw.encaisser),
+        recouvert: parseCarrierBoolean(raw.recouvert),
+      };
+    } catch {
+      return null;
+    }
+  })().finally(() => {
+    ecomTrackingInFlight.delete(key);
+  });
+
+  ecomTrackingInFlight.set(key, task);
+  return task;
 }
 
 export async function getEcomTrackingBatch(
@@ -444,8 +515,8 @@ export async function getEcomTrackingBatch(
     }
   }
 
-  for (let i = 0; i < toFetch.length; i += 8) {
-    const chunk = toFetch.slice(i, i + 8);
+  for (let i = 0; i < toFetch.length; i += 4) {
+    const chunk = toFetch.slice(i, i + 4);
     await Promise.all(
       chunk.map(async trk => {
         const data = await getEcomTracking(trk);

@@ -13,6 +13,7 @@ import {
   isCarrierStatusTextReturned,
   isCarrierTrackingDelivered,
   normCarrierText,
+  parseCarrierBoolean,
 } from "../shared/carrierStatus";
 import { parseCarrierTimestamp } from "../shared/carrierHistory";
 import { getCloudToken } from "./persistentStore";
@@ -85,8 +86,13 @@ let wilayasCache: { at: number; items: Array<{ wilaya_id: number; wilaya_name: s
 let feesCache: { at: number; rates: Record<string, ShippingRate> } | null = null;
 let allCommunesCache: { at: number; items: RawEcoCommune[] } | null = null;
 let allDesksCache: { at: number; myDesk?: RawEcoDesk | null; otherDesks: RawEcoDesk[] } | null = null;
+let wilayasInFlight: Promise<Array<{ wilaya_id: number; wilaya_name: string }>> | null = null;
+let feesInFlight: Promise<{ configured: boolean; rates: Record<string, ShippingRate> }> | null = null;
+let allCommunesInFlight: Promise<RawEcoCommune[]> | null = null;
+let allDesksInFlight: Promise<{ myDesk?: RawEcoDesk | null; otherDesks: RawEcoDesk[] }> | null = null;
+const ecoTrackingBatchInFlight = new Map<string, Promise<Record<string, EcomTrackingInfo>>>();
 const ECO_STATUS_TTL = 5 * 60 * 1000;
-const ECO_TRACKING_TTL = 90 * 1000;
+const ECO_TRACKING_TTL = 3 * 60 * 1000;
 let ecoStatusCache: { at: number; credsKey: string; error: string | null } | null = null;
 const ecoTrackingCache = new Map<string, { at: number; data: EcomTrackingInfo }>();
 
@@ -206,6 +212,23 @@ async function credentials() {
   return baseUrl && token ? { baseUrl, token } : null;
 }
 
+const sleepEco = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+let ecoQueueTail: Promise<void> = Promise.resolve();
+let lastEcoCallAt = 0;
+
+function scheduleEcoSlot(): Promise<void> {
+  const minGapMs = isTestEnv() ? 0 : 90;
+  const slot = ecoQueueTail.then(async () => {
+    if (minGapMs > 0) {
+      const wait = lastEcoCallAt + minGapMs - Date.now();
+      if (wait > 0) await sleepEco(wait);
+    }
+    lastEcoCallAt = Date.now();
+  });
+  ecoQueueTail = slot.catch(() => undefined);
+  return slot;
+}
+
 async function ecoRequest<T>(
   endpoint: string,
   options: {
@@ -221,29 +244,37 @@ async function ecoRequest<T>(
   for (const [k, v] of Object.entries(options.query ?? {})) {
     url.searchParams.set(k, String(v));
   }
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: options.method ?? "GET",
-      headers: {
-        Authorization: `Bearer ${creds.token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: AbortSignal.timeout(20000),
-    });
-  } catch {
-    throw new EcoTrackError("Plateforme EcoTrack injoignable, vérifiez l'URL ou réessayez.", 502);
-  }
-  const text = await res.text();
-  let json: unknown = null;
-  try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    json = null;
-  }
-  if (!res.ok) {
+  const maxAttempts = 3;
+  let lastError: EcoTrackError | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    await scheduleEcoSlot();
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        method: options.method ?? "GET",
+        headers: {
+          Authorization: `Bearer ${creds.token}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch {
+      throw new EcoTrackError("Plateforme EcoTrack injoignable, vérifiez l'URL ou réessayez.", 502);
+    }
+    const text = await res.text();
+    let json: unknown = null;
+    try {
+      json = text ? JSON.parse(text) : null;
+    } catch {
+      json = null;
+    }
+    if (res.ok) {
+      return json as T;
+    }
+
     const obj = (json && typeof json === "object" ? json : null) as {
       message?: string;
       errors?: Record<string, string[]>;
@@ -257,9 +288,24 @@ async function ecoRequest<T>(
         : res.status === 429
           ? "Quota EcoTrack dépassé, patientez un instant"
           : firstValidationErr || obj?.message || `Erreur EcoTrack (${res.status})`;
-    throw new EcoTrackError(msg, res.status);
+    lastError = new EcoTrackError(msg, res.status);
+
+    if (res.status === 429 && attempt < maxAttempts) {
+      const retryAfterSec = Number(res.headers.get("retry-after") || "0");
+      const backoffMs = isTestEnv()
+        ? 15 * attempt
+        : retryAfterSec > 0 && retryAfterSec <= 8
+          ? retryAfterSec * 1000
+          : attempt === 1
+            ? 1400
+            : 3000;
+      await sleepEco(backoffMs);
+      continue;
+    }
+    throw lastError;
   }
-  return json as T;
+
+  throw lastError ?? new EcoTrackError("Quota EcoTrack dépassé, patientez un instant", 429);
 }
 
 async function validateToken(creds: { baseUrl: string; token: string }) {
@@ -367,64 +413,103 @@ export async function getEcoTrackFees(): Promise<{
   if (feesCache && Date.now() - feesCache.at < CACHE_TTL) {
     return { configured: true, rates: feesCache.rates };
   }
-  const creds = await credentials();
-  if (!creds) return { configured: false, rates: {} };
-  try {
-    const data = await ecoRequest<{
-      livraison?: Array<{ wilaya_id: number | string; tarif: number | string; tarif_stopdesk: number | string }>;
-    }>("/api/v1/get/fees", { creds });
-    const rates: Record<string, ShippingRate> = {};
-    for (const row of data.livraison ?? []) {
-      const wid = Number(row.wilaya_id);
-      if (wid > 0) {
-        rates[String(wid)] = {
-          domicile: Number(row.tarif) || 0,
-          stopdesk: Number(row.tarif_stopdesk) || 0,
-        };
+  if (feesInFlight) return feesInFlight;
+
+  const task = (async () => {
+    const creds = await credentials();
+    if (!creds) return { configured: false, rates: {} };
+    try {
+      const data = await ecoRequest<{
+        livraison?: Array<{ wilaya_id: number | string; tarif: number | string; tarif_stopdesk: number | string }>;
+      }>("/api/v1/get/fees", { creds });
+      const rates: Record<string, ShippingRate> = {};
+      for (const row of data.livraison ?? []) {
+        const wid = Number(row.wilaya_id);
+        if (wid > 0) {
+          rates[String(wid)] = {
+            domicile: Number(row.tarif) || 0,
+            stopdesk: Number(row.tarif_stopdesk) || 0,
+          };
+        }
       }
+      feesCache = { at: Date.now(), rates };
+      return { configured: true, rates };
+    } catch {
+      return { configured: true, rates: feesCache?.rates ?? {} };
     }
-    feesCache = { at: Date.now(), rates };
-    return { configured: true, rates };
-  } catch {
-    return { configured: true, rates: feesCache?.rates ?? {} };
-  }
+  })().finally(() => {
+    feesInFlight = null;
+  });
+
+  feesInFlight = task;
+  return task;
 }
 
 async function getActiveWilayas(): Promise<Array<{ wilaya_id: number; wilaya_name: string }>> {
   if (wilayasCache && Date.now() - wilayasCache.at < CACHE_TTL) {
     return wilayasCache.items;
   }
-  const data = await ecoRequest<Array<{ wilaya_id: number; wilaya_name: string }> | Record<string, { wilaya_id: number; wilaya_name: string }>>(
-    "/api/v1/get/wilayas"
-  ).catch(() => []);
-  const arr = Array.isArray(data) ? data : Object.values(data || {});
-  wilayasCache = { at: Date.now(), items: arr };
-  return arr;
+  if (wilayasInFlight) return wilayasInFlight;
+
+  const task = (async () => {
+    const data = await ecoRequest<
+      Array<{ wilaya_id: number; wilaya_name: string }> | Record<string, { wilaya_id: number; wilaya_name: string }>
+    >("/api/v1/get/wilayas").catch(() => []);
+    const arr = Array.isArray(data) ? data : Object.values(data || {});
+    wilayasCache = { at: Date.now(), items: arr };
+    return arr;
+  })().finally(() => {
+    wilayasInFlight = null;
+  });
+
+  wilayasInFlight = task;
+  return task;
 }
 
 async function getAllCommunes(): Promise<RawEcoCommune[]> {
   if (allCommunesCache && Date.now() - allCommunesCache.at < CACHE_TTL) {
     return allCommunesCache.items;
   }
-  const raw = await ecoRequest<RawEcoCommune[] | Record<string, RawEcoCommune>>("/api/v1/get/communes").catch(() => []);
-  const arr = Array.isArray(raw) ? raw : Object.values(raw || {});
-  allCommunesCache = { at: Date.now(), items: arr };
-  return arr;
+  if (allCommunesInFlight) return allCommunesInFlight;
+
+  const task = (async () => {
+    const raw = await ecoRequest<RawEcoCommune[] | Record<string, RawEcoCommune>>("/api/v1/get/communes").catch(() => []);
+    const arr = Array.isArray(raw) ? raw : Object.values(raw || {});
+    allCommunesCache = { at: Date.now(), items: arr };
+    return arr;
+  })().finally(() => {
+    allCommunesInFlight = null;
+  });
+
+  allCommunesInFlight = task;
+  return task;
 }
 
 async function getAllDesks() {
   if (allDesksCache && Date.now() - allDesksCache.at < CACHE_TTL) {
     return allDesksCache;
   }
-  const raw = await ecoRequest<{
-    my_desk?: RawEcoDesk | null;
-    other_desks?: RawEcoDesk[] | Record<string, RawEcoDesk>;
-  } | RawEcoDesk[]>("/api/v1/get/desks").catch(() => ({ my_desk: null, other_desks: [] }));
-  const myDesk = !Array.isArray(raw) ? raw?.my_desk ?? null : null;
-  const rawOther = Array.isArray(raw) ? raw : raw?.other_desks ?? [];
-  const otherDesks = Array.isArray(rawOther) ? rawOther : Object.values(rawOther || {});
-  allDesksCache = { at: Date.now(), myDesk, otherDesks };
-  return allDesksCache;
+  if (allDesksInFlight) return allDesksInFlight;
+
+  const task = (async () => {
+    const raw = await ecoRequest<
+      | {
+          my_desk?: RawEcoDesk | null;
+          other_desks?: RawEcoDesk[] | Record<string, RawEcoDesk>;
+        }
+      | RawEcoDesk[]
+    >("/api/v1/get/desks").catch(() => ({ my_desk: null, other_desks: [] }));
+    const myDesk = !Array.isArray(raw) ? raw?.my_desk ?? null : null;
+    const rawOther = Array.isArray(raw) ? raw : raw?.other_desks ?? [];
+    const otherDesks = Array.isArray(rawOther) ? rawOther : Object.values(rawOther || {});
+    allDesksCache = { at: Date.now(), myDesk, otherDesks };
+    return allDesksCache;
+  })().finally(() => {
+    allDesksInFlight = null;
+  });
+
+  allDesksInFlight = task;
+  return task;
 }
 
 export async function getEcoTrackLocations(wilayaId: number): Promise<{
@@ -560,8 +645,14 @@ export async function shipEcoTrackOrders(
 ): Promise<EcoTrackShipResult[]> {
   await loadState();
   const results: EcoTrackShipResult[] = [];
+  let mutated = false;
   const byId = new Map(orders.map(o => [o.id, o]));
-  const feesData = await getEcoTrackFees().catch(() => ({ configured: false, rates: {} as Record<string, ShippingRate> }));
+  const [feesData] = await Promise.all([
+    getEcoTrackFees().catch(() => ({ configured: false, rates: {} as Record<string, ShippingRate> })),
+    getActiveWilayas().catch(() => []),
+    getAllCommunes().catch(() => []),
+    getAllDesks().catch(() => ({ myDesk: null, otherDesks: [] })),
+  ]);
 
   for (const input of inputs) {
     const order = byId.get(input.orderId);
@@ -574,9 +665,9 @@ export async function shipEcoTrackOrders(
     if (existing) {
       if (validateImmediately && !existing.readyToShip) {
         try {
-          await validateEcoTrackOrder(existing.tracking);
+          await validateEcoTrackOrder(existing.tracking, { save: false });
           existing.readyToShip = true;
-          await saveState();
+          mutated = true;
           results.push({
             orderId: order.id,
             ok: true,
@@ -728,7 +819,7 @@ export async function shipEcoTrackOrders(
       let ready = false;
       if (validateImmediately) {
         try {
-          await validateEcoTrackOrder(tracking);
+          await validateEcoTrackOrder(tracking, { save: false });
           ready = true;
         } catch {
           ready = false;
@@ -740,6 +831,7 @@ export async function shipEcoTrackOrders(
         at: new Date().toISOString(),
         readyToShip: ready,
       };
+      mutated = true;
       results.push({ orderId: order.id, ok: true, tracking, readyToShip: ready });
     } catch (err) {
       results.push({
@@ -750,13 +842,16 @@ export async function shipEcoTrackOrders(
     }
   }
 
-  if (results.some(r => r.ok)) {
+  if (mutated || results.some(r => r.ok)) {
     await saveState();
   }
   return results;
 }
 
-export async function validateEcoTrackOrder(tracking: string) {
+export async function validateEcoTrackOrder(
+  tracking: string,
+  options?: { save?: boolean }
+) {
   await loadState();
   const creds = await credentials();
   if (!creds) throw new EcoTrackError("EcoTrack non configuré");
@@ -774,7 +869,9 @@ export async function validateEcoTrackOrder(tracking: string) {
       state.shipments[orderId] = { ...sh, readyToShip: true };
     }
   }
-  await saveState();
+  if (options?.save !== false) {
+    await saveState();
+  }
   return resp;
 }
 
@@ -980,6 +1077,26 @@ function isTerminalOrLateEcoStatus(raw?: string): boolean {
   );
 }
 
+function hasValidDeliveredDate(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const trimmed = value.trim();
+  const norm = normCarrierText(trimmed);
+  if (
+    !trimmed ||
+    norm === "0" ||
+    norm === "false" ||
+    norm === "non" ||
+    norm === "no" ||
+    norm === "null" ||
+    norm === "undefined" ||
+    norm === "-" ||
+    /^0{4}[-/]0{2}[-/]0{2}/.test(trimmed)
+  ) {
+    return false;
+  }
+  return parseCarrierTimestamp(trimmed) !== null || /\d{4}[-/]\d{2}[-/]\d{2}/.test(trimmed);
+}
+
 export function buildEcoTrackingItem(trk: string, rawNode: RawEcoTrackingNode): EcomTrackingInfo {
   const info = rawNode.OrderInfo ?? rawNode.order ?? rawNode.parcel ?? rawNode;
   const events = collectEcoEvents(rawNode, info);
@@ -1018,9 +1135,15 @@ export function buildEcoTrackingItem(trk: string, rawNode: RawEcoTrackingNode): 
     isCarrierStatusTextReturned(rawStatus) ||
     isCarrierStatusTextReturned(sit);
 
+  const hasDeliveredDate =
+    hasValidDeliveredDate(info.livred_at) ||
+    hasValidDeliveredDate(info.delivered_at) ||
+    hasValidDeliveredDate(rawNode.livred_at) ||
+    hasValidDeliveredDate(rawNode.delivered_at);
+
   const isDelivered =
     !isReturned &&
-    (Boolean(info.livred_at || info.delivered_at || rawNode.livred_at || rawNode.delivered_at) ||
+    (hasDeliveredDate ||
       isCarrierStatusTextDelivered(rawStatus) ||
       isCarrierStatusTextDelivered(sit));
 
@@ -1028,7 +1151,10 @@ export function buildEcoTrackingItem(trk: string, rawNode: RawEcoTrackingNode): 
   const isCashCollected =
     isDelivered &&
     !isExplicitNonEncaisse &&
-    (Boolean(info.encaisse || info.encaisser || rawNode.encaisse || rawNode.encaisser) ||
+    (parseCarrierBoolean(info.encaisse) ||
+      parseCarrierBoolean(info.encaisser) ||
+      parseCarrierBoolean(rawNode.encaisse) ||
+      parseCarrierBoolean(rawNode.encaisser) ||
       rawNorm.includes("encaisse") ||
       rawNorm.includes("paye") ||
       rawNorm.includes("recouvr") ||
@@ -1046,7 +1172,8 @@ export function buildEcoTrackingItem(trk: string, rawNode: RawEcoTrackingNode): 
     recouvert:
       isCashCollected &&
       !rawNorm.includes("non_paye") &&
-      (Boolean(info.recouvrement || rawNode.recouvrement) ||
+      (parseCarrierBoolean(info.recouvrement) ||
+        parseCarrierBoolean(rawNode.recouvrement) ||
         rawNorm.includes("encaisse_paye") ||
         rawNorm.includes("paye_et_archive") ||
         rawStatus === "paye"),
@@ -1235,11 +1362,28 @@ export async function getEcoTrackTrackingBatch(
   trackings: string[],
   options?: { forceRefresh?: boolean }
 ): Promise<Record<string, EcomTrackingInfo>> {
+  const unique = Array.from(new Set(trackings.map(t => t.trim()).filter(Boolean)));
+  if (!unique.length) return {};
+  const forceRefresh = Boolean(options?.forceRefresh);
+  const flightKey = `${forceRefresh ? "1" : "0"}:${unique.slice().sort().join(",")}`;
+  const existingFlight = ecoTrackingBatchInFlight.get(flightKey);
+  if (existingFlight) {
+    return existingFlight;
+  }
+
+  const task = runEcoTrackTrackingBatch(unique, forceRefresh).finally(() => {
+    ecoTrackingBatchInFlight.delete(flightKey);
+  });
+  ecoTrackingBatchInFlight.set(flightKey, task);
+  return task;
+}
+
+async function runEcoTrackTrackingBatch(
+  unique: string[],
+  forceRefresh: boolean
+): Promise<Record<string, EcomTrackingInfo>> {
   const result: Record<string, EcomTrackingInfo> = {};
   const now = Date.now();
-  const forceRefresh = Boolean(options?.forceRefresh);
-  const unique = Array.from(new Set(trackings.map(t => t.trim()).filter(Boolean)));
-  if (!unique.length) return result;
   const creds = await credentials();
   if (!creds) return result;
 
@@ -1338,14 +1482,15 @@ export async function getEcoTrackTrackingBatch(
     }
   }
 
-  // 2) Enrich missing trackings OR active/recent parcels with empty historique via /api/v1/get/tracking/info
+  // 2) Enrich missing trackings OR (on explicit manual forceRefresh) active parcels with empty historique via /api/v1/get/tracking/info
   const missingFromOrders = toFetch.filter(t => !result[t]);
-  const emptyHistoryPriority = toFetch
-    .filter(t => result[t] && (!result[t].historique || result[t].historique!.length === 0));
+  const emptyHistoryPriority = forceRefresh
+    ? toFetch.filter(t => result[t] && (!result[t].historique || result[t].historique!.length === 0))
+    : [];
   const toEnrich = Array.from(new Set([...missingFromOrders, ...emptyHistoryPriority]));
 
-  for (let i = 0; i < toEnrich.length; i += 6) {
-    const chunk = toEnrich.slice(i, i + 6);
+  for (let i = 0; i < toEnrich.length; i += 3) {
+    const chunk = toEnrich.slice(i, i + 3);
     await Promise.all(
       chunk.map(async trk => {
         try {
