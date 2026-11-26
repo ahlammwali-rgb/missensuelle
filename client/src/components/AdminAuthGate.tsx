@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode, type FormEvent } from "react";
-import { AlertCircle, KeyRound, LogIn, RefreshCw, ShieldCheck } from "lucide-react";
-import { startLogin } from "@/const";
+import { AlertCircle, KeyRound, RefreshCw, ShieldCheck } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { GcomeLoginView } from "@/pages/gcome/GcomeLogin";
 
 type Props = { children: ReactNode };
 
@@ -46,11 +46,8 @@ export function AdminAuthGate({ children }: Props) {
     } catch {}
   }, [me.data, me.isLoading]);
   const claimAdmin = trpc.auth.claimAdmin.useMutation();
-  const loginPassword = trpc.auth.loginPassword.useMutation();
   const [code, setCode] = useState("");
   const [claimError, setClaimError] = useState("");
-  const [password, setPassword] = useState("");
-  const [passwordError, setPasswordError] = useState("");
 
   if (me.isLoading) {
     return <main className="admin-auth-shell"><section className="admin-auth-card" role="status" aria-live="polite"><span className="eyebrow">Administration</span><h1>Vérification de l’accès…</h1><p>Nous vérifions la session administrateur avant d’ouvrir les données enregistrées.</p><span className="admin-auth-spinner" aria-hidden="true" /></section></main>;
@@ -61,44 +58,7 @@ export function AdminAuthGate({ children }: Props) {
   }
 
   if (!me.data) {
-    const submitPassword = async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      setPasswordError("");
-      try {
-        await loginPassword.mutateAsync({ password });
-        setPassword("");
-        await utils.auth.me.invalidate();
-      } catch (error) {
-        setPasswordError(error instanceof Error ? error.message : "Mot de passe incorrect.");
-      }
-    };
-
-    return (
-      <main className="admin-auth-shell">
-        <section className="admin-auth-card">
-          <div className="admin-auth-icon"><KeyRound size={24} /></div>
-          <span className="eyebrow">Espace Administration</span>
-          <h1>Connexion Miss Sensuelle</h1>
-          <p>Saisissez votre mot de passe administrateur ou votre code confirmateur personnel pour accéder aux commandes.</p>
-          <form className="admin-activation-form" onSubmit={submitPassword}>
-            <label htmlFor="admin-password-input">Mot de passe Admin ou Code Confirmateur</label>
-            <input
-              id="admin-password-input"
-              type="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={event => setPassword(event.target.value)}
-              required
-            />
-            {passwordError && <p className="admin-auth-error" role="alert">{passwordError}</p>}
-            <button type="submit" className="button button-gradient" disabled={loginPassword.isPending}>
-              <ShieldCheck size={16} /> {loginPassword.isPending ? "Connexion…" : "Accéder à l’administration"}
-            </button>
-          </form>
-        </section>
-      </main>
-    );
+    return <GcomeLoginView />;
   }
 
   if (me.data.role === "admin") return <>{children}</>;
@@ -125,29 +85,25 @@ export function AdminAuthGate({ children }: Props) {
     };
 
     return (
-      <main className="admin-auth-shell">
-        <section className="admin-auth-card">
-          <div className="admin-auth-icon"><KeyRound size={24} /></div>
-          <span className="eyebrow">Première activation</span>
-          <h1>Active le compte propriétaire</h1>
-          <p>Ton compte est bien connecté, mais l’espace admin n’est pas encore activé. Saisis le code privé reçu séparément.</p>
+      <GcomeLoginView
+        claimSlot={
           <form className="admin-activation-form" onSubmit={submitClaim}>
-            <label htmlFor="admin-activation-code">Code d’activation privé</label>
-            <input id="admin-activation-code" type="password" autoComplete="one-time-code" value={code} onChange={event => setCode(event.target.value)} required />
+            <label htmlFor="admin-activation-code">Code d’activation privé propriétaire</label>
+            <input id="admin-activation-code" className="gc-input" type="password" autoComplete="one-time-code" value={code} onChange={event => setCode(event.target.value)} required />
             {claimError && <p className="admin-auth-error" role="alert">{claimError}</p>}
-            <button type="submit" className="button button-gradient" disabled={claimAdmin.isPending}>
+            <button type="submit" className="gc-btn-hero-primary" style={{ width: "100%" }} disabled={claimAdmin.isPending}>
               <ShieldCheck size={16} /> {claimAdmin.isPending ? "Activation…" : "Activer l’administration"}
             </button>
           </form>
-        </section>
-      </main>
+        }
+      />
     );
   }
 
   return (
     <main className="admin-auth-shell">
       <section className="admin-auth-card" role="alert">
-        <div className="admin-auth-icon"><ShieldCheck size={24} /></div>
+        <div className="admin-auth-icon"><KeyRound size={24} /></div>
         <span className="eyebrow">Accès restreint</span>
         <h1>Compte non administrateur</h1>
         <p>Cette session est connectée, mais elle ne possède pas le rôle admin. Les commandes restent protégées.</p>

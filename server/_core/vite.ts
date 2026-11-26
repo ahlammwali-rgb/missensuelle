@@ -5,6 +5,33 @@ import { nanoid } from "nanoid";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
+import { isGcomePrimaryRequest } from "./publicConfig";
+
+function applyGcomeHtmlMetadata(html: string, req: express.Request): string {
+  const hostHeader = String(req.headers["x-forwarded-host"] || req.headers.host || "");
+  const isPrimaryGcome = isGcomePrimaryRequest(hostHeader, process.env);
+  const isGcomePath = req.originalUrl === "/gcome" || req.originalUrl.startsWith("/gcome/");
+  const surfaceScript = `<script>window.__GCOME_SURFACE__=${JSON.stringify(
+    isPrimaryGcome ? "gcome" : "storefront"
+  )};</script>`;
+  let next = html.replace("</head>", `${surfaceScript}\n  </head>`);
+  if (isPrimaryGcome || isGcomePath) {
+    next = next
+      .replace(
+        /<title>[\s\S]*?<\/title>/i,
+        "<title>GCOME · Plateforme E-Commerce SaaS 3 en 1 — Algérie</title>"
+      )
+      .replace(
+        /<meta name="description" content="[^"]*"\s*\/?>/i,
+        `<meta name="description" content="Vends, confirme et livre sur 58 wilayas depuis une seule application mobile & dashboard : Boutique COD, Équipe confirmateurs, Transporteurs DHD/E-com & Finance IA." />\n    <meta property="og:title" content="GCOME · SaaS E-Commerce 3 en 1" />\n    <meta property="og:description" content="Boutique haute conversion, confirmation & livraison 58 wilayas dans un seul tableau de bord mobile-first." />\n    <meta property="og:image" content="/gcome-og.svg" />`
+      )
+      .replace(
+        `<link rel="icon" type="image/png" href="/admin-pwa-icon.png" />`,
+        `<link rel="icon" type="image/svg+xml" href="/gcome-icon.svg" />`
+      );
+  }
+  return next;
+}
 
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
@@ -39,7 +66,7 @@ export async function setupVite(app: Express, server: Server) {
         `src="/src/main.tsx?v=${nanoid()}"`
       );
       const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      res.status(200).set({ "Content-Type": "text/html" }).end(applyGcomeHtmlMetadata(page, req));
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -58,8 +85,20 @@ export function serveStatic(app: Express) {
     );
   }
 
+  let cachedIndexHtml: string | null = null;
+  const loadIndexHtml = () => {
+    if (!cachedIndexHtml) {
+      const indexFile = path.resolve(distPath, "index.html");
+      if (fs.existsSync(indexFile)) {
+        cachedIndexHtml = fs.readFileSync(indexFile, "utf-8");
+      }
+    }
+    return cachedIndexHtml;
+  };
+
   app.use(
     express.static(distPath, {
+      index: false,
       setHeaders: (res, filePath) => {
         const normalized = filePath.replace(/\\/g, "/");
         if (normalized.endsWith(".html") || normalized.endsWith("/sw.js") || normalized.endsWith("/manifest.json")) {
@@ -84,7 +123,13 @@ export function serveStatic(app: Express) {
   });
 
   // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  app.use("*", (req, res) => {
+    const html = loadIndexHtml();
+    if (!html) {
+      res.sendFile(path.resolve(distPath, "index.html"));
+      return;
+    }
+    res.setHeader("Cache-Control", "no-cache");
+    res.type("text/html").send(applyGcomeHtmlMetadata(html, req));
   });
 }

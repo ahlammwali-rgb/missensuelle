@@ -1,0 +1,667 @@
+/* =========================================================
+   GCOME SaaS — 100% Mobile-First App Style + 3D Scroll CSS
+   Isolated cleanly under .gcome-app-shell so storefront (/) stays untouched.
+   ========================================================= */
+
+.gcome-app-shell {
+  --gc-bg: #f8f7fc;
+  --gc-surface: #ffffff;
+  --gc-surface-muted: #f2eefc;
+  --gc-text: #120d26;
+  --gc-text-muted: #5b5478;
+  --gc-border: rgba(109, 40, 217, 0.14);
+  --gc-primary: #6d28d9;
+  --gc-primary-deep: #4c1d95;
+  --gc-primary-bright: #7c3aed;
+  --gc-gold: #f5b301;
+  --gc-gold-light: #fde047;
+  --gc-emerald: #10b981;
+  --gc-glass: rgba(255, 255, 255, 0.84);
+  --gc-shadow: 0 18px 42px -18px rgba(76, 29, 149, 0.24);
+
+  min-height: 100vh;
+  background: var(--gc-bg);
+  color: var(--gc-text);
+  font-family: "DM Sans", "Cairo", system-ui, -apple-system, sans-serif;
+  position: relative;
+  overflow-x: clip;
+  padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+}
+
+.gcome-app-shell[dir="rtl"] {
+  font-family: "Cairo", "DM Sans", system-ui, -apple-system, sans-serif;
+}
+
+html.dark .gcome-app-shell,
+.dark .gcome-app-shell {
+  --gc-bg: #070512;
+  --gc-surface: #110d24;
+  --gc-surface-muted: #1b1538;
+  --gc-text: #f8f7ff;
+  --gc-text-muted: #b6add8;
+  --gc-border: rgba(167, 139, 250, 0.22);
+  --gc-glass: rgba(14, 10, 30, 0.84);
+  --gc-shadow: 0 22px 54px -18px rgba(0, 0, 0, 0.78);
+}
+
+.gcome-container {
+  width: 100%;
+  max-width: 1180px;
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+
+/* ---------- Mobile-First Sticky App Topbar (58px mobile -> 68px desktop) ---------- */
+.gc-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 45;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid transparent;
+  background: var(--gc-glass);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.gc-topbar.is-scrolled {
+  border-bottom-color: var(--gc-border);
+  box-shadow: 0 8px 26px -14px rgba(30, 16, 59, 0.22);
+}
+
+.gc-topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gc-nav-desktop {
+  display: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.gc-nav-link {
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gc-text-muted);
+  text-decoration: none;
+  transition: color 0.16s ease, background 0.16s ease;
+}
+
+.gc-nav-link:hover,
+.gc-nav-link.is-active {
+  color: var(--gc-primary);
+  background: var(--gc-surface-muted);
+}
+
+html.dark .gc-nav-link:hover,
+html.dark .gc-nav-link.is-active {
+  color: #e9d5ff;
+}
+
+.gc-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gc-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 36px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid var(--gc-border);
+  background: var(--gc-surface);
+  color: var(--gc-text);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.14s ease, border-color 0.16s ease, background 0.16s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gc-pill-btn:active {
+  transform: scale(0.96);
+}
+
+.gc-pill-btn.is-primary {
+  border: 0;
+  background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 20px -8px rgba(124, 58, 237, 0.72);
+}
+
+.gc-pill-btn.is-gold {
+  border: 0;
+  background: linear-gradient(135deg, #fde047 0%, #f5b301 100%);
+  color: #1e103b;
+}
+
+.gc-hide-xs {
+  display: none;
+}
+
+/* ---------- Mobile Bottom App Navigation Dock ---------- */
+.gc-mobile-dock {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: max(10px, env(safe-area-inset-bottom, 0px));
+  z-index: 50;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(109, 40, 217, 0.2);
+  box-shadow: 0 18px 40px -10px rgba(30, 16, 59, 0.28);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+html.dark .gc-mobile-dock,
+.dark .gc-mobile-dock {
+  background: rgba(17, 13, 36, 0.94);
+  border-color: rgba(167, 139, 250, 0.28);
+  box-shadow: 0 18px 44px -8px rgba(0, 0, 0, 0.85);
+}
+
+.gc-dock-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 46px;
+  border-radius: 16px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--gc-text-muted);
+  text-decoration: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  z-index: 1;
+}
+
+.gc-dock-item.is-active {
+  color: #ffffff;
+}
+
+.gc-dock-pill-bg {
+  position: absolute;
+  inset: 1px 2px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%);
+  z-index: -1;
+}
+
+.gc-dock-cta {
+  background: linear-gradient(135deg, #fde047 0%, #f5b301 100%);
+  color: #1e103b !important;
+  box-shadow: 0 6px 16px -6px rgba(245, 179, 1, 0.85);
+}
+
+/* ---------- Buttons & Touch Targets (Thumb Zone >= 46px) ---------- */
+.gc-btn-hero-primary,
+.gc-btn-hero-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 16px;
+  font-size: 14.5px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gc-btn-hero-primary {
+  border: 0;
+  background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 55%, #6d28d9 100%);
+  color: #ffffff;
+  box-shadow: 0 14px 32px -10px rgba(109, 40, 217, 0.72);
+}
+
+.gc-btn-hero-secondary {
+  border: 1.5px solid var(--gc-border);
+  background: var(--gc-surface);
+  color: var(--gc-text);
+}
+
+.gc-btn-hero-primary:active,
+.gc-btn-hero-secondary:active {
+  transform: scale(0.97);
+}
+
+/* ---------- Hero Mobile-First + 3D Perspective Stage ---------- */
+.gc-hero {
+  position: relative;
+  padding-top: 20px;
+  padding-bottom: 34px;
+  overflow: hidden;
+}
+
+.gc-hero-glow {
+  position: absolute;
+  inset: -120px -80px auto -80px;
+  height: 460px;
+  background:
+    radial-gradient(circle at 22% 24%, rgba(124, 58, 237, 0.22), transparent 55%),
+    radial-gradient(circle at 82% 18%, rgba(245, 179, 1, 0.18), transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.gc-hero-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+  align-items: center;
+}
+
+.gc-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--gc-surface-muted);
+  border: 1px solid var(--gc-border);
+  color: var(--gc-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+html.dark .gc-eyebrow {
+  color: #ddd6fe;
+}
+
+.gc-hero-title {
+  margin-top: 12px;
+  font-size: clamp(1.9rem, 7.6vw, 3.35rem);
+  line-height: 1.08;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.gc-hero-title .is-accent {
+  background: linear-gradient(125deg, #6d28d9 0%, #9333ea 55%, #f5b301 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+html.dark .gc-hero-title .is-accent {
+  background: linear-gradient(125deg, #c4b5fd 0%, #a855f7 52%, #fde047 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.gc-hero-lead {
+  margin-top: 12px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--gc-text-muted);
+  max-width: 56ch;
+}
+
+.gc-hero-cta-row {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.gc-hero-trust-strip {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gc-text-muted);
+}
+
+.gc-hero-trust-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* 3D Perspective Stage */
+.g3d-stage {
+  perspective: 1250px;
+  position: relative;
+  padding-block: 10px 18px;
+}
+
+.g3d-card-frame {
+  transform-style: preserve-3d;
+  border-radius: 26px;
+  background: linear-gradient(155deg, #1b1038 0%, #0d081d 100%);
+  border: 1px solid rgba(196, 181, 253, 0.28);
+  padding: 14px;
+  box-shadow:
+    0 28px 64px -22px rgba(30, 16, 59, 0.65),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  color: #ffffff;
+}
+
+.g3d-float-badge {
+  position: absolute;
+  z-index: 4;
+  border-radius: 16px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #120d26;
+  border: 1px solid rgba(109, 40, 217, 0.18);
+  box-shadow: 0 14px 32px -12px rgba(18, 13, 38, 0.42);
+  font-size: 11.5px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  backdrop-filter: blur(12px);
+}
+
+html.dark .g3d-float-badge {
+  background: rgba(17, 13, 36, 0.96);
+  color: #f8f7ff;
+  border-color: rgba(196, 181, 253, 0.28);
+}
+
+/* ---------- Marquee Logo Strip ---------- */
+.gc-marquee-wrap {
+  overflow: hidden;
+  border-block: 1px solid var(--gc-border);
+  background: var(--gc-surface);
+  padding-block: 13px;
+}
+
+.gc-marquee-track {
+  display: flex;
+  width: max-content;
+  gap: 14px;
+  animation: gc-marquee-scroll 26s linear infinite;
+}
+
+.gc-marquee-wrap:hover .gc-marquee-track {
+  animation-play-state: paused;
+}
+
+.gc-marquee-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--gc-surface-muted);
+  border: 1px solid var(--gc-border);
+  font-size: 12.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+@keyframes gc-marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.gcome-app-shell[dir="rtl"] .gc-marquee-track {
+  animation-name: gc-marquee-scroll-rtl;
+}
+
+@keyframes gc-marquee-scroll-rtl {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(50%);
+  }
+}
+
+/* ---------- Mobile Horizontal Snap Swipe Rail ---------- */
+.gsnap-rail {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 10px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.gsnap-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.gsnap-item {
+  flex: 0 0 84%;
+  scroll-snap-align: center;
+}
+
+/* ---------- Section Headings & Cards ---------- */
+.gc-section {
+  padding-block: 44px;
+}
+
+.gc-section-head {
+  text-align: start;
+  margin-bottom: 22px;
+}
+
+.gc-section-title {
+  margin-top: 8px;
+  font-size: clamp(1.5rem, 6vw, 2.5rem);
+  line-height: 1.12;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+}
+
+.gc-section-sub {
+  margin-top: 8px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--gc-text-muted);
+  max-width: 60ch;
+}
+
+.gc-card {
+  background: var(--gc-surface);
+  border: 1px solid var(--gc-border);
+  border-radius: 22px;
+  padding: 18px;
+  box-shadow: var(--gc-shadow);
+}
+
+/* ---------- Segmented Pill Tabs (App style) ---------- */
+.gc-segmented {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--gc-surface-muted);
+  border: 1px solid var(--gc-border);
+  gap: 3px;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.gc-segmented-btn {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: var(--gc-text-muted);
+  font-size: 12.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.gc-segmented-btn.is-active {
+  background: var(--gc-surface);
+  color: var(--gc-primary);
+  box-shadow: 0 4px 12px -4px rgba(76, 29, 149, 0.25);
+}
+
+html.dark .gc-segmented-btn.is-active {
+  background: #6d28d9;
+  color: #ffffff;
+}
+
+/* ---------- Footer ---------- */
+.gc-footer {
+  border-top: 1px solid var(--gc-border);
+  background: var(--gc-surface);
+  padding-block: 32px 24px;
+}
+
+/* ---------- Split Auth / Signup / Payment App Shell ---------- */
+.gc-split-auth {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--gc-bg);
+}
+
+.gc-auth-form-pane {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 18px 18px calc(32px + env(safe-area-inset-bottom, 0px));
+  max-width: 520px;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.gc-auth-showcase-pane {
+  display: none;
+  position: relative;
+  overflow: hidden;
+  padding: 36px;
+  background: linear-gradient(155deg, #1b0c3b 0%, #3b0764 55%, #090517 100%);
+  color: #ffffff;
+}
+
+.gc-input {
+  width: 100%;
+  min-height: 46px;
+  border-radius: 14px;
+  border: 1.5px solid var(--gc-border);
+  background: var(--gc-surface);
+  color: var(--gc-text);
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.gc-input:focus {
+  border-color: var(--gc-primary-bright);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.16);
+}
+
+/* ---------- Desktop Breakpoints ---------- */
+@media (min-width: 640px) {
+  .gc-hide-xs {
+    display: inline;
+  }
+  .gc-hero-cta-row {
+    grid-template-columns: auto auto;
+    justify-content: start;
+  }
+  .gsnap-item {
+    flex: 0 0 47%;
+  }
+}
+
+@media (min-width: 768px) {
+  .gcome-app-shell {
+    padding-bottom: 0;
+  }
+  .gc-topbar {
+    height: 68px;
+  }
+  .gc-nav-desktop {
+    display: flex;
+  }
+  .gc-mobile-dock {
+    display: none;
+  }
+  .gc-section {
+    padding-block: 68px;
+  }
+  .gc-section-head {
+    text-align: center;
+  }
+  .gc-section-head .gc-section-sub {
+    margin-inline: auto;
+  }
+}
+
+@media (min-width: 960px) {
+  .gc-hero {
+    padding-top: 46px;
+    padding-bottom: 64px;
+  }
+  .gc-hero-grid {
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 42px;
+  }
+  .gsnap-rail {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+    padding-bottom: 0;
+  }
+  .gsnap-item {
+    flex: unset;
+  }
+  .gc-split-auth {
+    grid-template-columns: 1.02fr 0.98fr;
+  }
+  .gc-auth-showcase-pane {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gc-marquee-track {
+    animation: none !important;
+  }
+  .g3d-card-frame,
+  .g3d-float-badge {
+    transform: none !important;
+    transition: none !important;
+  }
+}

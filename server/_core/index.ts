@@ -31,8 +31,9 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
-  app.get("/api/platform/config.js", (_req, res) => {
-    res.set("Cache-Control", "no-store").type("application/javascript").send(publicPlatformScript());
+  app.get("/api/platform/config.js", (req, res) => {
+    const hostHeader = String(req.headers["x-forwarded-host"] || req.headers.host || "");
+    res.set("Cache-Control", "no-store").type("application/javascript").send(publicPlatformScript(process.env, hostHeader));
   });
   const sendLiveBootstrap = async (_req: express.Request, res: express.Response) => {
     await ensureCheckoutStoreReady().catch(() => {});

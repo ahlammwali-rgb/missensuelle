@@ -134,6 +134,20 @@ import {
   upsertFinanceExpense,
   upsertFinanceLot,
 } from "./financeStore";
+import {
+  billingCheckoutSchema,
+  billingRequestUpgradeSchema,
+  billingSignupSchema,
+} from "../shared/billing";
+import {
+  createBillingCheckoutSession,
+  createBillingSignupLead,
+  getAdminBillingOverview,
+  getBillingInvoiceSummary,
+  getPublicBillingCatalog,
+  requestOwnerPlanUpgrade,
+  updateBillingSignupLeadStatus,
+} from "./billingStore";
 import { z } from "zod";
 
 function isOwnerUser(user: { openId?: string | null; loginMethod?: string | null } | null | undefined): boolean {
@@ -1055,6 +1069,30 @@ export const appRouter = router({
         });
         return await askFinanceAiCopilot(input.question, overview);
       }),
+  }),
+  billing: router({
+    plans: publicProcedure.query(() => getPublicBillingCatalog()),
+    submitSignup: publicProcedure
+      .input(billingSignupSchema)
+      .mutation(async ({ input }) => await createBillingSignupLead(input)),
+    createCheckoutSession: publicProcedure
+      .input(billingCheckoutSchema)
+      .mutation(async ({ input }) => await createBillingCheckoutSession(input)),
+    getCheckoutStatus: publicProcedure
+      .input(z.object({ invoiceId: z.string().min(1).max(100) }))
+      .query(async ({ input }) => await getBillingInvoiceSummary(input.invoiceId)),
+    current: ownerFinanceProcedure.query(async () => await getAdminBillingOverview()),
+    requestUpgrade: ownerFinanceProcedure
+      .input(billingRequestUpgradeSchema)
+      .mutation(async ({ input }) => await requestOwnerPlanUpgrade(input)),
+    markSignupStatus: ownerFinanceProcedure
+      .input(
+        z.object({
+          leadId: z.string().min(1),
+          status: z.enum(["new", "contacted", "activated", "archived"]),
+        })
+      )
+      .mutation(async ({ input }) => await updateBillingSignupLeadStatus(input.leadId, input.status)),
   }),
 });
 

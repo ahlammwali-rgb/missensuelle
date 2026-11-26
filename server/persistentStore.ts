@@ -12,6 +12,10 @@ import {
   DEFAULT_FINANCE_SETTINGS,
   type PersistedFinanceState,
 } from "../shared/finance";
+import {
+  createDefaultBillingState,
+  type PersistedBillingState,
+} from "../shared/billing";
 import type {
   AbandonedCheckout,
   CheckoutOrder,
@@ -96,6 +100,7 @@ type PersistedState = {
   pixelSecrets?: PixelServerSecrets;
   sentVictoryTags?: string[];
   financeState?: PersistedFinanceState;
+  billingState?: PersistedBillingState;
 };
 
 const memoryStaffMembers = new Map<string, StaffMember>();
@@ -104,8 +109,29 @@ let memoryCatalogProducts: Record<string, unknown>[] = [];
 let memoryPixelConfig: PublicPixelConfig | null = null;
 let memoryPixelSecrets: PixelServerSecrets = { facebookCapiTokens: {} };
 let memoryFinanceState: PersistedFinanceState = createDefaultPersistedFinanceState();
+let memoryBillingState: PersistedBillingState = createDefaultBillingState();
 const memorySentVictoryTags = new Set<string>();
 const MAX_SENT_VICTORY_TAGS = 1500;
+
+export function getServerBillingState(): PersistedBillingState {
+  return memoryBillingState;
+}
+
+export function setServerBillingState(nextState: PersistedBillingState): PersistedBillingState {
+  const def = createDefaultBillingState();
+  memoryBillingState = {
+    subscription: {
+      ...def.subscription,
+      ...(nextState?.subscription || {}),
+      // Store owner unlimited mode stays protected unless explicitly overridden cleanly
+      isOwnerUnlimited:
+        nextState?.subscription?.isOwnerUnlimited ?? def.subscription.isOwnerUnlimited,
+    },
+    invoices: Array.isArray(nextState?.invoices) ? nextState.invoices : [],
+    signupLeads: Array.isArray(nextState?.signupLeads) ? nextState.signupLeads : [],
+  };
+  return memoryBillingState;
+}
 
 export function getServerFinanceState(): PersistedFinanceState {
   return memoryFinanceState;
@@ -766,6 +792,7 @@ async function pushCloudState(state: PersistedState): Promise<void> {
         pixelSecrets: state.pixelSecrets ?? existing.state?.pixelSecrets ?? memoryPixelSecrets,
         sentVictoryTags: finalSentVictoryTags,
         financeState: state.financeState ?? existing.state?.financeState ?? memoryFinanceState,
+        billingState: state.billingState ?? existing.state?.billingState ?? memoryBillingState,
       };
 
       writeLocalState(finalState);
@@ -930,6 +957,36 @@ function mergeStateIntoMemory(
     });
   }
 
+  if (source.billingState && typeof source.billingState === "object") {
+    const mergedInvoices = new Map<string, NonNullable<PersistedBillingState["invoices"]>[number]>();
+    for (const inv of source.billingState.invoices ?? []) {
+      if (inv?.id) mergedInvoices.set(inv.id, inv);
+    }
+    for (const inv of memoryBillingState.invoices ?? []) {
+      if (inv?.id) mergedInvoices.set(inv.id, inv);
+    }
+    const mergedLeads = new Map<string, NonNullable<PersistedBillingState["signupLeads"]>[number]>();
+    for (const lead of source.billingState.signupLeads ?? []) {
+      if (lead?.id) mergedLeads.set(lead.id, lead);
+    }
+    for (const lead of memoryBillingState.signupLeads ?? []) {
+      if (lead?.id) mergedLeads.set(lead.id, lead);
+    }
+    setServerBillingState({
+      subscription: {
+        ...createDefaultBillingState().subscription,
+        ...(source.billingState.subscription || {}),
+        ...(memoryBillingState.subscription || {}),
+      },
+      invoices: Array.from(mergedInvoices.values())
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+        .slice(0, 500),
+      signupLeads: Array.from(mergedLeads.values())
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+        .slice(0, 500),
+    });
+  }
+
   const currentCounters = getCounters();
   const maxOrderId = memoryOrders.reduce(
     (max, o) => Math.max(max, (o.dbId ?? 0) + 1),
@@ -975,6 +1032,7 @@ export async function ensurePersistentStoreLoaded(
           pixelSecrets: memoryPixelSecrets,
           sentVictoryTags: getSentVictoryTags(),
           financeState: memoryFinanceState,
+          billingState: memoryBillingState,
         });
       }
     })();
@@ -1004,6 +1062,7 @@ export function schedulePersistentStoreSave(
     pixelSecrets: memoryPixelSecrets,
     sentVictoryTags: getSentVictoryTags(),
     financeState: memoryFinanceState,
+    billingState: memoryBillingState,
   };
   writeLocalState(snapshot);
 
