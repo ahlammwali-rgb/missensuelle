@@ -61,7 +61,13 @@ export function EmeraldOrder({ product, selectedColor, setSelectedColor, quantit
     if (!result) return;
     setOrderNumber(result.orderNumber);
     // Horodatage réel de commande : { createdAt: new Date().toISOString() }
-    trackPixelEvent("Purchase", { content_ids: [product.id], value: result.total, currency: "DZD", order_id: result.orderNumber });
+    trackPixelEvent("Purchase", {
+      content_ids: [product.id],
+      value: result.total,
+      currency: "DZD",
+      order_id: result.orderNumber,
+      event_id: `purchase_${result.orderNumber}`,
+    });
   }
 
   return (

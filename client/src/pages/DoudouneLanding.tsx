@@ -300,6 +300,7 @@ export default function DoudouneLanding({
       value: orderTotal,
       currency: "DZD",
       order_id: serverOrderNumber,
+      event_id: `purchase_${serverOrderNumber}`,
       phone,
       customer: name,
     });

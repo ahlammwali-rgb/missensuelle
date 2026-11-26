@@ -776,12 +776,41 @@ export function AdminDashboard({
                                         <b>{order.color}</b>
                                       </span>
                                     )}
-                                    {order.size && order.size.trim() !== "" && (
-                                      <span className="aoc-chip aoc-chip-size">
-                                        <b>{order.size}</b>
-                                      </span>
-                                    )}
-                                  </>
+                                      {order.size && order.size.trim() !== "" && (
+                                        <span className="aoc-chip aoc-chip-size">
+                                          <b>{order.size}</b>
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
+                                {order.attribution?.channel && order.attribution.channel !== "direct" && (
+                                  <span
+                                    className={`aoc-chip aoc-chip-attr is-${order.attribution.channel}`}
+                                    title={
+                                      order.attribution.capiSent
+                                        ? `Source ${order.attribution.channel.toUpperCase()} · Conversions API Meta envoyée (${order.attribution.capiPixels ?? 1} pixel)`
+                                        : order.attribution.capiError
+                                          ? `Erreur CAPI: ${order.attribution.capiError}`
+                                          : `Source ${order.attribution.channel.toUpperCase()}`
+                                    }
+                                  >
+                                    <b>
+                                      {order.attribution.channel === "facebook"
+                                        ? "FB Ads"
+                                        : order.attribution.channel === "tiktok"
+                                          ? "TikTok Ads"
+                                          : "Google"}
+                                    </b>
+                                    {order.attribution.capiSent ? <span>· CAPI ✓</span> : null}
+                                  </span>
+                                )}
+                                {order.attribution?.channel === "direct" && order.attribution.capiSent && (
+                                  <span
+                                    className="aoc-chip aoc-chip-attr is-capi"
+                                    title={`Conversions API Meta envoyée (${order.attribution.capiPixels ?? 1} pixel)`}
+                                  >
+                                    <b>Meta CAPI ✓</b>
+                                  </span>
                                 )}
                               </div>
                             </div>

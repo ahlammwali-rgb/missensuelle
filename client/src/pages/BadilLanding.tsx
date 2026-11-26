@@ -411,6 +411,7 @@ export default function BadilLanding({ product }: { product?: Product }) {
       value: finalTotal,
       currency: "DZD",
       order_id: result.orderNumber,
+      event_id: `purchase_${result.orderNumber}`,
       phone: normalizedPhone,
       customer: trimmedName,
     });

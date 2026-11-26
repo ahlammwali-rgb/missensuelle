@@ -3,7 +3,9 @@ import path from "node:path";
 import {
   normalizePublicPixelConfig,
   sitePixelConfig,
+  type PixelServerSecrets,
   type PublicPixelConfig,
+  type PublicPixelSecretsStatus,
 } from "../shared/site-pixels";
 import {
   createDefaultPersistedFinanceState,
@@ -91,6 +93,7 @@ type PersistedState = {
   staffActivityLogs?: StaffActivityLog[];
   catalogProducts?: Record<string, unknown>[];
   pixelConfig?: PublicPixelConfig;
+  pixelSecrets?: PixelServerSecrets;
   sentVictoryTags?: string[];
   financeState?: PersistedFinanceState;
 };
@@ -99,6 +102,7 @@ const memoryStaffMembers = new Map<string, StaffMember>();
 let memoryStaffActivityLogs: StaffActivityLog[] = [];
 let memoryCatalogProducts: Record<string, unknown>[] = [];
 let memoryPixelConfig: PublicPixelConfig | null = null;
+let memoryPixelSecrets: PixelServerSecrets = { facebookCapiTokens: {} };
 let memoryFinanceState: PersistedFinanceState = createDefaultPersistedFinanceState();
 const memorySentVictoryTags = new Set<string>();
 const MAX_SENT_VICTORY_TAGS = 1500;
@@ -238,6 +242,90 @@ export function setServerPixelConfig(config: Partial<PublicPixelConfig>): Public
     ...memoryPixelConfig,
     facebookPixelIds: [...(memoryPixelConfig.facebookPixelIds ?? [])],
     tiktokPixelIds: [...(memoryPixelConfig.tiktokPixelIds ?? [])],
+  };
+}
+
+function maskTokenPreview(secret?: string): string {
+  const clean = String(secret || "").trim();
+  if (!clean) return "";
+  if (clean.length <= 8) return `${clean.slice(0, 2)}•••${clean.slice(-2)}`;
+  return `${clean.slice(0, 5)}••••${clean.slice(-4)}`;
+}
+
+function normalizePixelSecrets(raw?: Partial<PixelServerSecrets> | null): PixelServerSecrets {
+  const tokens: Record<string, string> = {};
+  if (raw?.facebookCapiTokens && typeof raw.facebookCapiTokens === "object") {
+    for (const [k, v] of Object.entries(raw.facebookCapiTokens)) {
+      const pid = String(k || "").trim();
+      const tok = String(v || "").trim();
+      if (pid && tok) tokens[pid] = tok;
+    }
+  }
+  const def = typeof raw?.facebookDefaultCapiToken === "string" ? raw.facebookDefaultCapiToken.trim() : "";
+  const testCode = typeof raw?.facebookTestEventCode === "string" ? raw.facebookTestEventCode.trim() : "";
+  return {
+    facebookCapiTokens: tokens,
+    ...(def ? { facebookDefaultCapiToken: def } : {}),
+    ...(testCode ? { facebookTestEventCode: testCode } : {}),
+  };
+}
+
+export function getServerPixelSecrets(): PixelServerSecrets {
+  return {
+    facebookCapiTokens: { ...memoryPixelSecrets.facebookCapiTokens },
+    ...(memoryPixelSecrets.facebookDefaultCapiToken
+      ? { facebookDefaultCapiToken: memoryPixelSecrets.facebookDefaultCapiToken }
+      : {}),
+    ...(memoryPixelSecrets.facebookTestEventCode
+      ? { facebookTestEventCode: memoryPixelSecrets.facebookTestEventCode }
+      : {}),
+  };
+}
+
+export function setServerPixelSecrets(patch: {
+  facebookDefaultCapiToken?: string;
+  clearDefaultCapiToken?: boolean;
+  facebookCapiTokens?: Record<string, string>;
+  facebookTestEventCode?: string;
+}): PublicPixelSecretsStatus {
+  const next = getServerPixelSecrets();
+  if (patch.clearDefaultCapiToken) {
+    delete next.facebookDefaultCapiToken;
+  } else if (typeof patch.facebookDefaultCapiToken === "string" && patch.facebookDefaultCapiToken.trim()) {
+    next.facebookDefaultCapiToken = patch.facebookDefaultCapiToken.trim();
+  }
+  if (patch.facebookCapiTokens && typeof patch.facebookCapiTokens === "object") {
+    for (const [k, v] of Object.entries(patch.facebookCapiTokens)) {
+      const pid = String(k || "").trim();
+      if (!pid) continue;
+      const val = String(v || "").trim();
+      if (val) next.facebookCapiTokens[pid] = val;
+      else delete next.facebookCapiTokens[pid];
+    }
+  }
+  if (typeof patch.facebookTestEventCode === "string") {
+    const code = patch.facebookTestEventCode.trim();
+    if (code) next.facebookTestEventCode = code;
+    else delete next.facebookTestEventCode;
+  }
+  memoryPixelSecrets = normalizePixelSecrets(next);
+  return getPublicPixelSecretsStatus();
+}
+
+export function getPublicPixelSecretsStatus(): PublicPixelSecretsStatus {
+  const envDefault = String(process.env.META_CAPI_ACCESS_TOKEN || "").trim();
+  const effectiveDefault = memoryPixelSecrets.facebookDefaultCapiToken || envDefault;
+  const capiTokenPreviews: Record<string, string> = {};
+  for (const [pid, tok] of Object.entries(memoryPixelSecrets.facebookCapiTokens)) {
+    if (tok) capiTokenPreviews[pid] = maskTokenPreview(tok);
+  }
+  return {
+    hasDefaultCapiToken: Boolean(effectiveDefault),
+    defaultCapiTokenPreview: maskTokenPreview(effectiveDefault),
+    envDefaultConfigured: Boolean(!memoryPixelSecrets.facebookDefaultCapiToken && envDefault),
+    capiTokenPreviews,
+    testEventCode:
+      memoryPixelSecrets.facebookTestEventCode || String(process.env.META_TEST_EVENT_CODE || "").trim(),
   };
 }
 
@@ -675,6 +763,7 @@ async function pushCloudState(state: PersistedState): Promise<void> {
             ? state.catalogProducts
             : existing.state?.catalogProducts ?? memoryCatalogProducts,
         pixelConfig: state.pixelConfig ?? existing.state?.pixelConfig ?? (memoryPixelConfig ?? undefined),
+        pixelSecrets: state.pixelSecrets ?? existing.state?.pixelSecrets ?? memoryPixelSecrets,
         sentVictoryTags: finalSentVictoryTags,
         financeState: state.financeState ?? existing.state?.financeState ?? memoryFinanceState,
       };
@@ -809,6 +898,10 @@ function mergeStateIntoMemory(
     memoryPixelConfig = normalizePublicPixelConfig(source.pixelConfig, sitePixelConfig);
   }
 
+  if (source.pixelSecrets && typeof source.pixelSecrets === "object") {
+    memoryPixelSecrets = normalizePixelSecrets(source.pixelSecrets);
+  }
+
   if (source.financeState && typeof source.financeState === "object") {
     setServerFinanceState({
       lots: source.financeState.lots?.length ? source.financeState.lots : memoryFinanceState.lots,
@@ -879,6 +972,7 @@ export async function ensurePersistentStoreLoaded(
           staffActivityLogs: memoryStaffActivityLogs,
           catalogProducts: memoryCatalogProducts,
           pixelConfig: memoryPixelConfig ?? undefined,
+          pixelSecrets: memoryPixelSecrets,
           sentVictoryTags: getSentVictoryTags(),
           financeState: memoryFinanceState,
         });
@@ -907,6 +1001,7 @@ export function schedulePersistentStoreSave(
     staffActivityLogs: memoryStaffActivityLogs,
     catalogProducts: memoryCatalogProducts,
     pixelConfig: memoryPixelConfig ?? undefined,
+    pixelSecrets: memoryPixelSecrets,
     sentVictoryTags: getSentVictoryTags(),
     financeState: memoryFinanceState,
   };

@@ -5,6 +5,7 @@ import type {
   SaveDraftResult,
   SubmitOrderResult,
 } from "@shared/checkout";
+import { readBrowserTrackingContext } from "./tracking";
 
 export type CheckoutApiError = Error & { status?: number };
 
@@ -40,11 +41,17 @@ async function postJson<T>(path: string, body: unknown, keepalive = false): Prom
 }
 
 export function saveCheckoutDraft(input: SaveDraftInput, keepalive = false): Promise<SaveDraftResult> {
-  return postJson<SaveDraftResult>("/api/checkout/draft", input, keepalive);
+  const payload = input.payload.tracking
+    ? input.payload
+    : { ...input.payload, tracking: readBrowserTrackingContext() };
+  return postJson<SaveDraftResult>("/api/checkout/draft", { ...input, payload }, keepalive);
 }
 
 export function submitCheckoutOrder(token: string, payload: CheckoutPayload): Promise<SubmitOrderResult> {
-  return postJson<SubmitOrderResult>("/api/checkout/order", { token, payload });
+  const enriched = payload.tracking
+    ? payload
+    : { ...payload, tracking: readBrowserTrackingContext() };
+  return postJson<SubmitOrderResult>("/api/checkout/order", { token, payload: enriched });
 }
 
 export function discardCheckoutDraft(input: DiscardDraftInput, keepalive = true): Promise<{ ok: true }> {

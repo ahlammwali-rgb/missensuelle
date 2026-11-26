@@ -51,7 +51,121 @@ type TrackingWindow = Window & {
   __missTikTokStatus?: SDKStatus;
   __missTikTokStatuses?: Record<string, SDKStatus>;
   __missPixelEvents?: Array<{ name: PixelEvent; at: string }>;
+  __missMetaAdvMatchKey?: string;
 };
+
+const ATTRIBUTION_KEY = "miss-sensuelle-attribution";
+const ATTRIBUTION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+type StoredAttribution = {
+  fbclid?: string;
+  ttclid?: string;
+  utmSource?: string;
+  fbc?: string;
+  capturedAt: number;
+};
+
+function readCookie(name: string): string {
+  if (typeof document === "undefined" || typeof document.cookie !== "string") return "";
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]*)`));
+  if (!match?.[1]) return "";
+  try {
+    return decodeURIComponent(match[1]).trim();
+  } catch {
+    return match[1].trim();
+  }
+}
+
+export function captureBrowserAttribution(): StoredAttribution {
+  const now = Date.now();
+  let stored: StoredAttribution = { capturedAt: now };
+  if (typeof window === "undefined") return stored;
+
+  try {
+    const raw =
+      window.sessionStorage?.getItem(ATTRIBUTION_KEY) ||
+      window.localStorage?.getItem(ATTRIBUTION_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<StoredAttribution>;
+      if (parsed && typeof parsed.capturedAt === "number" && now - parsed.capturedAt < ATTRIBUTION_TTL_MS) {
+        stored = {
+          fbclid: typeof parsed.fbclid === "string" ? parsed.fbclid : undefined,
+          ttclid: typeof parsed.ttclid === "string" ? parsed.ttclid : undefined,
+          utmSource: typeof parsed.utmSource === "string" ? parsed.utmSource : undefined,
+          fbc: typeof parsed.fbc === "string" ? parsed.fbc : undefined,
+          capturedAt: parsed.capturedAt,
+        };
+      }
+    }
+  } catch {
+    // Storage unavailable
+  }
+
+  try {
+    const sp = new URLSearchParams(window.location?.search || "");
+    const fbclid = sp.get("fbclid")?.trim();
+    const ttclid = sp.get("ttclid")?.trim();
+    const utmSource = sp.get("utm_source")?.trim();
+    let changed = false;
+
+    if (fbclid) {
+      stored.fbclid = fbclid.slice(0, 240);
+      stored.fbc = `fb.1.${now}.${stored.fbclid}`;
+      stored.utmSource ||= "facebook";
+      stored.capturedAt = now;
+      changed = true;
+    }
+    if (ttclid) {
+      stored.ttclid = ttclid.slice(0, 240);
+      stored.utmSource ||= "tiktok";
+      stored.capturedAt = now;
+      changed = true;
+    }
+    if (utmSource) {
+      stored.utmSource = utmSource.slice(0, 100);
+      stored.capturedAt = now;
+      changed = true;
+    }
+
+    const cookieFbc = readCookie("_fbc");
+    if (cookieFbc && cookieFbc !== stored.fbc) {
+      stored.fbc = cookieFbc;
+      changed = true;
+    } else if (stored.fbc && !cookieFbc && typeof document !== "undefined") {
+      try {
+        document.cookie = `_fbc=${encodeURIComponent(stored.fbc)}; Max-Age=7776000; Path=/; SameSite=Lax`;
+      } catch {
+        // Cookie write blocked
+      }
+    }
+
+    if (changed) {
+      const serialized = JSON.stringify(stored);
+      try { window.sessionStorage?.setItem(ATTRIBUTION_KEY, serialized); } catch {}
+      try { window.localStorage?.setItem(ATTRIBUTION_KEY, serialized); } catch {}
+    }
+  } catch {
+    // Ignore URL/storage parsing errors
+  }
+
+  return stored;
+}
+
+export function readBrowserTrackingContext() {
+  if (typeof window === "undefined") return {};
+  const attr = captureBrowserAttribution();
+  const fbp = readCookie("_fbp");
+  const fbc = readCookie("_fbc") || attr.fbc || (attr.fbclid ? `fb.1.${attr.capturedAt || Date.now()}.${attr.fbclid}` : "");
+  return {
+    fbc: fbc.slice(0, 250),
+    fbp: fbp.slice(0, 250),
+    fbclid: (attr.fbclid || "").slice(0, 250),
+    ttclid: (attr.ttclid || "").slice(0, 250),
+    utmSource: (attr.utmSource || "").slice(0, 120),
+    sourceUrl: String(window.location?.href || "").slice(0, 1000),
+  };
+}
 
 const PIXEL_KEY = "miss-sensuelle-pixels";
 
@@ -283,6 +397,7 @@ function installTikTok(ids: string[], customCode: string, win: TrackingWindow) {
 
 export function initializePixels() {
   if (typeof window === "undefined") return;
+  captureBrowserAttribution();
   const config = getPixelConfig();
   const win = window as TrackingWindow;
   installFacebook(getFacebookPixelIds(config), win);
@@ -394,16 +509,136 @@ function buildTikTokPayload(data: Record<string, unknown>) {
   };
 }
 
+function normalizeMetaPhoneDigits(phone: string): string {
+  const clean = phone.replace(/[\s\-\.\(\)]/g, "");
+  if (!clean) return "";
+  if (clean.startsWith("00")) return clean.slice(2).replace(/\D/g, "");
+  if (clean.startsWith("+")) return clean.slice(1).replace(/\D/g, "");
+  if (clean.startsWith("0")) return `213${clean.slice(1).replace(/\D/g, "")}`;
+  return clean.replace(/\D/g, "");
+}
+
+function buildMetaAdvancedMatching(data: {
+  phone?: string;
+  customer?: string;
+  wilaya?: string;
+  commune?: string;
+}): Record<string, string> | null {
+  const ph = data.phone ? normalizeMetaPhoneDigits(data.phone) : "";
+  const fullName = String(data.customer || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+  const parts = fullName ? fullName.split(" ") : [];
+  const fn = parts[0] || "";
+  const ln = parts.length > 1 ? parts.slice(1).join(" ") : "";
+  const cityRaw = String(data.commune || data.wilaya || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "");
+
+  if (!ph && !fn) return null;
+  const matched: Record<string, string> = { country: "dz" };
+  if (ph) matched.ph = ph;
+  if (fn) matched.fn = fn;
+  if (ln) matched.ln = ln;
+  if (cityRaw) matched.ct = cityRaw;
+  return matched;
+}
+
+export function identifyMetaUser(data: {
+  phone?: string;
+  customer?: string;
+  wilaya?: string;
+  commune?: string;
+}) {
+  if (typeof window === "undefined") return;
+  const config = getPixelConfig();
+  const fbIds = getFacebookPixelIds(config);
+  if (fbIds.length === 0) return;
+
+  const matched = buildMetaAdvancedMatching(data);
+  if (!matched) return;
+
+  const win = window as TrackingWindow;
+  const matchKey = `${fbIds.join(",")}:${matched.ph || ""}:${matched.fn || ""}`;
+  if (win.__missMetaAdvMatchKey === matchKey) return;
+  win.__missMetaAdvMatchKey = matchKey;
+
+  try {
+    for (const id of fbIds) {
+      win.fbq?.("init", id, matched);
+    }
+  } catch {
+    // Ignore SDK error
+  }
+}
+
+const META_STRIPPED_PII_AND_TRANSPORT_KEYS = new Set([
+  "phone",
+  "phone_number",
+  "customer",
+  "name",
+  "wilaya",
+  "commune",
+  "address",
+  "event_id",
+  "eventID",
+  "fbclid",
+  "ttclid",
+  "fbc",
+  "fbp",
+  "utm_source",
+  "sourceUrl",
+]);
+
+function prepareMetaTrackCall(data: Record<string, unknown>): {
+  cleanData: Record<string, unknown>;
+  eventId: string;
+} {
+  const eventId = String(data.event_id ?? data.eventID ?? "").trim();
+  const hasStrippedKey = Object.keys(data).some(k => META_STRIPPED_PII_AND_TRANSPORT_KEYS.has(k));
+  if (!hasStrippedKey) {
+    return { cleanData: data, eventId };
+  }
+  const cleanData: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (!META_STRIPPED_PII_AND_TRANSPORT_KEYS.has(k) && v !== undefined && v !== "") {
+      cleanData[k] = v;
+    }
+  }
+  return { cleanData, eventId };
+}
+
 export function trackPixelEvent(name: PixelEvent, data: Record<string, unknown> = {}) {
   if (typeof window === "undefined") return;
   const config = getPixelConfig(); initializePixels(); const win = window as TrackingWindow;
 
   const rawPhone = String(data.phone ?? data.phone_number ?? "");
+  const rawCustomer = String(data.customer ?? data.name ?? "");
+  const rawWilaya = typeof data.wilaya === "string" ? data.wilaya : undefined;
+  const rawCommune = typeof data.commune === "string" ? data.commune : undefined;
+
   if (rawPhone) {
-    identifyTikTokUser(rawPhone, String(data.customer ?? data.name ?? ""));
+    identifyTikTokUser(rawPhone, rawCustomer);
+  }
+  if (rawPhone || rawCustomer) {
+    identifyMetaUser({
+      phone: rawPhone,
+      customer: rawCustomer,
+      wilaya: rawWilaya,
+      commune: rawCommune,
+    });
   }
 
-  if (getFacebookPixelIds(config).length > 0) win.fbq?.("track", name, data);
+  if (getFacebookPixelIds(config).length > 0) {
+    const { cleanData, eventId } = prepareMetaTrackCall(data);
+    if (eventId) {
+      win.fbq?.("track", name, cleanData, { eventID: eventId });
+    } else {
+      win.fbq?.("track", name, cleanData);
+    }
+  }
   if (getTikTokPixelIds(config).length > 0 || config.tiktokCode) {
     const tiktokPayload = buildTikTokPayload(data);
     win.ttq?.track?.(name, tiktokPayload);

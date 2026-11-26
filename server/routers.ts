@@ -79,14 +79,17 @@ import {
   deleteStaffMember,
   findStaffMemberByCode,
   getNotificationPreferences,
+  getPublicPixelSecretsStatus,
   getServerPixelConfig,
   getStaffActivityLogs,
   getStaffMembers,
   savePushSubscriptionRecord,
   setNotificationPreferences,
   setServerPixelConfig,
+  setServerPixelSecrets,
   upsertStaffMember,
 } from "./persistentStore";
+import { sendMetaCapiPurchaseEvent } from "./metaCapi";
 import { triggerStoreSave } from "./checkout";
 import {
   generateLandingDraft,
@@ -553,6 +556,57 @@ export const appRouter = router({
         const updated = setServerPixelConfig(input);
         triggerStoreSave();
         return updated;
+      }),
+    getPixelSecretsStatus: ownerFinanceProcedure.query(async () => {
+      await ensureCheckoutStoreReady();
+      return getPublicPixelSecretsStatus();
+    }),
+    setPixelSecrets: ownerFinanceProcedure
+      .input(
+        z.object({
+          facebookDefaultCapiToken: z.string().trim().max(500).optional(),
+          clearDefaultCapiToken: z.boolean().optional(),
+          facebookCapiTokens: z.record(z.string().trim(), z.string().trim().max(500)).optional(),
+          facebookTestEventCode: z.string().trim().max(80).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await ensureCheckoutStoreReady();
+        const status = setServerPixelSecrets(input);
+        triggerStoreSave();
+        return status;
+      }),
+    testMetaCapi: ownerFinanceProcedure
+      .input(
+        z
+          .object({
+            testEventCode: z.string().trim().max(80).optional(),
+          })
+          .optional()
+      )
+      .mutation(async ({ ctx, input }) => {
+        await ensureCheckoutStoreReady();
+        const xff = ctx.req?.headers?.["x-forwarded-for"];
+        const ip =
+          (typeof xff === "string" ? xff.split(",")[0]?.trim() : undefined) ||
+          ctx.req?.ip ||
+          undefined;
+        const ua = typeof ctx.req?.headers?.["user-agent"] === "string" ? ctx.req.headers["user-agent"] : undefined;
+        return await sendMetaCapiPurchaseEvent({
+          orderNumber: `TEST-CAPI-${Date.now().toString().slice(-6)}`,
+          totalDzd: 2500,
+          productIds: ["p-012"],
+          numItems: 1,
+          phone: "0550123456",
+          customer: "Test Miss Sensuelle",
+          wilaya: "الجزائر",
+          commune: "حيدرة",
+          clientIp: ip,
+          userAgent: ua,
+          sourceUrl: "https://missensuelle.onrender.com/petit-meche",
+          eventName: "ViewContent",
+          testEventCode: input?.testEventCode,
+        });
       }),
     aiStatus: adminProcedure.query(() => getAiKeyStatus()),
     saveAiKey: adminProcedure

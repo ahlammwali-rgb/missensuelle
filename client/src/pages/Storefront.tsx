@@ -563,6 +563,7 @@ function ProductOrderFlow({ product, quantity = 1 }: { product: typeof products[
       value: finalTotal,
       currency: "DZD",
       order_id: serverOrderNumber,
+      event_id: `purchase_${serverOrderNumber}`,
       phone,
       customer,
     });
@@ -641,7 +642,15 @@ export function CheckoutPage({ cart, onClear }: { cart: CartLine[]; onClear: () 
       const existing = JSON.parse(localStorage.getItem("miss-sensuelle-orders") || "[]") as Order[];
       localStorage.setItem("miss-sensuelle-orders", JSON.stringify([savedOrder, ...existing]));
     } catch { /* La confirmation reste possible si le stockage du navigateur est indisponible. */ }
-    trackPixelEvent("Purchase", { content_ids: cart.map(line => line.id), value: total, currency: "DZD", order_id: id });
+    trackPixelEvent("Purchase", {
+      content_ids: cart.map(line => line.id),
+      value: total,
+      currency: "DZD",
+      order_id: id,
+      event_id: `purchase_${id}`,
+      phone,
+      customer,
+    });
     setOrderId(id); setSubmitted(true); onClear();
   };
   if (submitted) return <><StoreHeader cartCount={0} onOpenCart={() => {}} /><main className="success-page container"><div className="success-confetti">✦</div><span className="eyebrow">Commande bien reçue</span><h1>Merci, c'est<br /><em>dans la boîte.</em></h1><p>On va t'appeler très vite pour confirmer les détails de ta commande et organiser la livraison.</p><div className="order-ticket"><span>Ton numéro de commande</span><strong>{orderId}</strong><small>Pense à le garder précieusement</small></div><Link href="/catalogue" className="button button-dark">Continuer mes achats <ArrowRight size={16} /></Link></main><StoreFooter /></>;

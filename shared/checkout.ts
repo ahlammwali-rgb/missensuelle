@@ -7,6 +7,32 @@ export const checkoutItemSchema = z.object({
   size: z.string().trim().max(150).default(""),
 });
 
+export const checkoutTrackingSchema = z.object({
+  fbc: z.string().trim().max(255).optional().default(""),
+  fbp: z.string().trim().max(255).optional().default(""),
+  fbclid: z.string().trim().max(255).optional().default(""),
+  ttclid: z.string().trim().max(255).optional().default(""),
+  utmSource: z.string().trim().max(120).optional().default(""),
+  sourceUrl: z.string().trim().max(1000).optional().default(""),
+  eventId: z.string().trim().max(120).optional().default(""),
+}).optional();
+export type CheckoutTrackingInput = z.infer<typeof checkoutTrackingSchema>;
+
+export type OrderAttributionChannel = "facebook" | "tiktok" | "google" | "direct";
+
+export type OrderAttribution = {
+  channel: OrderAttributionChannel;
+  fbc?: string;
+  fbp?: string;
+  fbclid?: string;
+  ttclid?: string;
+  utmSource?: string;
+  eventId?: string;
+  capiSent?: boolean;
+  capiPixels?: number;
+  capiError?: string;
+};
+
 export const checkoutPayloadSchema = z.object({
   source: z.enum(["abaya", "coat", "product", "cart"]),
   customer: z.string().trim().max(160).default(""),
@@ -17,6 +43,7 @@ export const checkoutPayloadSchema = z.object({
   note: z.string().trim().max(1000).default(""),
   delivery: z.enum(["home", "office"]).default("home"),
   items: z.array(checkoutItemSchema).min(1).max(20),
+  tracking: checkoutTrackingSchema,
 });
 
 export const saveDraftSchema = z.object({
@@ -253,6 +280,7 @@ export type CheckoutOrder = {
   lastNrpAt?: string;
   historyCount?: number;
   history?: OrderHistoryEvent[];
+  attribution?: OrderAttribution;
 };
 export type AbandonedCheckout = {
   id: number; createdAt: string; updatedAt: string; customer: string; phone: string; product: string;

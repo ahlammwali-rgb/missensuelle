@@ -1332,7 +1332,7 @@ function AdminPageContent() {
     <Smartphone size={14} className="topbar-pill-icon" />
     <span className="neo-btn-label" style={{ fontWeight: 700 }}>App Mobile</span>
   </button>
-  <div className="gcome-notif-wrap"><button type="button" className={`icon-button gcome-notif-bell ${isNotifOpen ? "is-open" : ""}`} onClick={toggleNotifPanel} aria-expanded={isNotifOpen} aria-label="Notifications" title="Centre de notifications"><Bell size={19} />{notifUnreadCount > 0 && <span className="gcome-bell-badge">{notifUnreadCount > 99 ? "99+" : notifUnreadCount}</span>}</button></div><button type="button" className="admin-profile" onClick={() => setIsProfileModalOpen(true)} title="Voir mon profil, salaire & commissions" style={{ background: "transparent", border: 0, cursor: "pointer" }}><div className="admin-avatar small gcome-avatar-badge">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></button></div></header><div className="admin-content"><Suspense fallback={<section className="admin-data-state" role="status"><span className="eyebrow">Administration</span><h2>Chargement du module…</h2></section>}>{section === "finance" && isOwner ? <FinancePanel notify={notify} /> : section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} focusedOrderId={focusedOrderId} onClearFocusedOrder={() => setFocusedOrderId(null)} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} allOrders={serverOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onSetCarrier={handleSetCarrier} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} visitAnalytics={visitsQuery.data} visitAnalyticsLoading={visitsQuery.isLoading} visitAnalyticsFetching={visitsQuery.isFetching} onRefreshVisits={() => void visitsQuery.refetch()} stockPanel={<>{gcomeHeroBanner}<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} /></>} />}</Suspense></div></main><AdminNotificationCenter open={isNotifOpen} onClose={() => setIsNotifOpen(false)} items={notifItems} unreadCount={notifUnreadCount} isUnread={isNotifUnread} onMarkAsRead={markNotifRead} onMarkAllAsRead={markAllNotifsRead} onSelectNotification={item => handleNotificationDeepLink(item.orderId, item.targetSection)} /><GcomeBottomWaveBar /><nav className="admin-mobile-nav gcome-bottom-dock" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={18} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={18} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge gcome-red-badge">{transferredCount}</span>}</button><button type="button" className={section === "catalogue" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => { go("catalogue"); setIsMoreMenuOpen(false); }}><Package size={18} /><span>Produits</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={18} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><Menu size={18} /><span>Menu</span></button></nav>{isSearchOpen && (
+  <div className="gcome-notif-wrap"><button type="button" className={`icon-button gcome-notif-bell ${isNotifOpen ? "is-open" : ""}`} onClick={toggleNotifPanel} aria-expanded={isNotifOpen} aria-label="Notifications" title="Centre de notifications"><Bell size={19} />{notifUnreadCount > 0 && <span className="gcome-bell-badge">{notifUnreadCount > 99 ? "99+" : notifUnreadCount}</span>}</button></div><button type="button" className="admin-profile" onClick={() => setIsProfileModalOpen(true)} title="Voir mon profil, salaire & commissions" style={{ background: "transparent", border: 0, cursor: "pointer" }}><div className="admin-avatar small gcome-avatar-badge">{currentActorName.slice(0, 2).toUpperCase()}</div><ChevronDown size={16} /></button></div></header><div className="admin-content"><Suspense fallback={<section className="admin-data-state" role="status"><span className="eyebrow">Administration</span><h2>Chargement du module…</h2></section>}>{section === "finance" && isOwner ? <FinancePanel notify={notify} /> : section === "staff" ? <StaffPanel orders={serverOrders} notify={notify} onOpenOrderHistory={order => setHistoryOrderId(order.id)} onOpenOrderEdit={order => setSelected(order)} /> : section === "transferred" ? <TransferredOrdersPanel orders={serverOrders} notify={notify} onUpdateStatus={updateStatus} onRefreshOrders={() => void utils.admin.orders.invalidate()} focusedOrderId={focusedOrderId} onClearFocusedOrder={() => setFocusedOrderId(null)} /> : section === "returns" ? <ReturnsPanel orders={serverOrders} notify={notify} onRefreshOrders={() => void utils.admin.orders.invalidate()} /> : section === "catalogue" ? <CatalogPanel notify={notify} /> : section === "sheet" ? <GoogleSheetPanel notify={notify} onOrdersUpdated={() => void utils.admin.orders.invalidate()} /> : section === "ecom" ? <EcomDeliveryPanel orders={serverOrders} notify={notify} onShipped={() => void utils.admin.orders.invalidate()} /> : section === "settings" ? <TrackingSettings notify={notify} isOwner={isOwner} /> : section === "abandoned" ? <AbandonedOrders items={abandonedQuery.data ?? []} isLoading={abandonedQuery.isLoading} isError={Boolean(abandonedQuery.error)} onRetry={() => void abandonedQuery.refetch()} onConverted={() => void utils.admin.orders.invalidate()} /> : ordersQuery.isLoading ? <section className="admin-data-state" role="status"><span className="eyebrow">Données enregistrées</span><h2>Chargement des commandes…</h2><p>La vue admin attend la réponse sécurisée du serveur.</p></section> : ordersQuery.error ? <section className="admin-data-state admin-data-error" role="alert"><span className="eyebrow">Données indisponibles</span><h2>Les commandes n’ont pas pu être chargées.</h2><p>Une erreur serveur ou réseau est survenue. Les données ne sont pas remplacées par une liste vide.</p><button type="button" className="button button-gradient" onClick={() => void ordersQuery.refetch()}><RefreshCw size={16} /> Réessayer</button></section> : <AdminDashboard orders={periodOrders} allOrders={serverOrders} filtered={filtered} activeStatus={activeStatus} setActiveStatus={setActiveStatus} query={query} setQuery={setQuery} period={period} setPeriod={setPeriod} onSelect={order => setSelected(orderById.get(order.id) ?? null)} onCall={callCustomer} onCallOrder={handleCallOrder} onWhatsAppOrder={handleWhatsAppOrder} onOpenHistory={order => setHistoryOrderId(order.id)} onOpenPostponeModal={order => setPostponeOrderId(order.id)} onOpenCancelModal={order => setCancelOrderId(order.id)} onSetNrpLevel={(id, lvl) => updateStatusWithMeta(id, "ne_repond_pas", { nrpLevel: lvl })} onSetCarrier={handleSetCarrier} onExport={exportOrders} onCreateOrder={() => setIsCreatingOrder(true)} onUpdateStatus={updateStatus} visitAnalytics={visitsQuery.data} visitAnalyticsLoading={visitsQuery.isLoading} visitAnalyticsFetching={visitsQuery.isFetching} onRefreshVisits={() => void visitsQuery.refetch()} stockPanel={<>{gcomeHeroBanner}<StockPanel onManageCatalog={() => go("catalogue")} onOpenSheet={() => go("sheet")} /></>} />}</Suspense></div></main><AdminNotificationCenter open={isNotifOpen} onClose={() => setIsNotifOpen(false)} items={notifItems} unreadCount={notifUnreadCount} isUnread={isNotifUnread} onMarkAsRead={markNotifRead} onMarkAllAsRead={markAllNotifsRead} onSelectNotification={item => handleNotificationDeepLink(item.orderId, item.targetSection)} /><GcomeBottomWaveBar /><nav className="admin-mobile-nav gcome-bottom-dock" aria-label="Navigation admin mobile"><button type="button" className={section === "dashboard" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "dashboard" ? "page" : undefined} onClick={() => { go("dashboard"); setIsMoreMenuOpen(false); }}><LayoutDashboard size={18} /><span>Dashboard</span></button><button type="button" className={section === "transferred" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "transferred" ? "page" : undefined} onClick={() => { go("transferred"); setIsMoreMenuOpen(false); }}><Truck size={18} /><span>Transférées</span>{transferredCount > 0 && <span className="nav-count-badge gcome-red-badge">{transferredCount}</span>}</button><button type="button" className={section === "catalogue" && !isMoreMenuOpen ? "active" : ""} aria-current={section === "catalogue" ? "page" : undefined} onClick={() => { go("catalogue"); setIsMoreMenuOpen(false); }}><Package size={18} /><span>Produits</span></button><button type="button" className="btn-nav-search" onClick={() => { setIsSearchOpen(true); setIsMoreMenuOpen(false); }} aria-label="Recherche rapide de commande"><Search size={18} /><span>Recherche</span></button><button type="button" className={isMoreMenuOpen ? "active" : ""} onClick={() => setIsMoreMenuOpen(prev => !prev)} aria-label="Plus de menus"><Menu size={18} /><span>Menu</span></button></nav>{isSearchOpen && (
   <div className="admin-search-modal-overlay" onClick={() => setIsSearchOpen(false)}>
     <div className="admin-search-modal" onClick={e => e.stopPropagation()}>
       <div className="admin-search-modal-head">
@@ -3366,7 +3366,13 @@ function PixelIdListField({
   );
 }
 
-function TrackingSettings({ notify }: { notify: (message: string, type?: "normal" | "urgent" | "victory" | "order") => void }) {
+function TrackingSettings({
+  notify,
+  isOwner = true,
+}: {
+  notify: (message: string, type?: "normal" | "urgent" | "victory" | "order") => void;
+  isOwner?: boolean;
+}) {
   const utils = trpc.useUtils();
   const initialConfig = getPixelConfig();
   const [fbRows, setFbRows] = useState<string[]>(() => {
@@ -3378,10 +3384,61 @@ function TrackingSettings({ notify }: { notify: (message: string, type?: "normal
     return ids.length > 0 ? ids : [""];
   });
   const [tiktokCode, setTiktokCode] = useState<string>(() => initialConfig.tiktokCode || "");
+  const [capiDefaultInput, setCapiDefaultInput] = useState("");
+  const [capiPerPixelInputs, setCapiPerPixelInputs] = useState<Record<string, string>>({});
+  const [testEventCodeInput, setTestEventCodeInput] = useState("");
+  const [capiTestSummary, setCapiTestSummary] = useState<string>("");
 
   const pixelQuery = trpc.admin.getPixelConfig.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
+  });
+
+  const secretsQuery = trpc.admin.getPixelSecretsStatus.useQuery(undefined, {
+    enabled: isOwner,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  useEffect(() => {
+    if (secretsQuery.data && !testEventCodeInput && secretsQuery.data.testEventCode) {
+      setTestEventCodeInput(secretsQuery.data.testEventCode);
+    }
+  }, [secretsQuery.data]);
+
+  const saveSecretsMutation = trpc.admin.setPixelSecrets.useMutation({
+    onSuccess: () => {
+      setCapiDefaultInput("");
+      setCapiPerPixelInputs({});
+      void utils.admin.getPixelSecretsStatus.invalidate();
+      notify("✅ Tokens Conversions API (CAPI) enregistrés côté serveur !");
+    },
+    onError: error => {
+      notify(error instanceof Error ? error.message : "Impossible d'enregistrer les tokens CAPI", "urgent");
+    },
+  });
+
+  const testCapiMutation = trpc.admin.testMetaCapi.useMutation({
+    onSuccess: res => {
+      if (res.sentCount > 0) {
+        const msg = `✅ CAPI Serveur OK : ${res.sentCount} pixel(s) ont reçu l'événement Meta (${res.results.filter(r => r.ok).map(r => `${r.pixelId}: ${r.eventsReceived} reçu`).join(" · ")})`;
+        setCapiTestSummary(msg);
+        notify(msg, "victory");
+      } else if (res.skippedNoToken > 0 && res.attempted === 0) {
+        const msg = "⚠️ Aucun token Conversions API (CAPI) enregistré pour tes pixels Meta. Colle le token généré dans Events Manager ci-dessus.";
+        setCapiTestSummary(msg);
+        notify(msg, "urgent");
+      } else {
+        const firstErr = res.results.find(r => !r.ok)?.error || "Échec d'envoi Meta CAPI";
+        setCapiTestSummary(`❌ Erreur CAPI : ${firstErr}`);
+        notify(`Erreur CAPI : ${firstErr}`, "urgent");
+      }
+    },
+    onError: err => {
+      const msg = err instanceof Error ? err.message : "Impossible de tester Meta CAPI";
+      setCapiTestSummary(`❌ ${msg}`);
+      notify(msg, "urgent");
+    },
   });
 
   const syncFormFromConfig = (cfg: PixelConfig) => {
@@ -3469,6 +3526,85 @@ function TrackingSettings({ notify }: { notify: (message: string, type?: "normal
             inputMode="numeric"
           />
           <small>Saisis un ou plusieurs identifiants Dataset / Pixel Meta (ou colle plusieurs IDs séparés par virgule), puis clique sur « Enregistrer les pixels ».</small>
+          {isOwner && (
+            <div className="meta-capi-box">
+              <div className="meta-capi-head">
+                <strong>🛡️ Conversions API (CAPI Serveur — Anti-perte iPhone &amp; 4G)</strong>
+                <span className={`meta-capi-chip ${secretsQuery.data?.hasDefaultCapiToken || Object.keys(secretsQuery.data?.capiTokenPreviews || {}).length > 0 ? "is-ok" : ""}`}>
+                  {secretsQuery.data?.hasDefaultCapiToken
+                    ? `Token principal actif (${secretsQuery.data.defaultCapiTokenPreview})`
+                    : Object.keys(secretsQuery.data?.capiTokenPreviews || {}).length > 0
+                      ? `${Object.keys(secretsQuery.data?.capiTokenPreviews || {}).length} token(s) par pixel`
+                      : "Non configuré"}
+                </span>
+              </div>
+              <small>
+                Dans <b>Meta Events Manager → Paramètres → API Conversions → Générer un jeton d’accès</b>, colle le token ci-dessous pour envoyer 100 % des achats depuis ton serveur avec déduplication <code>event_id</code>.
+              </small>
+              <div className="meta-capi-fields">
+                <input
+                  type="password"
+                  value={capiDefaultInput}
+                  onChange={e => setCapiDefaultInput(e.target.value)}
+                  placeholder={
+                    secretsQuery.data?.hasDefaultCapiToken
+                      ? `Token CAPI principal (${secretsQuery.data.defaultCapiTokenPreview}) — laisser vide pour conserver`
+                      : "Token Conversions API principal (EAA...)"
+                  }
+                />
+                {normalizePixelIdList(fbRows).map(pid => (
+                  <input
+                    key={pid}
+                    type="password"
+                    value={capiPerPixelInputs[pid] || ""}
+                    onChange={e =>
+                      setCapiPerPixelInputs(prev => ({ ...prev, [pid]: e.target.value }))
+                    }
+                    placeholder={
+                      secretsQuery.data?.capiTokenPreviews?.[pid]
+                        ? `Token dédié pixel ${pid} (${secretsQuery.data.capiTokenPreviews[pid]})`
+                        : `Optionnel : token spécifique pour pixel ${pid}`
+                    }
+                  />
+                ))}
+                <div className="meta-capi-row">
+                  <input
+                    type="text"
+                    value={testEventCodeInput}
+                    onChange={e => setTestEventCodeInput(e.target.value)}
+                    placeholder="Optionnel : Code Test Events Manager (ex: TEST12345)"
+                  />
+                  <button
+                    type="button"
+                    className="button button-light"
+                    disabled={saveSecretsMutation.isPending}
+                    onClick={() =>
+                      saveSecretsMutation.mutate({
+                        facebookDefaultCapiToken: capiDefaultInput.trim() || undefined,
+                        facebookCapiTokens: Object.keys(capiPerPixelInputs).length > 0 ? capiPerPixelInputs : undefined,
+                        facebookTestEventCode: testEventCodeInput.trim(),
+                      })
+                    }
+                  >
+                    <Save size={14} /> Enregistrer CAPI
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-light"
+                    disabled={testCapiMutation.isPending}
+                    onClick={() =>
+                      testCapiMutation.mutate({
+                        testEventCode: testEventCodeInput.trim() || undefined,
+                      })
+                    }
+                  >
+                    <RefreshCw size={14} className={testCapiMutation.isPending ? "animate-spin" : ""} /> Tester CAPI Serveur
+                  </button>
+                </div>
+                {capiTestSummary && <p className="meta-capi-result">{capiTestSummary}</p>}
+              </div>
+            </div>
+          )}
         </div>
         <div className="tracking-card">
           <div className="tracking-card-head">

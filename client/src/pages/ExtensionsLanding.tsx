@@ -651,6 +651,7 @@ export default function ExtensionsLanding({
         num_items: billedQty,
         currency: "DZD",
         order_id: result.orderNumber,
+        event_id: `purchase_${result.orderNumber}`,
         phone: cleanPhone,
         customer: customer.trim(),
       });

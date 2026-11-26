@@ -35,6 +35,7 @@ import {
 import { getDb } from "./db";
 import { computeShippingFee } from "./ecomDelivery";
 import { importGoogleSheetToOrders, pushOrderToGoogleSheet } from "./googleSheet";
+import { resolveOrderAttribution, sendMetaCapiPurchaseEvent } from "./metaCapi";
 import { normalizeOrderLocation } from "../shared/shipping";
 import {
   appendStaffActivityLog,
@@ -1227,11 +1228,73 @@ function computeLineTotal(slugOrId: string, unitPrice: number, quantity: number)
   return unitPrice * quantity;
 }
 
-export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<SubmitOrderResult> {
+function extractClientIpFromReq(req: Request): string {
+  const xff = req.headers["x-forwarded-for"];
+  const raw = typeof xff === "string" ? xff.split(",")[0]?.trim() : Array.isArray(xff) ? xff[0]?.trim() : "";
+  return raw || req.ip || req.socket.remoteAddress || "";
+}
+
+function dispatchOrderMetaCapiPurchase(params: {
+  orderNumber: string;
+  totalDzd: number;
+  productIds: string[];
+  numItems: number;
+  phone: string;
+  customer: string;
+  wilaya: string;
+  commune: string;
+  attribution: ReturnType<typeof resolveOrderAttribution>;
+  sourceUrl?: string;
+  clientIp?: string;
+  userAgent?: string;
+  targetOrder?: CheckoutOrder;
+}) {
+  void sendMetaCapiPurchaseEvent({
+    orderNumber: params.orderNumber,
+    totalDzd: params.totalDzd,
+    productIds: params.productIds,
+    numItems: params.numItems,
+    phone: params.phone,
+    customer: params.customer,
+    wilaya: params.wilaya,
+    commune: params.commune,
+    attribution: params.attribution,
+    sourceUrl: params.sourceUrl,
+    clientIp: params.clientIp,
+    userAgent: params.userAgent,
+  })
+    .then(res => {
+      if (!params.targetOrder || res.attempted === 0) return;
+      const errMsg = res.results.find(r => !r.ok)?.error;
+      params.targetOrder.attribution = {
+        ...params.attribution,
+        capiSent: res.sentCount > 0,
+        capiPixels: res.sentCount,
+        ...(errMsg && res.sentCount === 0 ? { capiError: errMsg } : {}),
+      };
+      saveStore();
+    })
+    .catch(() => {
+      // Non-blocking telemetry
+    });
+}
+
+export type CheckoutRequestContext = {
+  clientIp?: string;
+  userAgent?: string;
+  referer?: string;
+};
+
+export async function submitCheckoutOrder(
+  input: SubmitOrderInput,
+  reqContext?: CheckoutRequestContext
+): Promise<SubmitOrderResult> {
   const parsed = submitOrderSchema.safeParse(input);
   if (!parsed.success) throw new CheckoutValidationError(validationMessage(parsed.error));
+  const rawTracking = parsed.data.payload.tracking;
   const payload = validateFullCheckoutPayload(parsed.data.payload);
   const hash = tokenHash(parsed.data.token);
+  const attribution = resolveOrderAttribution(rawTracking, reqContext?.referer);
   const db = await getDb();
   if (!db) {
     await loadStore();
@@ -1265,7 +1328,8 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
     const orderId = nextMemoryOrderId++;
     const now = new Date();
     const normLoc = normalizeOrderLocation(payload.wilaya, payload.commune, payload.address);
-    memoryOrders.unshift({
+    const totalQuantity = resolved.reduce((sum, { item }) => sum + item.quantity, 0);
+    const createdOrder: CheckoutOrder = {
       dbId: orderId,
       id: number,
       createdAt: now.toISOString(),
@@ -1273,7 +1337,7 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
       phone: payload.phone,
       productId: resolved[0]?.product.id ?? payload.items[0]?.productId ?? "p-007",
       product: resolved.map(({ item, product }) => `${product.name} × ${item.quantity}`).join(", "),
-      quantity: resolved.reduce((sum, { item }) => sum + item.quantity, 0),
+      quantity: totalQuantity,
       total,
       color: payload.items.map(item => item.color).filter(Boolean).join(", "),
       size: payload.items.map(item => item.size).filter(Boolean).join(", "),
@@ -1283,7 +1347,9 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
       address: normLoc.address,
       note: payload.note ?? "",
       status: "nouvelle",
-    });
+      attribution: { ...attribution, eventId: attribution.eventId || `purchase_${number}` },
+    };
+    memoryOrders.unshift(createdOrder);
     ordersNeedDedup = true;
     if (current) {
       current.state = "submitted";
@@ -1305,6 +1371,21 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
       });
     }
     saveStore();
+    dispatchOrderMetaCapiPurchase({
+      orderNumber: number,
+      totalDzd: total,
+      productIds: resolved.map(({ item }) => item.productId),
+      numItems: totalQuantity,
+      phone: payload.phone,
+      customer: payload.customer,
+      wilaya: normLoc.wilaya,
+      commune: normLoc.commune,
+      attribution: createdOrder.attribution!,
+      sourceUrl: rawTracking?.sourceUrl || reqContext?.referer,
+      clientIp: reqContext?.clientIp,
+      userAgent: reqContext?.userAgent,
+      targetOrder: createdOrder,
+    });
     if (getNotificationPreferences().notifyNewOrder) {
       void sendAdminPushNotification({
         title: "🛍️ Nouvelle Commande Reçue ! 💰",
@@ -1380,6 +1461,20 @@ export async function submitCheckoutOrder(input: SubmitOrderInput): Promise<Subm
         data: { url: `/admin?section=dashboard&orderId=${encodeURIComponent(number)}`, section: "dashboard", orderId: number, sound: "/sounds/shopify-chaching.mp3", type: "new_order" },
       });
     }
+    dispatchOrderMetaCapiPurchase({
+      orderNumber: number,
+      totalDzd: total,
+      productIds: resolved.map(({ item }) => item.productId),
+      numItems: resolved.reduce((sum, { item }) => sum + item.quantity, 0),
+      phone: payload.phone,
+      customer: payload.customer,
+      wilaya: payload.wilaya,
+      commune: payload.commune,
+      attribution: { ...attribution, eventId: attribution.eventId || `purchase_${number}` },
+      sourceUrl: rawTracking?.sourceUrl || reqContext?.referer,
+      clientIp: reqContext?.clientIp,
+      userAgent: reqContext?.userAgent,
+    });
     return { orderId, orderNumber: number, total, created: true };
   });
 }
@@ -1776,7 +1871,11 @@ export function registerCheckoutHttpRoutes(app: Express) {
   }));
   app.post("/api/checkout/order", route(req => {
     const parsed = submitOrderSchema.parse(req.body);
-    return submitCheckoutOrder(parsed);
+    return submitCheckoutOrder(parsed, {
+      clientIp: extractClientIpFromReq(req),
+      userAgent: typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : undefined,
+      referer: typeof req.headers.referer === "string" ? req.headers.referer : undefined,
+    });
   }));
   app.post("/api/checkout/discard", route(req => {
     const parsed = discardDraftSchema.parse(req.body);

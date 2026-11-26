@@ -476,6 +476,8 @@ export default function PerruqueLanding({
         value: grandTotal,
         currency: "DZD",
         order_id: orderNumber,
+        event_id: `purchase_${orderNumber}`,
+        phone: phone.trim(),
       });
 
       try {

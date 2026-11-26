@@ -409,6 +409,7 @@ export default function PetitMecheLanding({ product }: { product?: Product }) {
       value: finalTotal,
       currency: "DZD",
       order_id: result.orderNumber,
+      event_id: `purchase_${result.orderNumber}`,
       num_items: 1,
       phone: normalizedPhone,
       customer: trimmedName,

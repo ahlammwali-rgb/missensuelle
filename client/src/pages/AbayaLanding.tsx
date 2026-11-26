@@ -218,6 +218,7 @@ export default function AbayaLanding({ product, quantity = 1 }: { product: Produ
       value: result.total,
       currency: "DZD",
       order_id: result.orderNumber,
+      event_id: `purchase_${result.orderNumber}`,
       phone,
       customer,
     });

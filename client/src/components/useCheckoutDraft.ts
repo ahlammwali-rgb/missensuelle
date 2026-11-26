@@ -3,7 +3,7 @@ import type { CheckoutPayload, SaveDraftResult, SubmitOrderResult } from "@share
 import { discardCheckoutDraft, saveCheckoutDraft, submitCheckoutOrder } from "@/lib/checkout-api";
 import type { CheckoutDraftStatus } from "./CheckoutDraftNotice";
 
-type CheckoutField = keyof Omit<CheckoutPayload, "source" | "items">;
+type CheckoutField = keyof Omit<CheckoutPayload, "source" | "items" | "tracking">;
 type FieldAliases = Partial<Record<CheckoutField, string[]>>;
 
 type Options = {

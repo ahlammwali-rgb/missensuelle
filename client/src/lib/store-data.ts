@@ -1,3 +1,4 @@
+import type { OrderAttribution } from "@shared/checkout";
 import { coatImages } from "./coat-images";
 import { replaceAnnotatedAbayaPhotos } from "./abaya-gallery";
 
@@ -96,6 +97,7 @@ export type Order = {
   lastCalledBy?: string;
   historyCount?: number;
   history?: OrderHistoryEvent[];
+  attribution?: OrderAttribution;
 };
 
 export const heroImage = "/manus-storage/v-hero_de8d807e.jpg";

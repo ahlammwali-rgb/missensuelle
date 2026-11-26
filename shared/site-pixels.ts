@@ -6,6 +6,21 @@ export type PublicPixelConfig = {
   tiktokCode: string;
 };
 
+/** Stored strictly server-side; never exposed through `/api/tracking/bootstrap.js`. */
+export type PixelServerSecrets = {
+  facebookCapiTokens: Record<string, string>;
+  facebookDefaultCapiToken?: string;
+  facebookTestEventCode?: string;
+};
+
+export type PublicPixelSecretsStatus = {
+  hasDefaultCapiToken: boolean;
+  defaultCapiTokenPreview: string;
+  envDefaultConfigured: boolean;
+  capiTokenPreviews: Record<string, string>;
+  testEventCode: string;
+};
+
 /** Identifiants publics, et non jetons d'API ou secrets. */
 export const sitePixelConfig: PublicPixelConfig = {
   facebookPixelId: "916933364742371",
